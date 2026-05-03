@@ -2109,13 +2109,40 @@ function setEditorExportIntent(intent) { _editorExportIntent = intent; }
 // Routes a finished export blob to the right destination. Replaces the bare
 // downloadBlob call inside exportImage/exportVideo/exportVideoFast — keeps
 // those export functions single-purpose, with the destination decision here.
+//
+// Three destinations:
+//   - drive:        editorDriveExport (transient flag set by Drive button)
+//   - chosen folder: PREFS.defaultExportFolder (persisted Settings choice)
+//   - downloads:    classic <a download> (browser default)
 function deliverBlob(blob, filename, mimeOverride) {
   console.log('[deliverBlob]', { intent: _editorExportIntent, filename, blobSize: blob && blob.size, blobType: blob && blob.type });
   if (_editorExportIntent === 'drive') {
     _editorExportIntent = 'download'; // reset for next export
     const mime = mimeOverride || blob.type || 'application/octet-stream';
     editorDriveExport(blob, filename, mime);
-  } else {
+    return;
+  }
+  if (PREFS && PREFS.defaultExportFolder && window.__TAURI__ && window.__TAURI__.core) {
+    saveBlobToFolder(blob, filename, PREFS.defaultExportFolder);
+    return;
+  }
+  downloadBlob(blob, filename);
+}
+
+// Save an export blob to a user-chosen folder via Rust. Falls back to a
+// browser download if the Rust write fails (e.g. folder was deleted/moved).
+async function saveBlobToFolder(blob, filename, dir) {
+  try {
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    const finalPath = await window.__TAURI__.core.invoke('save_export_to_path', {
+      name: filename,
+      bytes: Array.from(buf),
+      dir,
+    });
+    showToast(`Saved to ${finalPath}`);
+  } catch (e) {
+    console.warn('[export] save to folder failed, falling back to download', e);
+    showToast('Folder save failed — using Downloads instead');
     downloadBlob(blob, filename);
   }
 }
@@ -5285,7 +5312,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.0.0';
+const APP_VERSION = '4.0.1';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -11521,6 +11548,7 @@ const PREFS = (() => {
     defaultMetaClean: false,
     defaultExportEngine: 'fast',
     defaultGpsCity: '',           // empty = no auto-set
+    defaultExportFolder: '',      // empty = browser default download (~/Downloads)
     autoCheckUpdates: true,
     showDebugLog: false,
   };
@@ -11614,6 +11642,16 @@ function ensureSettingsModal() {
               <option value="legacy">Legacy (MediaRecorder)</option>
             </select>
           </div>
+          <div class="settings-row" style="align-items:flex-start;">
+            <span style="display:flex;flex-direction:column;gap:3px;">
+              <span>Default save folder</span>
+              <span id="prefExportFolderPath" style="font-size:9px;color:var(--text-faint);font-family:'JetBrains Mono',monospace;word-break:break-all;">Browser default (Downloads)</span>
+            </span>
+            <span style="display:flex;gap:6px;flex-shrink:0;">
+              <button class="upd-action-btn" id="prefExportFolderPick">CHOOSE</button>
+              <button class="upd-action-btn" id="prefExportFolderClear">RESET</button>
+            </span>
+          </div>
         </div>
         <div class="settings-group">
           <div class="settings-label">METADATA</div>
@@ -11690,6 +11728,37 @@ function ensureSettingsModal() {
     }
   });
 
+  // Default export folder — pick a directory; deliverBlob routes there.
+  const refreshExportFolderLabel = () => {
+    const lbl = document.getElementById('prefExportFolderPath');
+    if (lbl) lbl.textContent = PREFS.defaultExportFolder || 'Browser default (Downloads)';
+  };
+  refreshExportFolderLabel();
+  document.getElementById('prefExportFolderPick').addEventListener('click', async () => {
+    if (!window.__TAURI__ || !window.__TAURI__.core) {
+      showToast('Folder picker only available in the desktop app.');
+      return;
+    }
+    try {
+      const path = await window.__TAURI__.core.invoke('pick_export_folder');
+      if (path) {
+        PREFS.defaultExportFolder = path;
+        savePrefs();
+        refreshExportFolderLabel();
+        showToast(`Exports will save to ${path}`);
+      }
+    } catch (e) {
+      console.warn('[prefs] pick folder failed', e);
+      showToast('Could not pick folder');
+    }
+  });
+  document.getElementById('prefExportFolderClear').addEventListener('click', () => {
+    PREFS.defaultExportFolder = '';
+    savePrefs();
+    refreshExportFolderLabel();
+    showToast('Exports will use the browser default folder');
+  });
+
   document.getElementById('prefOpenLog').addEventListener('click', () => {
     if (window.__TAURI__ && window.__TAURI__.core) {
       window.__TAURI__.core.invoke('open_url', { url: 'file:///tmp/snapcap-debug.log' }).catch(() => {});
@@ -11719,6 +11788,28 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.0.1',
+    date: '2026-05-03',
+    title: 'Filters, update flow, export folder',
+    sections: [
+      { h: 'New', items: [
+        'Default export folder — pick a location in Settings; exports go straight there instead of Downloads',
+        'Settings → Updates: inline check status (spinner → "✓ You are up to date" or "⚠ Update X.Y.Z is ready")',
+        'Auto-check now polls every 4 hours while the app is open + manual "Check for updates now" button',
+      ]},
+      { h: 'Fixed', items: [
+        'Noir filter no longer shows red — pipeline rewrite using Apple\'s CIPhotoEffect math',
+        'Filter overlays now cover the full image on Retina displays (was only the top-left quarter)',
+        'Filter look reset for every preset — iPhone presets via real LUTs, Instagram presets via CSSgram values',
+        'Random capture date defaults to today ± 8h instead of "anywhere in the last 7 days"',
+      ]},
+      { h: 'Under the hood', items: [
+        'Single-method-per-filter pipeline — no more triple-cooked CSS+LUT+tint stacking',
+        'Update event split: update-check-error vs update-error so install errors don\'t collide with check errors',
+      ]},
+    ]
+  },
   {
     version: '4.0.0',
     date: '2026-05-03',

@@ -29,6 +29,8 @@ fn main() {
             exiftool_run,
             check_updates_now,
             install_update,
+            pick_export_folder,
+            save_export_to_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -550,4 +552,77 @@ async fn install_update(handle: tauri::AppHandle) -> Result<(), String> {
 
     let _ = handle.emit("update-installed", serde_json::Value::Null);
     handle.restart();
+}
+
+// ---------- Export-to-folder commands ----------
+//
+// Lets the user pick a default export folder in Settings, then routes the
+// editor + carousel exports straight to that folder instead of triggering the
+// browser's standard download. Two commands:
+//   - pick_export_folder: opens a native folder picker and returns the path.
+//   - save_export_to_path: writes the export blob to <dir>/<name>, appending
+//     " (n)" before the extension on collision.
+
+#[tauri::command]
+async fn pick_export_folder(app: AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let mut tx_opt = Some(tx);
+    app.dialog().file().pick_folder(move |path| {
+        if let Some(tx) = tx_opt.take() {
+            let _ = tx.send(path);
+        }
+    });
+    let result = rx.await.map_err(|e| e.to_string())?;
+    Ok(result.map(|p| p.to_string()))
+}
+
+#[tauri::command]
+async fn save_export_to_path(
+    name: String,
+    bytes: Vec<u8>,
+    dir: String,
+) -> Result<String, String> {
+    let dir_path = std::path::PathBuf::from(&dir);
+    if !dir_path.is_dir() {
+        return Err(format!("not a directory: {}", dir));
+    }
+    // Sanitize only path-traversal characters; preserve original extension.
+    let safe_name: String = name
+        .chars()
+        .map(|c| if c == '/' || c == '\\' || c == '\0' { '_' } else { c })
+        .collect();
+    let mut target = dir_path.join(&safe_name);
+
+    if target.exists() {
+        let p = std::path::Path::new(&safe_name);
+        let stem = p
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| safe_name.clone());
+        let ext = p.extension().map(|e| e.to_string_lossy().to_string());
+        for n in 1..=999 {
+            let candidate = match &ext {
+                Some(e) => format!("{} ({}).{}", stem, n, e),
+                None => format!("{} ({})", stem, n),
+            };
+            target = dir_path.join(candidate);
+            if !target.exists() {
+                break;
+            }
+            if n == 999 {
+                return Err("too many filename collisions".to_string());
+            }
+        }
+    }
+
+    tokio::fs::write(&target, &bytes)
+        .await
+        .map_err(|e| e.to_string())?;
+    eprintln!(
+        "[export] wrote {} bytes to {}",
+        bytes.len(),
+        target.display()
+    );
+    Ok(target.to_string_lossy().to_string())
 }
