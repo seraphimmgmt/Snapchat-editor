@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TRENDING — QoL recommendations</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0c;--surface:#15151a;--surface-2:#1d1d24;--surface-3:#262630;
+  --border:#2a2a33;--border-strong:#3a3a48;
+  --text:#e8e8ec;--text-dim:#9c9ca8;--text-faint:#5e5e6c;
+  --accent:#d9c77a;--accent-hi:#e8d68a;
+  --red:#ef4444;--green:#5fd97e;--blue:#7fbbe3;--orange:#ffa257;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.5;padding:36px clamp(20px,3vw,50px);}
+h1{font-family:'Antonio',sans-serif;font-size:28px;letter-spacing:.18em;margin:0 0 6px;background:linear-gradient(90deg,#c0c0c0,#d9c77a 60%,#a99858);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.lede{color:var(--text-dim);font-size:13px;max-width:780px;margin-bottom:36px;}
+h2{font-family:'Antonio',sans-serif;font-size:16px;letter-spacing:.16em;color:var(--accent);margin:36px 0 18px;border-bottom:1px solid var(--border);padding-bottom:10px;}
+
+/* Recommendation card */
+.qol{display:grid;grid-template-columns:1fr minmax(280px, 360px);gap:28px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:22px;margin-bottom:18px;}
+@media(max-width:900px){.qol{grid-template-columns:1fr;}}
+.qol-body{display:flex;flex-direction:column;gap:8px;}
+.qol-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.qol-num{font-family:'Antonio',sans-serif;font-size:14px;letter-spacing:.1em;color:var(--text-faint);font-weight:700;}
+.qol-title{font-family:'Antonio',sans-serif;font-size:18px;letter-spacing:.06em;font-weight:700;}
+.qol-tags{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;}
+.qol-tag{font-size:9px;letter-spacing:.12em;padding:3px 8px;border-radius:10px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+.qol-tag.effort-s{background:rgba(95,217,126,.15);color:var(--green);border:1px solid rgba(95,217,126,.3);}
+.qol-tag.effort-m{background:rgba(255,162,87,.15);color:var(--orange);border:1px solid rgba(255,162,87,.3);}
+.qol-tag.effort-l{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);}
+.qol-tag.impact-h{background:var(--accent);color:var(--bg);}
+.qol-tag.impact-m{background:rgba(217,199,122,.2);color:var(--accent);border:1px solid rgba(217,199,122,.4);}
+.qol-desc{font-size:12px;color:var(--text-dim);line-height:1.6;}
+.qol-desc b{color:var(--text);}
+.qol-mockup{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:14px;display:flex;flex-direction:column;gap:8px;align-items:stretch;justify-content:center;min-height:180px;}
+
+/* Mini-mockup primitives */
+.m-row{display:flex;align-items:center;gap:8px;}
+.m-card{background:var(--surface-2);border:1px solid var(--border);border-radius:3px;padding:8px 10px;font-size:11px;}
+.m-card.accent{border-color:var(--accent);}
+.m-thumb{width:48px;height:48px;background:linear-gradient(135deg,#3a3a48,#1d1d24);border-radius:3px;flex-shrink:0;position:relative;}
+.m-thumb.checked::after{content:'✓';position:absolute;top:-4px;right:-4px;background:var(--accent);color:var(--bg);font-size:9px;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;}
+.m-btn{background:var(--accent);color:var(--bg);border:none;padding:6px 12px;font-family:'Antonio',sans-serif;font-size:10px;font-weight:700;letter-spacing:.12em;border-radius:2px;}
+.m-btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:5px 10px;font-family:'Antonio',sans-serif;font-size:9px;font-weight:700;letter-spacing:.12em;border-radius:2px;}
+.m-chip{font-size:9px;background:var(--surface-3);color:var(--text-dim);padding:3px 8px;border-radius:10px;letter-spacing:.06em;text-transform:uppercase;}
+.m-pill{font-size:9px;background:var(--accent);color:var(--bg);padding:3px 8px;border-radius:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;}
+.m-label{font-size:9px;color:var(--text-faint);letter-spacing:.12em;}
+.m-bar{height:6px;background:var(--surface-3);border-radius:3px;overflow:hidden;}
+.m-bar > div{height:100%;background:var(--accent);}
+.m-toast{background:var(--surface-3);border-left:3px solid var(--accent);padding:10px 12px;font-size:11px;border-radius:2px;display:flex;align-items:center;gap:8px;}
+.m-toast .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px rgba(95,217,126,.6);}
+.m-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.m-stat-mini{background:var(--surface-2);padding:6px 8px;border-radius:2px;}
+.m-stat-mini .v{font-family:'Antonio',sans-serif;font-size:13px;font-weight:700;}
+.m-stat-mini .l{font-size:8px;color:var(--text-faint);letter-spacing:.12em;}
+
+.summary{background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:24px;margin-top:36px;}
+.summary h2{margin-top:0;border-bottom:none;padding-bottom:0;}
+.summary p{font-size:12px;color:var(--text);line-height:1.7;margin:0 0 8px;}
+.summary table{width:100%;border-collapse:collapse;margin-top:14px;font-size:11px;}
+.summary table th,.summary table td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);}
+.summary table th{font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.14em;color:var(--text-faint);font-weight:700;}
+.summary table td:first-child{font-weight:600;}
+
+/* Mockup banner */
+.banner{position:fixed;top:0;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--bg);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;padding:4px 14px;border-radius:0 0 4px 4px;z-index:100;}
+</style>
+</head>
+<body>
+<div class="banner">RECOMMENDATIONS — TRENDING TAB</div>
+
+<h1>TRENDING — QoL ROADMAP</h1>
+<p class="lede">Things I'd add to make Trending feel like a tool you reach for daily, not a dashboard you check once a week. Tagged by effort and impact so you can pick what to build first.</p>
+
+<!-- ============================== -->
+<h2>HIGHEST IMPACT FIRST</h2>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">01</span>
+      <span class="qol-title">Bulk select + download</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-h">IMPACT HIGH</span></span>
+    </div>
+    <p class="qol-desc">Hold Cmd/Shift to multi-select reels in the grid, then a floating action bar offers <b>Download all selected</b>, <b>Add to collection</b>, or <b>Export stats CSV</b>. Most-asked feature in similar tools — once you start tracking, you want to grab a batch at once, not one at a time.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-label">SELECTION ACTIVE — 3 OF 12</div>
+    <div class="m-row">
+      <div class="m-thumb checked"></div>
+      <div class="m-thumb checked"></div>
+      <div class="m-thumb"></div>
+      <div class="m-thumb checked"></div>
+      <div class="m-thumb"></div>
+    </div>
+    <div class="m-toast" style="background:var(--surface-2);border-left-color:var(--accent);margin-top:6px;">
+      <span style="flex:1;">3 selected · 1.4 GB total</span>
+      <span class="m-btn">DOWNLOAD ALL</span>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">02</span>
+      <span class="qol-title">New-post desktop notifications</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-h">IMPACT HIGH</span></span>
+    </div>
+    <p class="qol-desc">When a tracked creator posts — especially a <b>trial reel</b>, since those decay fast — pop a desktop notification. Click takes you straight to the post in the viewer. Per-creator + per-event-type toggles in settings (e.g. notify only for trial reels, not regular posts).</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-toast">
+      <span class="dot"></span>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:12px;">⚡ TRIAL REEL · @aurora.fields</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:2px;">"this trial reel popped harder than my last 3 posts combined"</div>
+      </div>
+      <span class="m-btn-ghost">VIEW</span>
+    </div>
+    <div class="m-card" style="font-size:10px;color:var(--text-dim);">
+      Notify on: <span class="m-pill" style="background:var(--accent);">TRIAL REELS</span> <span class="m-chip">REGULAR POSTS</span> <span class="m-chip">STORIES</span>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">03</span>
+      <span class="qol-title">Hook & caption library</span>
+      <span class="qol-tags"><span class="qol-tag effort-m">EFFORT M</span><span class="qol-tag impact-h">IMPACT HIGH</span></span>
+    </div>
+    <p class="qol-desc">Auto-extract the <b>first 5 words</b> ("the hook") of every post your tracked creators publish, ranked by view performance. Filter by creator or tag. Click any hook to see the full caption + post. <b>Use this hook in editor</b> button paths back into the editor with the text pre-filled. Turns competitor research into reusable templates.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-label">TOP HOOKS · LAST 30 DAYS</div>
+    <div class="m-card">
+      <div style="font-size:11px;font-weight:600;">"POV: you just got off..."</div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);margin-top:3px;">@aurora · 1.2M views<span style="color:var(--green);">↑ 2.6× avg</span></div>
+    </div>
+    <div class="m-card">
+      <div style="font-size:11px;font-weight:600;">"this trial reel popped..."</div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);margin-top:3px;">@aurora · 980K views<span style="color:var(--green);">↑ 2.0× avg</span></div>
+    </div>
+    <div class="m-row" style="margin-top:6px;justify-content:flex-end;">
+      <span class="m-btn-ghost">USE IN EDITOR →</span>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">04</span>
+      <span class="qol-title">Audio trends across creators</span>
+      <span class="qol-tags"><span class="qol-tag effort-m">EFFORT M</span><span class="qol-tag impact-h">IMPACT HIGH</span></span>
+    </div>
+    <p class="qol-desc">Aggregate the audio tracks your creators are using. Shows trend ("used by 4 of your tracked creators this week, up 24% globally"). Click an audio → see <b>every</b> tracked post using that audio, side-by-side. Catches sounds before they fully blow up.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-label">TRENDING AUDIO · YOUR TRACKED CREATORS</div>
+    <div class="m-card accent">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:600;font-size:11px;">♫ "Original — sleepyboi"</span>
+        <span class="m-pill">+24%</span>
+      </div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Used by 4 creators · 8 posts</div>
+    </div>
+    <div class="m-card">
+      <div style="font-weight:600;font-size:11px;">♫ "Slow Down — Selena"</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Used by 2 creators · 3 posts</div>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">05</span>
+      <span class="qol-title">Best-time-to-post heatmap per creator</span>
+      <span class="qol-tags"><span class="qol-tag effort-m">EFFORT M</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">A 7×24 grid (days × hours) on each creator detail page showing avg view performance by post time. Helps identify when each creator's audience is most active — useful if you're posting in a similar niche.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-label">@AURORA.FIELDS · POSTING HEATMAP</div>
+    <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:2px;font-size:8px;color:var(--text-faint);">
+      <span></span><span style="text-align:center;">M</span><span style="text-align:center;">T</span><span style="text-align:center;">W</span><span style="text-align:center;">T</span><span style="text-align:center;">F</span><span style="text-align:center;">S</span><span style="text-align:center;">S</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:2px;">
+      <span style="font-size:8px;color:var(--text-faint);">9a</span>
+      <div style="background:rgba(217,199,122,.2);height:14px;border-radius:1px;"></div>
+      <div style="background:rgba(217,199,122,.5);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.3);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.4);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.2);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.1);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.1);height:14px;"></div>
+      <span style="font-size:8px;color:var(--text-faint);">6p</span>
+      <div style="background:rgba(217,199,122,.5);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.7);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.6);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.9);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.8);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.4);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.3);height:14px;"></div>
+      <span style="font-size:8px;color:var(--text-faint);">9p</span>
+      <div style="background:rgba(217,199,122,.4);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.6);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.5);height:14px;"></div>
+      <div style="background:rgba(217,199,122,1);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.7);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.5);height:14px;"></div>
+      <div style="background:rgba(217,199,122,.4);height:14px;"></div>
+    </div>
+    <div class="m-label" style="margin-top:8px;color:var(--accent);">PEAK · THU 9PM EST</div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<h2>SMART AUTOMATION</h2>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">06</span>
+      <span class="qol-title">Auto-download on post</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Per-creator toggle: when this creator posts, auto-download the new post into a creator-named folder. Catches transient stuff like Stories before they expire. Combine with notifications above for a "set and forget" research workflow.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card">
+      <div class="m-row">
+        <div class="m-thumb"></div>
+        <div style="flex:1;">
+          <div style="font-weight:600;">@aurora.fields</div>
+          <div style="font-size:10px;color:var(--text-dim);">Auto-download new posts</div>
+        </div>
+        <span class="m-pill" style="background:var(--accent);">ON</span>
+      </div>
+    </div>
+    <div class="m-card" style="font-size:10px;color:var(--text-dim);">
+      → Saves to <span style="color:var(--accent);">~/Desktop/IG/aurora.fields/</span>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">07</span>
+      <span class="qol-title">Refresh schedule + manual sync</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Settings: how often the webview checks for new posts (every 1h / 6h / 12h / daily). Plus a <b>Sync now</b> button on each creator's page for ad-hoc refresh. Show timestamp of last sync per creator.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card">
+      <div class="m-row" style="justify-content:space-between;">
+        <span style="font-size:11px;">Refresh interval</span>
+        <select style="background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:3px 8px;font-size:10px;font-family:inherit;border-radius:2px;">
+          <option>Every 6h</option>
+        </select>
+      </div>
+    </div>
+    <div class="m-card" style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:10px;color:var(--text-dim);">Last sync · 2h ago</span>
+      <span class="m-btn-ghost">↻ SYNC NOW</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<h2>RESEARCH WORKFLOW</h2>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">08</span>
+      <span class="qol-title">Caption / hashtag search across all tracked posts</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Search bar at the top of Trending — query like <code>"linen"</code> or <code>#cairo</code> and see every matching post across all creators. Indexed locally from the data we already store.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card" style="display:flex;align-items:center;gap:6px;background:var(--surface-3);">
+      <span style="color:var(--text-faint);">🔍</span>
+      <span style="font-size:11px;color:var(--text);flex:1;">"linen"</span>
+      <span class="m-chip">12 RESULTS</span>
+    </div>
+    <div class="m-card"><div style="font-size:10px;color:var(--text-dim);">@aurora · "how I fold a button-up so it never wrinkles…"</div></div>
+    <div class="m-card"><div style="font-size:10px;color:var(--text-dim);">@zaynkdrip · "linen co-ord rotation for september"</div></div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">09</span>
+      <span class="qol-title">Side-by-side creator compare</span>
+      <span class="qol-tags"><span class="qol-tag effort-m">EFFORT M</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Pick 2-3 creators → comparison view shows their stats next to each other: follower growth lines on one chart, post cadence, avg engagement, top hashtags overlap. Useful for benchmarking.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-grid-2">
+      <div class="m-stat-mini"><div class="l">@AURORA · GROWTH</div><div class="v" style="color:var(--green);">+12.4K</div></div>
+      <div class="m-stat-mini"><div class="l">@LINA · GROWTH</div><div class="v" style="color:var(--green);">+18.7K</div></div>
+      <div class="m-stat-mini"><div class="l">AURORA · AVG VIEWS</div><div class="v">482K</div></div>
+      <div class="m-stat-mini"><div class="l">LINA · AVG VIEWS</div><div class="v">168K</div></div>
+    </div>
+    <div class="m-card" style="font-size:10px;color:var(--text-dim);text-align:center;">SHARED HASHTAGS · #lifestyle #cairo #fall</div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">10</span>
+      <span class="qol-title">Collections (mood boards)</span>
+      <span class="qol-tags"><span class="qol-tag effort-m">EFFORT M</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Save downloaded posts into named collections — "Fall fits", "Hooks I love", "Audio test pool". Drag-drop reorganize. Doubles as a curated reference library inside the app, separate from raw downloads.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card" style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:600;font-size:11px;">📁 Fall fits</span>
+      <span class="m-chip">14 ITEMS</span>
+    </div>
+    <div class="m-card" style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:600;font-size:11px;">📁 Hooks I love</span>
+      <span class="m-chip">8 ITEMS</span>
+    </div>
+    <div class="m-card" style="display:flex;justify-content:space-between;align-items:center;border-style:dashed;border-color:var(--border-strong);">
+      <span style="color:var(--text-faint);font-size:11px;">+ New collection</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<h2>SMALL WINS</h2>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">11</span>
+      <span class="qol-title">"Use this in editor" deep link</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Button on any tracked post: opens the editor with the image loaded as background and the caption pre-filled. Lets you riff on a competitor's post in 1 click instead of manual download → drag → retype.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card">
+      <div style="font-size:10px;color:var(--text-dim);">Caption preview:</div>
+      <div style="font-size:11px;margin-top:4px;">"POV: you just got off the plane and your hotel is across the canal"</div>
+    </div>
+    <div class="m-row" style="justify-content:flex-end;">
+      <span class="m-btn">→ OPEN IN EDITOR</span>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">12</span>
+      <span class="qol-title">Webview connection status indicator</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Small status dot in the Trending header — green = IG session is alive, yellow = stale (refresh in &lt;1h), red = expired (click to re-login via webview). No more silent failures because cookies expired.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-row" style="justify-content:space-between;">
+      <span style="font-family:'Antonio',sans-serif;font-size:14px;letter-spacing:.16em;">TRENDING</span>
+      <span class="m-row" style="gap:6px;">
+        <span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px rgba(95,217,126,.6);"></span>
+        <span style="font-size:10px;color:var(--text-dim);">IG · CONNECTED</span>
+      </span>
+    </div>
+    <div class="m-card" style="display:flex;align-items:center;gap:8px;">
+      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);"></span>
+      <span style="font-size:11px;color:var(--text);">Session expired —</span>
+      <span class="m-btn">RE-LOGIN</span>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">13</span>
+      <span class="qol-title">Caption + hashtag clipboard buttons</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Tiny copy buttons in the post viewer for the full caption AND just the hashtags. One-tap to your clipboard. Common need; saves the manual select-all dance.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card">
+      <div style="font-size:10px;color:var(--text-dim);">"how I fold a button-up so it never wrinkles in a carry-on #linen #travel #cairo #ootd"</div>
+      <div class="m-row" style="margin-top:8px;justify-content:flex-end;gap:5px;">
+        <span class="m-btn-ghost">⧉ FULL CAPTION</span>
+        <span class="m-btn-ghost">⧉ HASHTAGS</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">14</span>
+      <span class="qol-title">Export creator stats to CSV</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT LOW</span></span>
+    </div>
+    <p class="qol-desc">Per-creator CSV export with all tracked posts: date, type, views, likes, comments, shares, caption, hashtags, audio. For people who want to do their own analysis in Excel/Sheets.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);line-height:1.7;">
+      date,type,views,likes,...<br>
+      2026-05-01,reel,1240000,184000<br>
+      2026-04-29,carousel,820000,127000<br>
+      2026-04-27,reel,623000,98000
+    </div>
+    <div class="m-row" style="justify-content:flex-end;"><span class="m-btn">↓ EXPORT CSV</span></div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<div class="summary">
+  <h2>SUGGESTED ROADMAP</h2>
+  <p>If you ship Trending in stages instead of one big drop:</p>
+  <table>
+    <tr><th>Phase</th><th>Items</th><th>Why this order</th></tr>
+    <tr><td>v0 — MVP</td><td>Add creator + creator detail + reel viewer + download (single + carousel)</td><td>Get the core loop working end-to-end before any QoL</td></tr>
+    <tr><td>v1 — Daily-driver</td><td>01 Bulk select · 02 Notifications · 12 Connection status · 13 Clipboard buttons</td><td>Things you'd notice missing on day 2 of using it</td></tr>
+    <tr><td>v2 — Research depth</td><td>03 Hook library · 04 Audio trends · 08 Search · 14 CSV export</td><td>Where it transitions from "viewer" to "intel tool"</td></tr>
+    <tr><td>v3 — Power features</td><td>05 Posting heatmap · 06 Auto-download · 07 Refresh schedule · 09 Compare · 10 Collections</td><td>Heavier lifts that require more polish</td></tr>
+    <tr><td>v4 — Cross-tab</td><td>11 "Use in editor" — connects Trending tab back to the existing editor flow</td><td>Best when both surfaces are stable</td></tr>
+  </table>
+</div>
+
+</body>
+</html>

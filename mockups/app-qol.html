@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Snap Caption Studio — App-wide QoL</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0c;--surface:#15151a;--surface-2:#1d1d24;--surface-3:#262630;
+  --border:#2a2a33;--border-strong:#3a3a48;
+  --text:#e8e8ec;--text-dim:#9c9ca8;--text-faint:#5e5e6c;
+  --accent:#d9c77a;--accent-hi:#e8d68a;
+  --red:#ef4444;--green:#5fd97e;--blue:#7fbbe3;--orange:#ffa257;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.5;padding:36px clamp(20px,3vw,50px);}
+h1{font-family:'Antonio',sans-serif;font-size:28px;letter-spacing:.18em;margin:0 0 6px;background:linear-gradient(90deg,#c0c0c0,#d9c77a 60%,#a99858);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.lede{color:var(--text-dim);font-size:13px;max-width:780px;margin-bottom:36px;}
+h2{font-family:'Antonio',sans-serif;font-size:16px;letter-spacing:.16em;color:var(--accent);margin:36px 0 18px;border-bottom:1px solid var(--border);padding-bottom:10px;}
+
+.qol{display:grid;grid-template-columns:1fr minmax(280px, 360px);gap:28px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:22px;margin-bottom:18px;}
+@media(max-width:900px){.qol{grid-template-columns:1fr;}}
+.qol-body{display:flex;flex-direction:column;gap:8px;}
+.qol-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.qol-num{font-family:'Antonio',sans-serif;font-size:14px;letter-spacing:.1em;color:var(--text-faint);font-weight:700;}
+.qol-title{font-family:'Antonio',sans-serif;font-size:18px;letter-spacing:.06em;font-weight:700;}
+.qol-tags{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;}
+.qol-tag{font-size:9px;letter-spacing:.12em;padding:3px 8px;border-radius:10px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+.qol-tag.effort-s{background:rgba(95,217,126,.15);color:var(--green);border:1px solid rgba(95,217,126,.3);}
+.qol-tag.effort-m{background:rgba(255,162,87,.15);color:var(--orange);border:1px solid rgba(255,162,87,.3);}
+.qol-tag.effort-l{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);}
+.qol-tag.impact-h{background:var(--accent);color:var(--bg);}
+.qol-tag.impact-m{background:rgba(217,199,122,.2);color:var(--accent);border:1px solid rgba(217,199,122,.4);}
+.qol-desc{font-size:12px;color:var(--text-dim);line-height:1.6;}
+.qol-desc b{color:var(--text);}
+.qol-desc code{background:var(--surface-3);padding:1px 6px;border-radius:2px;color:var(--accent);font-size:11px;}
+.qol-mockup{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:14px;display:flex;flex-direction:column;gap:8px;align-items:stretch;justify-content:center;min-height:180px;}
+
+.m-row{display:flex;align-items:center;gap:8px;}
+.m-card{background:var(--surface-2);border:1px solid var(--border);border-radius:3px;padding:8px 10px;font-size:11px;}
+.m-card.accent{border-color:var(--accent);}
+.m-thumb{width:48px;height:48px;background:linear-gradient(135deg,#3a3a48,#1d1d24);border-radius:3px;flex-shrink:0;position:relative;}
+.m-btn{background:var(--accent);color:var(--bg);border:none;padding:6px 12px;font-family:'Antonio',sans-serif;font-size:10px;font-weight:700;letter-spacing:.12em;border-radius:2px;}
+.m-btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:5px 10px;font-family:'Antonio',sans-serif;font-size:9px;font-weight:700;letter-spacing:.12em;border-radius:2px;}
+.m-chip{font-size:9px;background:var(--surface-3);color:var(--text-dim);padding:3px 8px;border-radius:10px;letter-spacing:.06em;text-transform:uppercase;}
+.m-pill{font-size:9px;background:var(--accent);color:var(--bg);padding:3px 8px;border-radius:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;}
+.m-label{font-size:9px;color:var(--text-faint);letter-spacing:.12em;}
+.m-toast{background:var(--surface-3);border-left:3px solid var(--accent);padding:10px 12px;font-size:11px;border-radius:2px;display:flex;align-items:center;gap:8px;}
+.m-key{display:inline-block;background:var(--surface-3);border:1px solid var(--border-strong);border-radius:3px;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text);min-width:18px;text-align:center;}
+
+.summary{background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:24px;margin-top:36px;}
+.summary h2{margin-top:0;border-bottom:none;padding-bottom:0;}
+.summary p{font-size:12px;color:var(--text);line-height:1.7;margin:0 0 8px;}
+.summary table{width:100%;border-collapse:collapse;margin-top:14px;font-size:11px;}
+.summary table th,.summary table td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top;}
+.summary table th{font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.14em;color:var(--text-faint);font-weight:700;}
+.summary table td:first-child{font-weight:600;white-space:nowrap;}
+
+.banner{position:fixed;top:0;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--bg);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;padding:4px 14px;border-radius:0 0 4px 4px;z-index:100;}
+</style>
+</head>
+<body>
+<div class="banner">RECOMMENDATIONS — APP-WIDE QoL</div>
+
+<h1>SNAP CAPTION STUDIO — QoL ROADMAP</h1>
+<p class="lede">Things that don't add new tabs but make the existing app feel like a daily tool. Sorted by area, tagged by effort and impact. Pick the ones that resonate.</p>
+
+<!-- ============================== -->
+<h2>WORKFLOW & SHORTCUTS</h2>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">01</span>
+      <span class="qol-title">Keyboard shortcuts everywhere</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-h">IMPACT HIGH</span></span>
+    </div>
+    <p class="qol-desc">Bind common actions: <b>Cmd+E</b> export, <b>Cmd+,</b> settings, <b>Cmd+T</b> caption template menu, <b>Cmd+Shift+R</b> trial reel randomizer, <b>Cmd+1/2/3/4</b> switch tabs, <b>Esc</b> close any modal, <b>?</b> show all shortcuts. Adds a small <b>?</b> in the header that pops a cheat sheet.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-label">PRESS <span class="m-key">?</span> ANYWHERE</div>
+    <div class="m-card">
+      <div class="m-row" style="justify-content:space-between;font-size:11px;">
+        <span>Export</span><span><span class="m-key">⌘</span> <span class="m-key">E</span></span>
+      </div>
+      <div class="m-row" style="justify-content:space-between;font-size:11px;margin-top:5px;">
+        <span>Settings</span><span><span class="m-key">⌘</span> <span class="m-key">,</span></span>
+      </div>
+      <div class="m-row" style="justify-content:space-between;font-size:11px;margin-top:5px;">
+        <span>Switch tab</span><span><span class="m-key">⌘</span> <span class="m-key">1-4</span></span>
+      </div>
+      <div class="m-row" style="justify-content:space-between;font-size:11px;margin-top:5px;">
+        <span>Trial reel</span><span><span class="m-key">⌘</span> <span class="m-key">⇧</span> <span class="m-key">R</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">02</span>
+      <span class="qol-title">Undo / Redo across edits</span>
+      <span class="qol-tags"><span class="qol-tag effort-m">EFFORT M</span><span class="qol-tag impact-h">IMPACT HIGH</span></span>
+    </div>
+    <p class="qol-desc">Cmd+Z to undo the last 50 actions: text edit, slider change, filter apply, font swap. The single most-asked feature for any creative tool — currently you have to reset entire sections.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-toast">
+      <span style="font-size:14px;">↶</span>
+      <span style="flex:1;">Undid: applied "Vivid" filter</span>
+      <span style="color:var(--text-faint);font-size:10px;">42 / 50 in history</span>
+    </div>
+    <div class="m-row" style="justify-content:center;gap:6px;">
+      <span class="m-key">⌘</span><span class="m-key">Z</span>
+      <span style="color:var(--text-faint);">·</span>
+      <span class="m-key">⌘</span><span class="m-key">⇧</span><span class="m-key">Z</span>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">03</span>
+      <span class="qol-title">Auto-save drafts (and recovery)</span>
+      <span class="qol-tags"><span class="qol-tag effort-m">EFFORT M</span><span class="qol-tag impact-h">IMPACT HIGH</span></span>
+    </div>
+    <p class="qol-desc">Snapshot the editor + carousel state to disk every 30s. On launch: <b>"Recover unsaved session?"</b> if the app was killed mid-edit. Removes the panic when the app crashes mid-export or you close the wrong window.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-toast">
+      <span class="m-pill">RECOVER</span>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:11px;">Unsaved session from 18 min ago</div>
+        <div style="font-size:10px;color:var(--text-dim);">5 carousel images · "Vivid" filter applied</div>
+      </div>
+    </div>
+    <div class="m-row" style="justify-content:flex-end;gap:6px;">
+      <span class="m-btn-ghost">DISCARD</span>
+      <span class="m-btn">RESTORE</span>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">04</span>
+      <span class="qol-title">Recent files / Recent exports menu</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">A <b>Recents</b> dropdown next to upload. Last 10 sources you opened + last 10 things you exported. Reopen with one click — no more "where did I save that".</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-label">RECENT</div>
+    <div class="m-card"><div style="font-size:11px;">📷 IMG_4823.HEIC <span style="color:var(--text-faint);font-size:9px;margin-left:6px;">2h ago</span></div></div>
+    <div class="m-card"><div style="font-size:11px;">🎬 reel_draft.mp4 <span style="color:var(--text-faint);font-size:9px;margin-left:6px;">yesterday</span></div></div>
+    <div class="m-card"><div style="font-size:11px;">▦ carousel_5img.zip <span style="color:var(--text-faint);font-size:9px;margin-left:6px;">3 days</span></div></div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<h2>EDITOR</h2>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">05</span>
+      <span class="qol-title">Caption character counter w/ platform limits</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Tiny counter under the caption input: <code>132 / 2200 chars</code> for IG, <code>132 / 280</code> for X, etc. Switch via a small platform dropdown. Goes red when over.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card">
+      <div style="font-size:11px;color:var(--text-dim);">"POV: you just got off the plane and your hotel..."</div>
+    </div>
+    <div class="m-row" style="justify-content:space-between;align-items:center;">
+      <span class="m-chip">IG (2200)</span>
+      <span style="font-size:10px;color:var(--text-faint);font-family:'JetBrains Mono',monospace;">132 <span style="color:var(--text);">/</span> 2200</span>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">06</span>
+      <span class="qol-title">Color picker history</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Last 8 colors used appear as swatches under the color picker. Cuts the constant re-picking when you have a brand palette you reuse.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-label">RECENT COLORS</div>
+    <div class="m-row" style="gap:5px;">
+      <div style="width:24px;height:24px;background:#d9c77a;border-radius:3px;"></div>
+      <div style="width:24px;height:24px;background:#ef4444;border-radius:3px;"></div>
+      <div style="width:24px;height:24px;background:#7fbbe3;border-radius:3px;"></div>
+      <div style="width:24px;height:24px;background:#5fd97e;border-radius:3px;"></div>
+      <div style="width:24px;height:24px;background:#fff;border-radius:3px;"></div>
+      <div style="width:24px;height:24px;background:#ffa257;border-radius:3px;"></div>
+      <div style="width:24px;height:24px;background:#000;border-radius:3px;border:1px solid var(--border-strong);"></div>
+      <div style="width:24px;height:24px;background:#9c9ca8;border-radius:3px;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">07</span>
+      <span class="qol-title">Tooltips on every icon button</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Every icon-only button gets a hover label after ~600ms. Removes the "what does this button do?" tax for new users + power users who haven't memorized everything.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-row" style="justify-content:center;align-items:flex-end;gap:14px;height:80px;">
+      <div style="width:32px;height:32px;background:var(--surface-2);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-dim);">⊞</div>
+      <div style="position:relative;">
+        <div style="width:32px;height:32px;background:var(--surface-2);border:1px solid var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--accent);">⚄</div>
+        <div style="position:absolute;top:-26px;left:50%;transform:translateX(-50%);background:var(--surface-3);border:1px solid var(--border);border-radius:3px;padding:3px 8px;font-size:10px;white-space:nowrap;">Trial Reel · ⌘⇧R</div>
+      </div>
+      <div style="width:32px;height:32px;background:var(--surface-2);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-dim);">⚙</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<h2>EXPORT</h2>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">08</span>
+      <span class="qol-title">Batch export to multiple ratios</span>
+      <span class="qol-tags"><span class="qol-tag m">EFFORT M</span><span class="qol-tag impact-h">IMPACT HIGH</span></span>
+    </div>
+    <p class="qol-desc">Checkbox row in the export dialog: <b>4:5 (IG feed)</b>, <b>9:16 (story/reel)</b>, <b>1:1 (carousel)</b>, <b>1.91:1 (link card)</b>. Tick the ones you want, get all of them in one export pass. Creator workflow saver.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-label">EXPORT FORMATS</div>
+    <div class="m-card" style="display:flex;align-items:center;gap:8px;">
+      <span style="color:var(--accent);">☑</span> <span style="font-size:11px;flex:1;">4:5 · IG feed</span> <span class="m-chip">1080×1350</span>
+    </div>
+    <div class="m-card" style="display:flex;align-items:center;gap:8px;">
+      <span style="color:var(--accent);">☑</span> <span style="font-size:11px;flex:1;">9:16 · story/reel</span> <span class="m-chip">1080×1920</span>
+    </div>
+    <div class="m-card" style="display:flex;align-items:center;gap:8px;">
+      <span style="color:var(--text-faint);">☐</span> <span style="font-size:11px;flex:1;color:var(--text-dim);">1:1 · carousel</span>
+    </div>
+    <div class="m-row" style="justify-content:flex-end;"><span class="m-btn">EXPORT 2 FILES</span></div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">09</span>
+      <span class="qol-title">Export-complete notification + reveal/open buttons</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Desktop notification when a long export finishes (videos can take a minute+). The toast offers <b>SHOW IN FOLDER</b> + <b>OPEN</b>. Means you can alt-tab to reply to a message and not miss when it's done.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-toast">
+      <span style="font-size:16px;">✓</span>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:11px;">Export complete · 24s</div>
+        <div style="font-size:10px;color:var(--text-dim);">snap-2026-05-04-0001.mp4 (38 MB)</div>
+      </div>
+    </div>
+    <div class="m-row" style="justify-content:flex-end;gap:5px;">
+      <span class="m-btn-ghost">SHOW IN FOLDER</span>
+      <span class="m-btn">OPEN</span>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">10</span>
+      <span class="qol-title">Export presets — 1-tap quality profiles</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Three buttons above the resolution selector: <b>Social</b> (1080p, h264, q92), <b>Print</b> (4K, lossless), <b>Web</b> (2K, h265, q85). Sets all the underlying knobs at once instead of you remembering which CRF + format combo you wanted.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-row" style="gap:5px;">
+      <span class="m-pill" style="font-size:10px;padding:5px 10px;">SOCIAL</span>
+      <span class="m-chip" style="font-size:10px;padding:5px 10px;">PRINT</span>
+      <span class="m-chip" style="font-size:10px;padding:5px 10px;">WEB</span>
+      <span class="m-chip" style="font-size:10px;padding:5px 10px;">CUSTOM</span>
+    </div>
+    <div class="m-card" style="font-size:10px;color:var(--text-dim);">→ 1080p · h264 · CRF 18 · medium preset · faststart</div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<h2>STATE & CRASH SAFETY</h2>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">11</span>
+      <span class="qol-title">Window state remembered</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">App opens at the same window size and position as last time. Currently it always opens at default (1400×900). Annoying on multi-monitor setups.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);line-height:1.7;">
+      window.x = 1240<br>
+      window.y = 180<br>
+      window.width = 1840<br>
+      window.height = 1080<br>
+      window.maximized = false
+    </div>
+    <div class="m-label">SAVED ON QUIT · RESTORED ON LAUNCH</div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">12</span>
+      <span class="qol-title">"Reveal in folder" everywhere</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Right-click any source image in the editor / carousel → <b>Reveal in Finder/Explorer</b>. Same backend as the saved-export modal already uses (the <code>reveal_in_folder</code> Rust command). Two-line addition.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card" style="background:var(--surface-3);">
+      <div style="font-size:11px;padding:3px 0;">📷 Open</div>
+      <div style="font-size:11px;padding:3px 0;color:var(--accent);">📂 Reveal in Finder</div>
+      <div style="font-size:11px;padding:3px 0;">⧉ Copy path</div>
+      <div style="font-size:11px;padding:3px 0;">↻ Reload</div>
+      <div style="border-top:1px solid var(--border);margin:3px 0;"></div>
+      <div style="font-size:11px;padding:3px 0;color:var(--red);">✕ Remove</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<h2>POLISH</h2>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">13</span>
+      <span class="qol-title">Better empty states</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Each empty zone (carousel before any images, inspector before any file, trending before any creators) gets a guided empty state: icon + <b>what this is</b> + 1-2 sample actions. New users + returning-after-a-week users get oriented faster.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card" style="text-align:center;padding:20px;">
+      <div style="font-size:32px;color:var(--text-faint);margin-bottom:8px;">▦</div>
+      <div style="font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.14em;font-weight:700;">CAROUSEL EDIT</div>
+      <div style="font-size:10px;color:var(--text-dim);margin:6px 0 12px;">Drop 2-10 images to build a multi-slide post.</div>
+      <div class="m-row" style="justify-content:center;gap:5px;">
+        <span class="m-btn">+ ADD IMAGES</span>
+        <span class="m-btn-ghost">FROM DRIVE</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">14</span>
+      <span class="qol-title">First-launch onboarding tour</span>
+      <span class="qol-tags"><span class="qol-tag effort-m">EFFORT M</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">5-step popover tour the first time the app opens: drag a file, set caption, apply filter, hit export, here's the cogwheel. Skippable + dismissible permanently. Most apps that don't have one are leaving 30%+ of new users stuck on screen 1.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card" style="border-color:var(--accent);position:relative;">
+      <div style="font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.14em;font-weight:700;color:var(--accent);">STEP 2 OF 5</div>
+      <div style="font-size:11px;margin-top:6px;line-height:1.5;">Type your caption here. The text live-renders on the preview as you type — drag it on the canvas to reposition.</div>
+      <div class="m-row" style="margin-top:10px;justify-content:space-between;">
+        <span style="font-size:9px;color:var(--text-faint);">SKIP TOUR</span>
+        <span class="m-btn">NEXT →</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">15</span>
+      <span class="qol-title">Better error messages (not stack traces)</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">Audit every error path: replace tech-y messages like <code>"FFMPEG ENCODE FAILED: Conversion failed"</code> with what happened + what to do. <code>"Couldn't encode the video — your source file may be corrupted. Try opening it in QuickTime to verify."</code></p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card" style="border-color:var(--red);background:rgba(239,68,68,.05);">
+      <div style="font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.14em;color:var(--red);font-weight:700;">EXPORT FAILED</div>
+      <div style="font-size:11px;margin:6px 0;line-height:1.5;">The video encoder couldn't read frame 142 — usually means the source file is partially corrupted.</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:10px;">Try: Open the source in QuickTime to verify it plays end-to-end.</div>
+      <div class="m-row" style="justify-content:flex-end;gap:5px;">
+        <span class="m-btn-ghost">SHOW LOG</span>
+        <span class="m-btn">RETRY</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">16</span>
+      <span class="qol-title">Search inside Settings</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT LOW</span></span>
+    </div>
+    <p class="qol-desc">Tiny search bar at the top of the Settings modal — fuzzy filter sections + rows by keyword. Settings will keep growing; this future-proofs it.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card" style="background:var(--surface-3);">
+      <span style="color:var(--text-faint);">🔍</span>
+      <span style="font-size:11px;color:var(--text);margin-left:6px;">"export"</span>
+    </div>
+    <div class="m-card" style="font-size:10px;color:var(--text-dim);">3 matches: Default resolution · Default FPS · Default save folder</div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">17</span>
+      <span class="qol-title">In-app changelog button</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT LOW</span></span>
+    </div>
+    <p class="qol-desc">Already partly there (the patch notes button). After auto-updates, a tiny gold dot on the patch notes icon until clicked — nudges users to see what's new without a popup.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-row" style="justify-content:center;gap:14px;">
+      <div style="position:relative;width:34px;height:34px;background:var(--surface-2);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-dim);">📋
+        <span style="position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px rgba(217,199,122,.6);"></span>
+      </div>
+      <div style="width:34px;height:34px;background:var(--surface-2);border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-dim);">⚙</div>
+    </div>
+    <div class="m-label" style="text-align:center;">DOT FADES AFTER OPENING NOTES</div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<h2>UNDER THE HOOD</h2>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">18</span>
+      <span class="qol-title">Apple Developer signing + notarization</span>
+      <span class="qol-tags"><span class="qol-tag effort-m">EFFORT M</span><span class="qol-tag impact-h">IMPACT HIGH</span></span>
+    </div>
+    <p class="qol-desc">Already on the todo list — pulling forward. Eliminates the <code>xattr -cr</code> dance for every fresh download. $99/yr Apple Developer account, certs in GitHub secrets, ~6 lines added to the workflow. Tauri-action handles the rest. Whoever installs your app shouldn't need to touch Terminal.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card" style="font-size:11px;color:var(--text-dim);">
+      Currently:
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--bg);padding:6px 8px;border-radius:2px;margin-top:5px;color:var(--accent);">$ xattr -cr "/Applications/Snap Caption Studio.app"</div>
+    </div>
+    <div class="m-card" style="font-size:11px;color:var(--text);background:var(--surface-3);border-color:var(--accent);">
+      After signing:
+      <div style="font-size:11px;margin-top:5px;color:var(--green);">✓ Double-click → app opens. Done.</div>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">19</span>
+      <span class="qol-title">Crash report buffer</span>
+      <span class="qol-tags"><span class="qol-tag effort-m">EFFORT M</span><span class="qol-tag impact-m">IMPACT MED</span></span>
+    </div>
+    <p class="qol-desc">If the app crashes, write a small report file with last 200 log lines + system info. Next launch: <b>"App crashed last session — view report?"</b> Lets you debug remote bug reports without asking users to find log files manually.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-toast" style="border-left-color:var(--orange);">
+      <span style="color:var(--orange);font-size:16px;">⚠</span>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:11px;">App didn't shut down cleanly last time</div>
+        <div style="font-size:10px;color:var(--text-dim);">crash-2026-05-03-2218.log saved · 12 KB</div>
+      </div>
+      <span class="m-btn-ghost">VIEW</span>
+    </div>
+  </div>
+</div>
+
+<div class="qol">
+  <div class="qol-body">
+    <div class="qol-head">
+      <span class="qol-num">20</span>
+      <span class="qol-title">Tauri 2.x → latest Tauri keep-up</span>
+      <span class="qol-tags"><span class="qol-tag effort-s">EFFORT S</span><span class="qol-tag impact-m">IMPACT LOW</span></span>
+    </div>
+    <p class="qol-desc">Quarterly bump of Tauri + plugins to current minor versions. Picks up perf + security patches and keeps the toolchain compatible with new macOS / Windows releases. Dependabot or a manual check.</p>
+  </div>
+  <div class="qol-mockup">
+    <div class="m-card" style="font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.7;color:var(--text-dim);">
+      tauri = "2.11.0" → <span style="color:var(--accent);">"2.13.2"</span><br>
+      tauri-plugin-updater = "2" <span style="color:var(--green);">✓</span><br>
+      tauri-plugin-dialog = "2" <span style="color:var(--green);">✓</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== -->
+<div class="summary">
+  <h2>SUGGESTED ROADMAP</h2>
+  <p>If you batch these into focused releases instead of mixing with feature work:</p>
+  <table>
+    <tr><th>Release</th><th>Theme</th><th>Items</th></tr>
+    <tr><td>v4.1</td><td>Foundation</td><td>02 Undo/Redo · 03 Auto-save + recovery · 11 Window state · 18 Apple signing</td></tr>
+    <tr><td>v4.2</td><td>Speed</td><td>01 Keyboard shortcuts · 04 Recents · 09 Export-complete notif · 10 Export presets · 12 Reveal-in-folder everywhere</td></tr>
+    <tr><td>v4.3</td><td>Polish</td><td>05 Caption counter · 06 Color history · 07 Tooltips · 13 Empty states · 15 Better errors · 17 Patch notes dot</td></tr>
+    <tr><td>v4.4</td><td>Pro features</td><td>08 Batch multi-ratio export · 14 Onboarding · 16 Settings search</td></tr>
+    <tr><td>v4.5</td><td>Reliability</td><td>19 Crash reports · 20 Dep updates</td></tr>
+    <tr><td>v5.0</td><td>Big move</td><td>The Trending tab itself (separate roadmap doc)</td></tr>
+  </table>
+  <p style="margin-top:14px;font-size:11px;color:var(--text-dim);">All 20 fit in roughly 4-6 weeks of focused work. None require new infra — only #18 has an external dep ($99/yr Apple cert).</p>
+</div>
+
+</body>
+</html>

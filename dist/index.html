@@ -5391,7 +5391,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.0.7';
+const APP_VERSION = '4.0.8';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -9843,8 +9843,35 @@ function bindCarouselEvents() {
     sizeSlider.addEventListener('input', () => applySize(sizeSlider.value, true));
     if (sizeFitBtn) {
       sizeFitBtn.addEventListener('click', () => {
-        // "Fit" — reset to 100% (max viewport-aware size)
-        applySize(100, true);
+        // Smart fit — compute the cardSize % that lets cards sit cleanly
+        // without colliding, instead of just snapping to 100% (which
+        // overlapped peeking neighbours in carousel view on wider monitors).
+        // Carousel: 3 cards visible (active + two peeks) with gaps between.
+        // Grid: lets the auto-fill CSS do its work but eases off when the
+        // user only has a couple of images so they don't blow up huge.
+        const stage = document.querySelector('.carousel-stage');
+        const stageW = stage ? stage.getBoundingClientRect().width : window.innerWidth * 0.6;
+        const n = carouselState.images.length || 1;
+        let pct = 100;
+        if (carouselState.viewMode === 'carousel') {
+          // computeCardDisplaySize: maxW = min(stageW * 0.45, 640) * cardSize
+          // For 3 visible cards + 2 gaps to fit:
+          //   3 * cardW + 2 * gap <= stageW
+          //   cardW <= (stageW - 2*gap) / 3
+          // Solve for cardSize: cardSize = (stageW - 2*gap) / (3 * baseW)
+          const gap = 32;
+          const baseW = Math.min(stageW * 0.45, 640);
+          const fitSize = (stageW - 2 * gap) / (3 * baseW);
+          pct = Math.max(40, Math.min(100, Math.floor(fitSize * 100)));
+        } else {
+          // Grid view — auto-fill handles columns; just tone down for very
+          // small grids so 1-3 images don't expand to fill the whole row.
+          if (n <= 2) pct = 70;
+          else if (n <= 4) pct = 80;
+          else if (n <= 8) pct = 90;
+          else pct = 100;
+        }
+        applySize(pct, true);
       });
     }
   }
@@ -11694,7 +11721,7 @@ function ensureSettingsModal() {
   overlay.id = 'settingsOverlay';
   overlay.className = 'picker-overlay hidden';
   overlay.innerHTML = `
-    <div class="picker-modal" style="max-width:min(560px,calc(100vw - 32px));width:min(560px,calc(100vw - 32px));">
+    <div class="picker-modal" style="max-width:min(560px,calc(100vw - 32px));width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);">
       <div class="picker-head">
         <span class="ttl">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--accent);"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -11702,7 +11729,7 @@ function ensureSettingsModal() {
         </span>
         <button class="x" id="settingsCloseBtn" aria-label="Close">×</button>
       </div>
-      <div style="padding:18px 22px 22px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);">
+      <div style="padding:18px 22px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);overflow-y:auto;flex:1;min-height:0;">
         <div class="settings-group">
           <div class="settings-label">EXPORT DEFAULTS</div>
           <div class="settings-row">
@@ -11777,8 +11804,10 @@ function ensureSettingsModal() {
             <button class="none-toggle danger" id="prefReset">RESET</button>
           </div>
         </div>
-        <p class="settings-note">Most settings save instantly. Hit <b>Save &amp; Apply</b> to reload the app and apply default-state changes (iPhone meta, resolution, etc).</p>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+      </div>
+      <div style="padding:14px 22px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;">
+        <p class="settings-note" style="margin:0 0 10px;">Most settings save instantly. Hit <b>Save &amp; Apply</b> to reload the app and apply default-state changes (iPhone meta, resolution, etc).</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
           <button id="prefCancelBtn" style="background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:8px 16px;font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.14em;text-transform:uppercase;border-radius:2px;cursor:pointer;">CLOSE</button>
           <button id="prefApplyBtn" style="background:var(--accent);border:none;color:var(--bg);padding:8px 18px;font-family:'Antonio',sans-serif;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;border-radius:2px;cursor:pointer;">SAVE &amp; APPLY</button>
         </div>
@@ -11880,6 +11909,17 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.0.8',
+    date: '2026-05-04',
+    title: 'Settings modal scroll + smart FIT',
+    sections: [
+      { h: 'Fixed', items: [
+        'Settings modal got cut off at the bottom on shorter viewports — Save & Apply / Close buttons could be off-screen with no way to scroll. Body now scrolls internally; the action buttons sit in a sticky footer that\'s always visible.',
+        'Carousel FIT button used to just snap to 100% which caused cards to mesh together on wider screens (3 cards × 0.45 stage each = overflow). Now computes the actual cardSize % needed for 3 cards + 2 gaps to sit cleanly within the stage width. Grid mode also eases off when you only have 1-4 images so they don\'t balloon to fill the row.',
+      ]},
+    ]
+  },
   {
     version: '4.0.7',
     date: '2026-05-03',

@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TRENDING tab — mockup</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0c;--surface:#15151a;--surface-2:#1d1d24;--surface-3:#262630;
+  --border:#2a2a33;--border-strong:#3a3a48;
+  --text:#e8e8ec;--text-dim:#9c9ca8;--text-faint:#5e5e6c;
+  --accent:#d9c77a;--accent-hi:#e8d68a;--accent-dim:#a99858;
+  --red:#ef4444;--green:#5fd97e;--blue:#7fbbe3;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.5;min-height:100vh;display:flex;flex-direction:column;}
+button{font-family:inherit;}
+img{display:block;max-width:100%;}
+
+/* App chrome */
+header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:14px 24px;border-bottom:1px solid var(--border);gap:16px;flex-shrink:0;}
+.logo{display:flex;align-items:center;gap:12px;justify-self:start;}
+.logo-mark{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#d9c77a,#a99858);box-shadow:0 0 18px rgba(217,199,122,.35);}
+.logo h1{font-family:'Antonio',sans-serif;font-weight:700;font-size:20px;letter-spacing:.1em;margin:0;}
+.header-meta{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-faint);letter-spacing:.08em;text-align:center;}
+.header-cog{width:34px;height:34px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);justify-self:end;display:flex;align-items:center;justify-content:center;}
+
+.view-tabs{display:flex;background:var(--bg);border-bottom:1px solid var(--border);padding:0 16px;flex-shrink:0;}
+.view-tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-dim);padding:11px 18px;cursor:pointer;font-family:'Antonio',sans-serif;font-size:12px;font-weight:700;letter-spacing:.16em;display:flex;align-items:center;gap:8px;transition:all .15s;}
+.view-tab:hover{color:var(--text);}
+.view-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+.view-tab .tab-icon{font-size:13px;opacity:.7;}
+.view-tab.active .tab-icon{opacity:1;}
+.view-tab .new-badge{font-size:8px;background:var(--accent);color:var(--bg);padding:2px 5px;border-radius:6px;letter-spacing:.1em;font-family:'JetBrains Mono',monospace;}
+
+main{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+
+/* ============================================================ */
+/* TRENDING — main view (creator grid)                          */
+/* ============================================================ */
+.trending-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px clamp(20px,3vw,40px) 12px;flex-wrap:wrap;}
+.trending-toolbar h2{font-family:'Antonio',sans-serif;font-size:24px;letter-spacing:.18em;margin:0;background:linear-gradient(90deg,#c0c0c0,#d9c77a 60%,#a99858);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.trending-toolbar .toolbar-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.search-box{background:var(--surface-2);border:1px solid var(--border);border-radius:2px;padding:7px 12px;font-family:inherit;font-size:12px;color:var(--text);width:240px;outline:none;}
+.search-box:focus{border-color:var(--accent);}
+.sort-select{background:var(--surface-2);border:1px solid var(--border);border-radius:2px;padding:7px 12px;font-family:inherit;font-size:12px;color:var(--text);outline:none;cursor:pointer;}
+
+/* Tag filter row */
+.tag-filter-row{display:flex;align-items:center;gap:8px;padding:0 clamp(20px,3vw,40px) 14px;flex-wrap:wrap;border-bottom:1px solid var(--border);}
+.tag-filter-row .label{font-size:9px;color:var(--text-faint);letter-spacing:.16em;margin-right:4px;}
+.tag-chip{background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:5px 12px;font-family:inherit;font-size:10px;letter-spacing:.08em;border-radius:14px;cursor:pointer;text-transform:uppercase;font-weight:500;transition:all .12s;}
+.tag-chip:hover{color:var(--text);border-color:var(--accent);}
+.tag-chip.active{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:700;}
+.tag-chip .count{margin-left:6px;opacity:.7;font-size:9px;}
+
+/* Creator grid */
+.creator-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;padding:18px clamp(20px,3vw,40px) 40px;overflow-y:auto;flex:1;align-content:start;}
+
+.creator-card{background:var(--surface);border:1px solid var(--border);border-radius:4px;cursor:pointer;transition:all .15s;overflow:hidden;display:flex;flex-direction:column;}
+.creator-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.4);}
+.creator-card-head{display:flex;align-items:center;gap:12px;padding:14px;}
+.creator-avatar{width:56px;height:56px;border-radius:50%;border:2px solid var(--accent);object-fit:cover;background:var(--surface-3);flex-shrink:0;}
+.creator-handle{font-family:'Antonio',sans-serif;font-size:15px;font-weight:700;letter-spacing:.04em;line-height:1.2;color:var(--text);}
+.creator-name{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.creator-card-stats{padding:0 14px 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.stat-block{background:var(--surface-2);border-radius:2px;padding:10px;}
+.stat-label{font-size:9px;color:var(--text-faint);letter-spacing:.12em;margin-bottom:4px;}
+.stat-value{font-family:'Antonio',sans-serif;font-size:18px;font-weight:700;color:var(--text);line-height:1;}
+.stat-delta{font-size:10px;margin-top:4px;font-weight:500;}
+.stat-delta.up{color:var(--green);}
+.stat-delta.down{color:var(--red);}
+.creator-card-tags{display:flex;flex-wrap:wrap;gap:4px;padding:0 14px 14px;}
+.creator-tag{font-size:9px;background:var(--surface-3);color:var(--text-dim);padding:3px 8px;border-radius:10px;letter-spacing:.06em;text-transform:uppercase;}
+
+/* Add creator card (always first) */
+.add-creator-card{background:transparent;border:2px dashed var(--border-strong);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-faint);cursor:pointer;min-height:240px;gap:10px;transition:all .15s;}
+.add-creator-card:hover{border-color:var(--accent);color:var(--accent);background:rgba(217,199,122,.04);}
+.add-creator-card .plus{font-size:32px;line-height:1;font-weight:300;}
+.add-creator-card .label{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.18em;}
+.add-creator-card .hint{font-size:10px;color:var(--text-faint);text-align:center;padding:0 14px;}
+
+/* ============================================================ */
+/* CREATOR DETAIL view                                          */
+/* ============================================================ */
+.creator-detail{display:flex;flex-direction:column;height:100%;overflow:hidden;}
+.creator-back{display:flex;align-items:center;gap:6px;background:transparent;border:none;color:var(--text-dim);padding:14px clamp(20px,3vw,40px) 8px;cursor:pointer;font-family:inherit;font-size:11px;letter-spacing:.08em;}
+.creator-back:hover{color:var(--accent);}
+
+.creator-detail-head{display:flex;align-items:center;gap:20px;padding:8px clamp(20px,3vw,40px) 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.creator-detail-avatar{width:96px;height:96px;border-radius:50%;border:3px solid var(--accent);}
+.creator-detail-info{flex:1;min-width:0;}
+.creator-detail-handle{font-family:'Antonio',sans-serif;font-size:24px;font-weight:700;letter-spacing:.04em;}
+.creator-detail-bio{font-size:11px;color:var(--text-dim);max-width:520px;margin-top:6px;line-height:1.5;}
+.creator-detail-tags{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;}
+.creator-detail-stats{display:flex;gap:12px;flex-wrap:wrap;}
+.detail-stat{background:var(--surface-2);border:1px solid var(--border);padding:10px 14px;border-radius:3px;min-width:120px;}
+
+/* Filter row */
+.filter-tabs{display:flex;gap:0;padding:0 clamp(20px,3vw,40px);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;}
+.filter-tab{background:transparent;border:none;padding:14px 18px;font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .12s;display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.filter-tab:hover{color:var(--text);}
+.filter-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+.filter-tab .icon{font-size:12px;opacity:.7;}
+.filter-tab .count{font-size:9px;background:var(--surface-3);color:var(--text-dim);padding:2px 6px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-weight:500;letter-spacing:.06em;}
+.filter-tab.trial-pill{position:relative;}
+.filter-tab.trial-pill::before{content:'';position:absolute;left:8px;top:50%;width:5px;height:5px;border-radius:50%;background:var(--accent);transform:translateY(-50%);box-shadow:0 0 6px rgba(217,199,122,.6);}
+.filter-tab.trial-pill{padding-left:18px;}
+
+/* Reel grid (Instagram-style) */
+.reel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px;padding:14px clamp(20px,3vw,40px) 40px;overflow-y:auto;flex:1;align-content:start;}
+.reel-card{position:relative;aspect-ratio:9/16;background:var(--surface);border-radius:2px;overflow:hidden;cursor:pointer;}
+.reel-card img{width:100%;height:100%;object-fit:cover;}
+.reel-card::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.7) 0%,rgba(0,0,0,0) 40%,rgba(0,0,0,0) 70%,rgba(0,0,0,.4) 100%);pointer-events:none;}
+.reel-stats{position:absolute;bottom:8px;left:8px;right:8px;display:flex;justify-content:space-between;color:#fff;font-size:11px;font-weight:600;z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.6);}
+.reel-stat{display:flex;align-items:center;gap:4px;}
+.reel-stat svg{width:13px;height:13px;}
+.reel-card .reel-meta-top{position:absolute;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;align-items:flex-start;z-index:1;}
+.reel-card .play-icon{width:16px;height:16px;color:#fff;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));}
+.reel-card .top-right-icon{display:flex;align-items:center;gap:4px;color:#fff;font-size:10px;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.7);}
+.reel-card .slide-count{font-family:'JetBrains Mono',monospace;letter-spacing:.05em;}
+.reel-card .trial-badge{background:var(--accent);color:var(--bg);font-size:8px;letter-spacing:.12em;padding:3px 6px;border-radius:2px;font-weight:700;text-shadow:none;font-family:'JetBrains Mono',monospace;}
+.reel-card.trial{outline:2px solid var(--accent);outline-offset:-2px;}
+
+/* ============================================================ */
+/* REEL VIEWER modal                                            */
+/* ============================================================ */
+.viewer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px;}
+.viewer-overlay.show{display:flex;}
+.viewer-shell{display:flex;gap:20px;max-height:calc(100vh - 40px);max-width:calc(100vw - 40px);}
+.viewer-video-frame{position:relative;background:#000;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;aspect-ratio:9/16;height:min(80vh,720px);}
+.viewer-video-frame img{height:100%;width:auto;object-fit:cover;}
+.viewer-actions{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:18px;padding:14px 6px;}
+.viewer-btn{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.viewer-btn:hover{background:rgba(255,255,255,.18);border-color:var(--accent);color:var(--accent);}
+.viewer-btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent);}
+.viewer-btn.primary:hover{background:var(--accent-hi);}
+.viewer-btn-label{color:#fff;font-size:10px;font-weight:600;text-align:center;margin-top:-12px;letter-spacing:.04em;}
+.viewer-meta{position:absolute;bottom:0;left:0;right:0;padding:14px 18px;background:linear-gradient(to top,rgba(0,0,0,.85),rgba(0,0,0,0));color:#fff;}
+.viewer-meta .handle{font-family:'Antonio',sans-serif;font-size:15px;font-weight:700;}
+.viewer-meta .caption{font-size:11px;line-height:1.5;color:#dcdce0;margin-top:4px;}
+.viewer-stats{position:absolute;top:14px;left:14px;display:flex;gap:14px;color:#fff;font-size:11px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.7);}
+.viewer-trial-flag{position:absolute;top:14px;right:14px;background:var(--accent);color:var(--bg);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;padding:5px 10px;border-radius:2px;font-weight:700;text-transform:uppercase;}
+.viewer-carousel-flag{position:absolute;top:14px;right:14px;background:rgba(0,0,0,.7);color:#fff;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.06em;padding:5px 10px;border-radius:14px;font-weight:600;}
+
+/* Carousel slide nav */
+.slide-arrow{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.55);border:none;color:#fff;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;transition:background .15s;}
+.slide-arrow:hover{background:rgba(0,0,0,.85);}
+.slide-prev{left:10px;}
+.slide-next{right:10px;}
+.slide-arrow:disabled{opacity:.25;cursor:default;}
+.slide-dots{position:absolute;bottom:84px;left:50%;transform:translateX(-50%);display:flex;gap:5px;}
+.slide-dots .dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.4);transition:all .15s;}
+.slide-dots .dot.active{background:#fff;width:18px;border-radius:3px;}
+.viewer-close{position:absolute;top:14px;right:14px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);width:34px;height:34px;border-radius:50%;color:#fff;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;}
+
+/* Stats panel — collapsible right rail in viewer */
+.viewer-stats-panel{width:340px;max-height:min(80vh,720px);background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow-y:auto;display:flex;flex-direction:column;color:var(--text);}
+.viewer-stats-panel.hidden{display:none;}
+.stats-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:3px;}
+.stats-head .ttl{font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.18em;font-weight:700;}
+.stats-head .ttl-meta{font-size:9px;color:var(--text-faint);letter-spacing:.08em;}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);}
+.stat-tile{background:var(--surface);padding:12px 14px;}
+.stat-tile.primary{background:var(--surface-2);grid-column:1/-1;}
+.stat-tile-label{font-size:9px;color:var(--text-faint);letter-spacing:.14em;}
+.stat-tile-value{font-family:'Antonio',sans-serif;font-size:22px;font-weight:700;margin-top:4px;line-height:1;}
+.stat-tile.primary .stat-tile-value{font-size:32px;}
+.stat-tile-delta{font-size:10px;color:var(--text-dim);margin-top:6px;}
+.stat-tile-delta.up{color:var(--green);}
+.stat-tile-delta.down{color:var(--red);}
+.stats-section{padding:14px 16px;border-top:1px solid var(--border);}
+.stats-section-h{font-size:9px;color:var(--text-faint);letter-spacing:.14em;margin-bottom:8px;display:block;}
+.stats-section-h-row{display:flex;justify-content:space-between;margin-bottom:8px;}
+.stats-section-h-meta{font-size:9px;color:var(--text-faint);letter-spacing:.08em;}
+.stats-row{display:flex;justify-content:space-between;font-size:11px;padding:5px 0;color:var(--text-dim);}
+.stats-row span:last-child{color:var(--text);text-align:right;}
+.stats-row span.up{color:var(--green);}
+.velocity-chart{display:flex;align-items:flex-end;gap:6px;height:80px;}
+.velocity-chart .bar{flex:1;background:linear-gradient(to top,rgba(217,199,122,.6),rgba(217,199,122,.2));border-top:2px solid var(--accent);position:relative;border-radius:1px;}
+.velocity-chart .bar span{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--text-faint);letter-spacing:.06em;}
+.velocity-chart{margin-bottom:18px;}
+
+/* ============================================================ */
+/* ADD CREATOR modal                                            */
+/* ============================================================ */
+.add-modal{background:var(--surface);border:1px solid var(--border-strong);border-radius:4px;width:min(480px,calc(100vw - 32px));max-height:calc(100vh - 48px);display:flex;flex-direction:column;}
+.add-modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.add-modal-head .ttl{font-family:'Antonio',sans-serif;font-size:14px;letter-spacing:.18em;}
+.add-modal-body{padding:20px;}
+.add-modal-body label{display:block;font-size:10px;color:var(--text-faint);letter-spacing:.14em;margin:14px 0 6px;text-transform:uppercase;}
+.add-modal-body label:first-child{margin-top:0;}
+.add-modal-body input,.add-modal-body textarea{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:2px;padding:9px 12px;font-family:inherit;font-size:12px;color:var(--text);outline:none;}
+.add-modal-body input:focus,.add-modal-body textarea:focus{border-color:var(--accent);}
+.add-modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+.btn{background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:8px 16px;font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;border-radius:2px;}
+.btn:hover{color:var(--text);border-color:var(--accent);}
+.btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:700;}
+.btn.primary:hover{background:var(--accent-hi);}
+
+/* Tag input chips */
+.tag-input-row{display:flex;flex-wrap:wrap;gap:5px;background:var(--surface-2);border:1px solid var(--border);border-radius:2px;padding:6px;}
+.tag-input-row input{background:transparent;border:none;flex:1;min-width:80px;padding:3px 6px;outline:none;color:var(--text);font-family:inherit;font-size:12px;}
+.input-chip{background:var(--accent);color:var(--bg);font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;}
+.input-chip .x{cursor:pointer;opacity:.7;}
+.input-chip .x:hover{opacity:1;}
+
+/* Helper text */
+.note{font-size:10px;color:var(--text-faint);margin-top:8px;line-height:1.5;font-style:italic;}
+
+/* Mockup banner */
+.mockup-banner{position:fixed;top:0;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--bg);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;padding:4px 14px;border-radius:0 0 4px 4px;z-index:2000;text-transform:uppercase;}
+
+</style>
+</head>
+<body>
+<div class="mockup-banner">DESIGN MOCKUP — NOT WIRED TO REAL DATA</div>
+
+<header>
+  <div class="logo"><div class="logo-mark"></div><h1>SNAP CAPTION STUDIO</h1></div>
+  <div class="header-meta">v4.0.7 · TRENDING</div>
+  <div class="header-cog">⚙</div>
+</header>
+
+<div class="view-tabs">
+  <button class="view-tab"><span class="tab-icon">⊞</span> EDITOR</button>
+  <button class="view-tab"><span class="tab-icon">▦</span> CAROUSEL EDIT</button>
+  <button class="view-tab"><span class="tab-icon">🔍</span> METADATA INSPECTOR</button>
+  <button class="view-tab active"><span class="tab-icon">🔥</span> TRENDING <span class="new-badge">NEW</span></button>
+</div>
+
+<main>
+  <!-- ============================================================ -->
+  <!-- VIEW: Trending main (creator grid)                            -->
+  <!-- ============================================================ -->
+  <div id="view-main">
+    <div class="trending-toolbar">
+      <h2>TRACKED CREATORS</h2>
+      <div class="toolbar-controls">
+        <input type="text" class="search-box" placeholder="Search creators…" />
+        <select class="sort-select">
+          <option>Sort: Follower gain ↑</option>
+          <option>Sort: Most posts</option>
+          <option>Sort: Most views</option>
+          <option>Sort: Recently added</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="tag-filter-row">
+      <span class="label">FILTER BY TAG</span>
+      <button class="tag-chip active">All <span class="count">12</span></button>
+      <button class="tag-chip">Fashion <span class="count">4</span></button>
+      <button class="tag-chip">Lifestyle <span class="count">3</span></button>
+      <button class="tag-chip">Fitness <span class="count">2</span></button>
+      <button class="tag-chip">Travel <span class="count">2</span></button>
+      <button class="tag-chip">Tech <span class="count">1</span></button>
+    </div>
+
+    <div class="creator-grid" id="creator-grid">
+      <div class="add-creator-card" onclick="openAdd()">
+        <span class="plus">+</span>
+        <span class="label">ADD CREATOR</span>
+        <span class="hint">paste an Instagram handle to start tracking their posts and reels</span>
+      </div>
+      <!-- Cards injected by JS -->
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- VIEW: Creator detail                                         -->
+  <!-- ============================================================ -->
+  <div id="view-creator" style="display:none;height:100%;">
+    <div class="creator-detail">
+      <button class="creator-back" onclick="backToMain()">← back to creators</button>
+      <div class="creator-detail-head">
+        <img class="creator-detail-avatar" id="cd-avatar" alt="">
+        <div class="creator-detail-info">
+          <div class="creator-detail-handle" id="cd-handle"></div>
+          <div class="creator-detail-bio" id="cd-bio"></div>
+          <div class="creator-detail-tags" id="cd-tags"></div>
+        </div>
+        <div class="creator-detail-stats">
+          <div class="detail-stat">
+            <div class="stat-label">FOLLOWERS</div>
+            <div class="stat-value" id="cd-followers"></div>
+            <div class="stat-delta up" id="cd-delta"></div>
+          </div>
+          <div class="detail-stat">
+            <div class="stat-label">POSTS TRACKED</div>
+            <div class="stat-value" id="cd-posts"></div>
+            <div class="stat-delta" id="cd-trial">12 trial reels</div>
+          </div>
+          <div class="detail-stat">
+            <div class="stat-label">AVG VIEWS</div>
+            <div class="stat-value" id="cd-avgviews"></div>
+            <div class="stat-delta up">+8.2% vs last week</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-tabs" id="cd-filters">
+        <button class="filter-tab active" data-filter="all"><span class="icon">⊞</span> ALL <span class="count">87</span></button>
+        <button class="filter-tab" data-filter="reels"><span class="icon">🎬</span> REELS <span class="count">54</span></button>
+        <button class="filter-tab" data-filter="posts"><span class="icon">▦</span> POSTS <span class="count">28</span></button>
+        <button class="filter-tab" data-filter="stories"><span class="icon">⊙</span> STORIES <span class="count">5</span></button>
+        <button class="filter-tab" data-filter="views"><span class="icon">▶</span> TOP VIEWS</button>
+        <button class="filter-tab" data-filter="likes"><span class="icon">♥</span> TOP LIKES</button>
+        <button class="filter-tab" data-filter="shares"><span class="icon">↗</span> TOP SHARES</button>
+        <button class="filter-tab trial-pill" data-filter="trial">TRIAL REELS <span class="count">12</span></button>
+      </div>
+
+      <div class="reel-grid" id="reel-grid"></div>
+    </div>
+  </div>
+</main>
+
+<!-- Reel viewer overlay -->
+<div class="viewer-overlay" id="viewer">
+  <div class="viewer-shell">
+    <div class="viewer-video-frame" id="viewer-frame">
+      <img id="viewer-img" alt="">
+      <div class="viewer-stats">
+        <span id="vs-views"></span>
+        <span id="vs-likes"></span>
+        <span id="vs-shares"></span>
+      </div>
+      <div class="viewer-trial-flag" id="vs-trial" style="display:none;">⚡ TRIAL REEL</div>
+      <div class="viewer-carousel-flag" id="vs-carousel" style="display:none;"><span id="vs-slide-pos">1 / 5</span></div>
+      <button class="viewer-close" onclick="closeViewer()">×</button>
+      <!-- Carousel nav: only shown when type === 'carousel' -->
+      <button class="slide-arrow slide-prev" id="slide-prev" onclick="navSlide(-1)" style="display:none;">‹</button>
+      <button class="slide-arrow slide-next" id="slide-next" onclick="navSlide(1)" style="display:none;">›</button>
+      <div class="slide-dots" id="slide-dots" style="display:none;"></div>
+      <div class="viewer-meta">
+        <div class="handle" id="viewer-handle"></div>
+        <div class="caption" id="viewer-caption"></div>
+      </div>
+    </div>
+    <div class="viewer-actions">
+      <button class="viewer-btn" title="Like"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+      <button class="viewer-btn" title="Comment"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
+      <button class="viewer-btn" title="Share"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
+      <button class="viewer-btn primary" title="Download"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+      <div class="viewer-btn-label">DOWNLOAD</div>
+      <button class="viewer-btn" title="Toggle stats panel" onclick="toggleStats()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="3" y1="20" x2="3" y2="14"/><line x1="3" y1="10" x2="3" y2="4"/><line x1="12" y1="20" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="4"/><line x1="21" y1="20" x2="21" y2="16"/><line x1="21" y1="12" x2="21" y2="4"/></svg></button>
+    </div>
+    <!-- Stats panel — collapsible right rail with everything we can scrape -->
+    <div class="viewer-stats-panel" id="viewer-stats-panel">
+      <div class="stats-head">
+        <span class="ttl">POST STATISTICS</span>
+        <span class="ttl-meta" id="vsp-posted">posted 3d ago · 8:42 PM EST</span>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-tile primary">
+          <div class="stat-tile-label">VIEWS</div>
+          <div class="stat-tile-value" id="vsp-views">1.24M</div>
+          <div class="stat-tile-delta up">↑ 2.6× creator's avg</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile-label">LIKES</div>
+          <div class="stat-tile-value" id="vsp-likes">184K</div>
+          <div class="stat-tile-delta">14.8% like rate</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile-label">COMMENTS</div>
+          <div class="stat-tile-value" id="vsp-comments">3.4K</div>
+          <div class="stat-tile-delta">0.27% comment rate</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile-label">SHARES</div>
+          <div class="stat-tile-value" id="vsp-shares">12K</div>
+          <div class="stat-tile-delta up">↑ shares-to-likes 6.5%</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile-label">DURATION</div>
+          <div class="stat-tile-value">0:18</div>
+          <div class="stat-tile-delta">9.2 plays/view</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile-label">ENGAGEMENT</div>
+          <div class="stat-tile-value">15.8%</div>
+          <div class="stat-tile-delta up">↑ top 8% creator's posts</div>
+        </div>
+      </div>
+      <div class="stats-section">
+        <div class="stats-section-h">CAPTION ANALYSIS</div>
+        <div class="stats-row"><span>Length</span><span>132 chars</span></div>
+        <div class="stats-row"><span>Hashtags</span><span>4 — #fall #linen #cairo #ootd</span></div>
+        <div class="stats-row"><span>Mentions</span><span>1 — @aurora.brand</span></div>
+        <div class="stats-row"><span>Emoji</span><span>2 — 🍂 ✨</span></div>
+        <div class="stats-row"><span>Hook (first 5 words)</span><span>"POV: you just got off"</span></div>
+      </div>
+      <div class="stats-section">
+        <div class="stats-section-h">AUDIO</div>
+        <div class="stats-row"><span>Track</span><span>"Original audio"</span></div>
+        <div class="stats-row"><span>Used by</span><span>1.2K reels</span></div>
+        <div class="stats-row"><span>Trending</span><span class="up">↑ +24% this week</span></div>
+      </div>
+      <div class="stats-section">
+        <div class="stats-section-h-row">
+          <span class="stats-section-h">7-DAY VIEW VELOCITY</span>
+          <span class="stats-section-h-meta">snapshots</span>
+        </div>
+        <div class="velocity-chart">
+          <div class="bar" style="height:30%"><span>D1</span></div>
+          <div class="bar" style="height:62%"><span>D2</span></div>
+          <div class="bar" style="height:88%"><span>D3</span></div>
+          <div class="bar" style="height:74%"><span>D4</span></div>
+          <div class="bar" style="height:51%"><span>D5</span></div>
+          <div class="bar" style="height:38%"><span>D6</span></div>
+          <div class="bar" style="height:24%"><span>D7</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Creator modal (very simple) -->
+<div class="viewer-overlay" id="add-overlay">
+  <div class="add-modal">
+    <div class="add-modal-head">
+      <div class="ttl">+ ADD CREATOR</div>
+      <button class="viewer-close" style="position:static;background:transparent;border:none;font-size:22px;color:var(--text-dim);" onclick="closeAdd()">×</button>
+    </div>
+    <div class="add-modal-body">
+      <label>Instagram handle</label>
+      <input type="text" placeholder="@hailee.steinfeld" />
+      <label>Tags (comma-separated)</label>
+      <div class="tag-input-row">
+        <span class="input-chip">FASHION <span class="x">×</span></span>
+        <span class="input-chip">LIFESTYLE <span class="x">×</span></span>
+        <input placeholder="add tag…" />
+      </div>
+      <label>Notes (optional)</label>
+      <textarea rows="3" placeholder="why are you tracking this creator? niche notes, posting cadence, etc."></textarea>
+      <div class="note">Trial Reels detection requires the desktop app to load Instagram in a logged-in webview. Some metrics will pull from the public profile; others require the app to be open with an active session.</div>
+    </div>
+    <div class="add-modal-foot">
+      <button class="btn" onclick="closeAdd()">CANCEL</button>
+      <button class="btn primary" onclick="closeAdd()">ADD</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Demo data — fake creators + posts. Stand-in for real IG data.
+// ============================================================
+const CREATORS = [
+  {
+    handle: '@aurora.fields',
+    name: 'Aurora Fields',
+    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop',
+    followers: '1.24M',
+    delta: '+12.4K this week',
+    tags: ['Fashion','Lifestyle'],
+    posts: 87,
+    trialReels: 12,
+    avgViews: '482K',
+    bio: 'Style + slow living. Cairo → NYC. Trial reels every Sunday for the inner circle.',
+  },
+  {
+    handle: '@zaynkdrip',
+    name: 'Zayn Khalil',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop',
+    followers: '742K',
+    delta: '+4.1K this week',
+    tags: ['Fashion','Streetwear'],
+    posts: 54,
+    trialReels: 8,
+    avgViews: '215K',
+    bio: 'Sneaker drops + thrifted fits. Replies in DMs.',
+  },
+  {
+    handle: '@lina.builds',
+    name: 'Lina Park',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop',
+    followers: '512K',
+    delta: '+18.7K this week',
+    tags: ['Tech','Lifestyle'],
+    posts: 31,
+    trialReels: 4,
+    avgViews: '168K',
+    bio: 'Indie founder · building in public. Daily product breakdowns.',
+  },
+  {
+    handle: '@marco.runs',
+    name: 'Marco Estrada',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop',
+    followers: '388K',
+    delta: '+2.8K this week',
+    tags: ['Fitness'],
+    posts: 96,
+    trialReels: 21,
+    avgViews: '94K',
+    bio: 'Marathon coach. Ultras, training plans, recovery breakdowns.',
+  },
+  {
+    handle: '@kaiisoflight',
+    name: 'Kai Sofia',
+    avatar: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&h=200&fit=crop',
+    followers: '2.1M',
+    delta: '-1.2K this week',
+    tags: ['Travel','Lifestyle'],
+    posts: 142,
+    trialReels: 6,
+    avgViews: '1.4M',
+    bio: 'Slow travel. Kyoto → Lisbon → Mexico City right now. 3 reels per week.',
+    deltaDirection: 'down',
+  },
+];
+
+// Fake reel data — picsum gives random images; sized for portrait
+function makeReels(n = 18) {
+  const captions = [
+    'POV: you just got off the plane and your hotel is across the canal',
+    'how I fold a button-up so it never wrinkles in a carry-on',
+    'this trial reel popped harder than my last 3 posts combined',
+    'tutorial: why your highlights look gray on camera',
+    'rate this fit 1-10 — hat from a random thrift in lisbon',
+    'final cut after 14 takes — dont @ me',
+    'gear list in my bio. yes its overkill.',
+    'trial reel: testing this hook on non-followers first',
+    '6 months of running daily — heres what changed',
+    'no but the sunset hit different',
+  ];
+  // Mark a few entries as carousels with N slides each
+  const carouselSlots = { 1: 4, 5: 7, 9: 3, 13: 5 };  // index → slide count
+  return Array.from({ length: n }, (_, i) => {
+    const slideCount = carouselSlots[i] || 0;
+    return {
+      id: i,
+      thumb: `https://picsum.photos/seed/reel${i}/360/640`,
+      views: ['1.2M','842K','623K','512K','411K','388K','295K','241K','198K','175K'][i % 10],
+      likes: ['184K','127K','98K','76K','61K','52K','41K','34K','28K','24K'][i % 10],
+      shares: ['12K','8.4K','6.1K','5.2K','4.7K','3.9K','3.1K','2.4K','2.1K','1.8K'][i % 10],
+      caption: captions[i % captions.length],
+      trial: [2,7,11,15].includes(i),
+      type: slideCount > 0 ? 'carousel' : 'reel',
+      slides: slideCount > 0
+        ? Array.from({ length: slideCount }, (_, s) => `https://picsum.photos/seed/reel${i}slide${s}/360/640`)
+        : null,
+    };
+  });
+}
+
+// ============================================================
+// Render functions
+// ============================================================
+function renderCreators() {
+  const grid = document.getElementById('creator-grid');
+  // Keep the add card; rebuild rest
+  grid.innerHTML = `
+    <div class="add-creator-card" onclick="openAdd()">
+      <span class="plus">+</span>
+      <span class="label">ADD CREATOR</span>
+      <span class="hint">paste an Instagram handle to start tracking their posts and reels</span>
+    </div>
+  `;
+  for (const c of CREATORS) {
+    const card = document.createElement('div');
+    card.className = 'creator-card';
+    card.onclick = () => openCreator(c);
+    const dn = c.deltaDirection === 'down';
+    card.innerHTML = `
+      <div class="creator-card-head">
+        <img class="creator-avatar" src="${c.avatar}" alt="">
+        <div>
+          <div class="creator-handle">${c.handle}</div>
+          <div class="creator-name">${c.name}</div>
+        </div>
+      </div>
+      <div class="creator-card-stats">
+        <div class="stat-block">
+          <div class="stat-label">FOLLOWERS</div>
+          <div class="stat-value">${c.followers}</div>
+          <div class="stat-delta ${dn?'down':'up'}">${dn?'↓ ':'↑ '}${c.delta}</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-label">AVG VIEWS</div>
+          <div class="stat-value">${c.avgViews}</div>
+          <div class="stat-delta">${c.posts} posts · ${c.trialReels} trial</div>
+        </div>
+      </div>
+      <div class="creator-card-tags">
+        ${c.tags.map(t=>`<span class="creator-tag">${t}</span>`).join('')}
+      </div>
+    `;
+    grid.appendChild(card);
+  }
+}
+
+function openCreator(c) {
+  document.getElementById('view-main').style.display = 'none';
+  document.getElementById('view-creator').style.display = 'block';
+  document.getElementById('cd-avatar').src = c.avatar;
+  document.getElementById('cd-handle').textContent = c.handle;
+  document.getElementById('cd-bio').textContent = c.bio;
+  document.getElementById('cd-tags').innerHTML = c.tags.map(t=>`<span class="creator-tag">${t}</span>`).join('');
+  document.getElementById('cd-followers').textContent = c.followers;
+  const dn = c.deltaDirection === 'down';
+  const deltaEl = document.getElementById('cd-delta');
+  deltaEl.textContent = (dn?'↓ ':'↑ ') + c.delta;
+  deltaEl.className = 'stat-delta ' + (dn?'down':'up');
+  document.getElementById('cd-posts').textContent = c.posts;
+  document.getElementById('cd-trial').textContent = c.trialReels + ' trial reels';
+  document.getElementById('cd-avgviews').textContent = c.avgViews;
+  renderReels(c, 'all');
+}
+
+function renderReels(creator, filter) {
+  let reels = makeReels(18);
+  if (filter === 'trial') reels = reels.filter(r => r.trial);
+  if (filter === 'views' || filter === 'likes' || filter === 'shares') reels = reels.slice(0, 12);  // demo "top" filter
+  const grid = document.getElementById('reel-grid');
+  grid.innerHTML = '';
+  for (const r of reels) {
+    const card = document.createElement('div');
+    card.className = 'reel-card' + (r.trial ? ' trial' : '');
+    card.onclick = () => openViewer(creator, r);
+    const isCarousel = r.type === 'carousel';
+    const topRightIcon = isCarousel
+      ? `<svg class="play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="7" width="14" height="14" rx="2"/><path d="M3 17V5a2 2 0 0 1 2-2h12"/></svg><span class="slide-count">${r.slides.length}</span>`
+      : '<svg class="play-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>';
+    card.innerHTML = `
+      <img src="${r.thumb}" alt="">
+      <div class="reel-meta-top">
+        ${r.trial ? '<span class="trial-badge">⚡ TRIAL</span>' : '<span></span>'}
+        <span class="top-right-icon">${topRightIcon}</span>
+      </div>
+      <div class="reel-stats">
+        <span class="reel-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6,4 20,12 6,20"/></svg> ${r.views}</span>
+        <span class="reel-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> ${r.likes}</span>
+      </div>
+    `;
+    grid.appendChild(card);
+  }
+  // Wire filter tabs
+  document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.filter === filter);
+    tab.onclick = () => renderReels(creator, tab.dataset.filter);
+  });
+}
+
+// Stash the open reel + slide cursor so the slide arrows can drive it
+let _openReel = null;
+let _slideIdx = 0;
+
+function openViewer(creator, reel) {
+  _openReel = reel;
+  _slideIdx = 0;
+  document.getElementById('viewer-handle').textContent = creator.handle;
+  document.getElementById('viewer-caption').textContent = reel.caption;
+  document.getElementById('vs-views').textContent = '▶ ' + reel.views;
+  document.getElementById('vs-likes').textContent = '♥ ' + reel.likes;
+  document.getElementById('vs-shares').textContent = '↗ ' + reel.shares;
+  document.getElementById('vs-trial').style.display = reel.trial ? 'block' : 'none';
+  // Sync stats panel
+  document.getElementById('vsp-views').textContent = reel.views;
+  document.getElementById('vsp-likes').textContent = reel.likes;
+  document.getElementById('vsp-shares').textContent = reel.shares;
+  // Carousel UI: arrows + dots + slide counter; download label changes
+  const isCarousel = reel.type === 'carousel';
+  document.getElementById('vs-carousel').style.display = isCarousel && !reel.trial ? 'block' : 'none';
+  document.getElementById('vs-trial').style.display = reel.trial ? 'block' : 'none';
+  document.getElementById('slide-prev').style.display = isCarousel ? 'flex' : 'none';
+  document.getElementById('slide-next').style.display = isCarousel ? 'flex' : 'none';
+  const dots = document.getElementById('slide-dots');
+  if (isCarousel) {
+    dots.style.display = 'flex';
+    dots.innerHTML = reel.slides.map((_, i) => `<span class="dot${i === 0 ? ' active' : ''}"></span>`).join('');
+    document.getElementById('vs-slide-pos').textContent = `1 / ${reel.slides.length}`;
+    // Update download button label
+    setDownloadLabel(`DOWNLOAD ALL ${reel.slides.length}`);
+  } else {
+    dots.style.display = 'none';
+    setDownloadLabel('DOWNLOAD');
+  }
+  setSlide(0);
+  document.getElementById('viewer').classList.add('show');
+}
+
+function setSlide(i) {
+  if (!_openReel) return;
+  if (_openReel.type === 'carousel') {
+    _slideIdx = Math.max(0, Math.min(_openReel.slides.length - 1, i));
+    document.getElementById('viewer-img').src = _openReel.slides[_slideIdx];
+    document.getElementById('vs-slide-pos').textContent = `${_slideIdx + 1} / ${_openReel.slides.length}`;
+    document.querySelectorAll('#slide-dots .dot').forEach((d, idx) => {
+      d.classList.toggle('active', idx === _slideIdx);
+    });
+    document.getElementById('slide-prev').disabled = _slideIdx === 0;
+    document.getElementById('slide-next').disabled = _slideIdx === _openReel.slides.length - 1;
+  } else {
+    document.getElementById('viewer-img').src = _openReel.thumb;
+  }
+}
+function navSlide(delta) { setSlide(_slideIdx + delta); }
+
+function setDownloadLabel(label) {
+  // Find the DOWNLOAD button label in the actions column
+  const labels = document.querySelectorAll('.viewer-btn-label');
+  if (labels.length) labels[0].textContent = label;
+}
+
+function closeViewer() { document.getElementById('viewer').classList.remove('show'); }
+function toggleStats() { document.getElementById('viewer-stats-panel').classList.toggle('hidden'); }
+
+function backToMain() {
+  document.getElementById('view-main').style.display = 'block';
+  document.getElementById('view-creator').style.display = 'none';
+}
+
+function openAdd() { document.getElementById('add-overlay').classList.add('show'); }
+function closeAdd() { document.getElementById('add-overlay').classList.remove('show'); }
+
+// Init
+renderCreators();
+</script>
+</body>
+</html>

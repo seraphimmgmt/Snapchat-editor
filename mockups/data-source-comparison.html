@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TRENDING — data source comparison</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0c;--surface:#15151a;--surface-2:#1d1d24;--surface-3:#262630;
+  --border:#2a2a33;--border-strong:#3a3a48;
+  --text:#e8e8ec;--text-dim:#9c9ca8;--text-faint:#5e5e6c;
+  --accent:#d9c77a;--accent-hi:#e8d68a;--accent-dim:#a99858;
+  --red:#ef4444;--green:#5fd97e;--blue:#7fbbe3;--orange:#ffa257;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.5;padding:36px clamp(20px,3vw,50px);}
+h1{font-family:'Antonio',sans-serif;font-size:28px;letter-spacing:.18em;margin:0 0 8px;background:linear-gradient(90deg,#c0c0c0,#d9c77a 60%,#a99858);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.lede{color:var(--text-dim);font-size:13px;max-width:780px;margin-bottom:36px;}
+.lede b{color:var(--text);}
+
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-bottom:36px;}
+@media(max-width:1100px){.compare-grid{grid-template-columns:1fr;}}
+
+.option{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:18px;}
+.option.recommended{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+.option-head{display:flex;align-items:center;justify-content:space-between;}
+.option-head .name{font-family:'Antonio',sans-serif;font-size:18px;letter-spacing:.14em;font-weight:700;}
+.recommended-badge{background:var(--accent);color:var(--bg);font-size:9px;letter-spacing:.14em;padding:3px 8px;border-radius:2px;font-weight:700;}
+
+/* Diagram boxes — show the data flow */
+.flow{display:flex;flex-direction:column;gap:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:16px;}
+.flow-step{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:3px;}
+.flow-step .num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--bg);font-weight:700;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.flow-step .body{flex:1;}
+.flow-step .ttl{font-weight:600;font-size:12px;}
+.flow-step .desc{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.flow-arrow{color:var(--text-faint);text-align:center;font-size:14px;line-height:1;margin:-2px 0;}
+
+/* Pros / cons grid */
+.pc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.pc-block{background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:14px;}
+.pc-block h3{font-size:10px;letter-spacing:.18em;color:var(--text-faint);margin:0 0 10px;}
+.pc-block ul{margin:0;padding-left:18px;font-size:11px;color:var(--text);line-height:1.6;}
+.pc-block.pros h3{color:var(--green);}
+.pc-block.cons h3{color:var(--red);}
+
+/* Key facts row */
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.fact{background:var(--surface-2);border:1px solid var(--border);padding:10px 12px;border-radius:3px;}
+.fact .label{font-size:9px;color:var(--text-faint);letter-spacing:.14em;}
+.fact .value{font-family:'Antonio',sans-serif;font-size:15px;font-weight:700;margin-top:4px;line-height:1;}
+
+/* Code snippet */
+.snippet{background:#0a0a0c;border:1px solid var(--border);border-radius:3px;padding:12px;font-size:11px;color:var(--text-dim);overflow-x:auto;line-height:1.6;}
+.snippet .k{color:var(--accent);}
+.snippet .s{color:var(--green);}
+.snippet .c{color:var(--text-faint);font-style:italic;}
+
+/* Verdict */
+.verdict{background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:24px;}
+.verdict h2{font-family:'Antonio',sans-serif;font-size:18px;letter-spacing:.16em;margin:0 0 14px;color:var(--accent);}
+.verdict p{font-size:13px;color:var(--text);line-height:1.7;margin:0 0 10px;}
+.verdict p b{color:var(--accent-hi);}
+
+/* Inline icon */
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:1px;}
+.dot.green{background:var(--green);}
+.dot.red{background:var(--red);}
+.dot.orange{background:var(--orange);}
+
+</style>
+</head>
+<body>
+
+<h1>TRENDING — DATA SOURCE</h1>
+<p class="lede">Two realistic ways to fetch creator data inside the desktop app. Both are technically scraping (no real API exists for tracking arbitrary creators). The difference is <b>where the request comes from</b> and <b>how Instagram sees it.</b></p>
+
+<div class="compare-grid">
+
+  <!-- ============================== OWN SCRAPER ============================== -->
+  <div class="option">
+    <div class="option-head">
+      <div class="name">A · OWN SCRAPER</div>
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin:0;">A background process inside the Tauri app that hits Instagram's HTTP endpoints directly using <b>requests / reqwest</b> with no real browser involved.</p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="num">1</div>
+        <div class="body">
+          <div class="ttl">Rust async task</div>
+          <div class="desc">Runs every 6h on a tokio interval (or on-demand from the UI)</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">2</div>
+        <div class="body">
+          <div class="ttl">HTTP GET <code>i.instagram.com/api/v1/users/{username}/info/</code></div>
+          <div class="desc">Spoofs Instagram's mobile app User-Agent + headers. No session token = limited to public data.</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">3</div>
+        <div class="body">
+          <div class="ttl">Parse JSON response</div>
+          <div class="desc">Followers, post grid, view counts. Trial reels: NOT visible (server filters them out for non-tester accounts).</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">4</div>
+        <div class="body">
+          <div class="ttl">Store in local SQLite</div>
+          <div class="desc">Compute deltas vs last fetch, push to UI via Tauri event.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pc-grid">
+      <div class="pc-block pros">
+        <h3>PROS</h3>
+        <ul>
+          <li>Fast — single HTTP call per creator</li>
+          <li>No webview UI baggage</li>
+          <li>Runs in background even when app is in tray</li>
+          <li>Easy to schedule + batch</li>
+        </ul>
+      </div>
+      <div class="pc-block cons">
+        <h3>CONS</h3>
+        <ul>
+          <li><b>IP gets rate-limited fast</b> — same IP hitting many creators triggers IG's bot detection</li>
+          <li>Endpoints change every few months → maintenance treadmill</li>
+          <li><b>Can't see trial reels at all</b> (server-side filter)</li>
+          <li>If you log in to authenticate → IG can ban that account</li>
+          <li>ToS violation; risk of legal C&D for distribution at scale</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="snippet">
+<span class="c">// Rust — simplified own-scraper</span>
+<span class="k">async fn</span> fetch_creator(handle: &amp;str) -&gt; Result&lt;Profile&gt; {
+  <span class="k">let</span> url = format!(<span class="s">"https://i.instagram.com/api/v1/users/web_profile_info/?username={handle}"</span>);
+  <span class="k">let</span> res = client.get(&amp;url)
+    .header(<span class="s">"User-Agent"</span>, <span class="s">"Instagram 269.0.0.18.75 Android"</span>)
+    .header(<span class="s">"X-IG-App-ID"</span>, <span class="s">"936619743392459"</span>)
+    .send().<span class="k">await</span>?;
+  <span class="c">// 90% of the time: rate-limit error, captcha, or shadow-ban</span>
+  res.json().<span class="k">await</span>
+}</div>
+
+    <div class="facts">
+      <div class="fact"><div class="label">SETUP</div><div class="value">~2 days</div></div>
+      <div class="fact"><div class="label">RUNTIME</div><div class="value">Background</div></div>
+      <div class="fact"><div class="label">TRIAL REELS</div><div class="value" style="color:var(--red);">No</div></div>
+      <div class="fact"><div class="label">RISK</div><div class="value" style="color:var(--red);">High</div></div>
+    </div>
+  </div>
+
+  <!-- ============================== APP VIA WEBVIEW ============================== -->
+  <div class="option recommended">
+    <div class="option-head">
+      <div class="name">B · APP VIA WEBVIEW</div>
+      <span class="recommended-badge">RECOMMENDED</span>
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin:0;">A second hidden Tauri webview window that loads <b>instagram.com</b> with the user's actual logged-in session, then parses the rendered DOM via injected JS.</p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="num">1</div>
+        <div class="body">
+          <div class="ttl">Hidden Tauri window opens instagram.com</div>
+          <div class="desc">First time: user logs in once. Cookies persist between launches in the webview's profile dir.</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">2</div>
+        <div class="body">
+          <div class="ttl">Navigate to creator's profile URL</div>
+          <div class="desc">e.g. instagram.com/aurora.fields/ — IG renders the real page in our webview, exactly like a browser.</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">3</div>
+        <div class="body">
+          <div class="ttl">Inject JS to read DOM + intercept GraphQL</div>
+          <div class="desc">Wait for posts to load, scrape stats from the rendered page. Tap into IG's own GraphQL responses by patching fetch().</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">4</div>
+        <div class="body">
+          <div class="ttl">Trial reels handling</div>
+          <div class="desc">Webview is logged-in as YOUR account. If IG picked you as a tester, trial reels of THAT creator appear in your feed and we can scrape them. Otherwise: same blind spot as Option A.</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">
+        <div class="num">5</div>
+        <div class="body">
+          <div class="ttl">Send results back to main UI</div>
+          <div class="desc">JS calls window.__TAURI__.event.emit('creator-data', payload). Main window listens.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pc-grid">
+      <div class="pc-block pros">
+        <h3>PROS</h3>
+        <ul>
+          <li><b>IG can't tell us apart from a real Chrome user</b> — same cookies, same fingerprint, same JS execution</li>
+          <li>Rate-limit risk is whatever your normal browsing hits, not API-bot levels</li>
+          <li>Can see <b>everything you can see manually</b> — including trial reels IF you're an IG-chosen tester</li>
+          <li>Gets data on private accounts you follow</li>
+          <li>No reverse-engineering endpoints — IG's own JS does the fetching</li>
+        </ul>
+      </div>
+      <div class="pc-block cons">
+        <h3>CONS</h3>
+        <ul>
+          <li>Slower — needs to render full pages (~1-2s per creator)</li>
+          <li>Requires keeping the hidden webview alive (more memory)</li>
+          <li>Selector breakage when IG changes class names</li>
+          <li>Still ToS-violating; account ban risk if IG ever notices the JS injection</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="snippet">
+<span class="c">// JS — injected into the hidden IG webview</span>
+<span class="k">const</span> origFetch = window.fetch;
+window.fetch = <span class="k">async</span> (...args) =&gt; {
+  <span class="k">const</span> res = <span class="k">await</span> origFetch(...args);
+  <span class="k">if</span> (args[0]?.includes?.(<span class="s">'/graphql/query'</span>)) {
+    <span class="k">const</span> clone = res.clone();
+    clone.json().then(data =&gt; {
+      <span class="c">// Trial reels show up here when we ARE the tester audience</span>
+      window.__TAURI__.event.emit(<span class="s">'ig-graphql'</span>, data);
+    });
+  }
+  <span class="k">return</span> res;
+};</div>
+
+    <div class="facts">
+      <div class="fact"><div class="label">SETUP</div><div class="value">~3-4 days</div></div>
+      <div class="fact"><div class="label">RUNTIME</div><div class="value">In-app only</div></div>
+      <div class="fact"><div class="label">TRIAL REELS</div><div class="value" style="color:var(--orange);">Maybe</div></div>
+      <div class="fact"><div class="label">RISK</div><div class="value" style="color:var(--orange);">Medium</div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Verdict -->
+<div class="verdict">
+  <h2>BOTTOM LINE</h2>
+  <p><span class="dot green"></span><b>Webview is the way.</b> It uses your real session, renders the real page, and is functionally indistinguishable from you scrolling Instagram in Chrome. Same fingerprint, same cookies, same rate limits.</p>
+  <p><span class="dot orange"></span><b>Trial reels caveat — same for both:</b> Instagram only shows trial reels to a curated set of non-followers IG picked as testers. If your account isn't in that audience for a given creator, the trial reel does not exist from your perspective. No API or workaround changes that. We can detect them with high reliability when they DO appear in your session, but we can't conjure them out of thin air.</p>
+  <p><span class="dot red"></span><b>Both routes violate IG's ToS.</b> The webview path is much harder for IG to detect (it's just a logged-in browser). Risk of account ban is non-zero; risk of legal action against a self-hosted desktop tool is essentially zero in practice.</p>
+  <p style="margin-top:18px;color:var(--text-dim);font-size:12px;">Recommend: <b style="color:var(--accent);">Option B (webview)</b>, with a "Connect Instagram" first-run flow that opens the hidden webview to instagram.com, lets the user log in manually, then the cookie persists. We start the trending feature behind a settings toggle so it's opt-in.</p>
+</div>
+
+</body>
+</html>
