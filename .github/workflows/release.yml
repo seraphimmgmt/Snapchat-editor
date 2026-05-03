@@ -77,29 +77,24 @@ jobs:
           # on windows-latest) to pull a prebuilt mingw libheif. heif-enc.exe
           # runs as its own process, so the mingw runtime doesn't conflict
           # with our MSVC-built tauri app.
-          /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed mingw-w64-x86_64-libheif
+          # Install libheif AND ntldd. ntldd is the Windows equivalent of ldd
+          # — given an .exe/.dll, it lists all transitive DLL deps with their
+          # resolved paths. v4.0.4's hand-rolled bash recursion via objdump
+          # silently produced 1 result on the runner (likely Git Bash
+          # quirks with declare -A or objdump path), so DLLs after libheif's
+          # direct deps weren't getting bundled. ntldd is single-shot.
+          /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed mingw-w64-x86_64-libheif mingw-w64-x86_64-ntldd-git
           cp /c/msys64/mingw64/bin/heif-enc.exe src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe
-          # Walk heif-enc.exe's full DLL dependency tree using objdump and
-          # copy every transitive dependency that exists in mingw64/bin.
-          # Hard-coded allowlists kept missing things (libjbig, libLerc,
-          # liblzma, etc — anything libtiff/libheif pull in), so this walks
-          # the actual import table instead.
-          MINGW_BIN=/c/msys64/mingw64/bin
-          OUT=src-tauri/binaries
-          declare -A SEEN
-          walk_deps() {
-            local exe="$1"
-            for dll in $("$MINGW_BIN/objdump.exe" -p "$exe" 2>/dev/null | awk '/DLL Name:/ {print $3}'); do
-              [ -n "${SEEN[$dll]:-}" ] && continue
-              SEEN[$dll]=1
-              local src="$MINGW_BIN/$dll"
-              [ -f "$src" ] || continue   # system DLLs (KERNEL32 etc) skipped
-              cp "$src" "$OUT/"
-              walk_deps "$src"
-            done
-          }
-          walk_deps "$OUT/heif-enc-x86_64-pc-windows-msvc.exe"
-          echo "Bundled $(ls $OUT/*.dll | wc -l) DLL(s) for heif-enc"
+          # Recursively list every DLL the binary depends on (and their deps,
+          # and so on), filter to mingw64/bin DLLs (skip system DLLs like
+          # KERNEL32), copy unique ones into binaries/.
+          /c/msys64/mingw64/bin/ntldd.exe -R src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe 2>&1 \
+            | grep -oE '/c/msys64/mingw64/bin/[^ ]+\.dll' \
+            | sort -u \
+            | while read src; do cp "$src" src-tauri/binaries/; done
+          echo "Bundled DLLs for heif-enc:"
+          ls -1 src-tauri/binaries/*.dll | wc -l
+          ls -1 src-tauri/binaries/*.dll | head -50
 
       - uses: tauri-apps/tauri-action@v0
         env:
