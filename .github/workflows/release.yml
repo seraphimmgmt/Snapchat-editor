@@ -23,8 +23,6 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
-          - platform: 'macos-latest'
-            args: '--target x86_64-apple-darwin'
           - platform: 'windows-latest'
             args: ''
 
@@ -35,7 +33,7 @@ jobs:
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - name: rust cache
         uses: swatinem/rust-cache@v2
@@ -49,16 +47,6 @@ jobs:
       #
       # Mac aarch64 already has ffmpeg + perl-based exiftool committed to the
       # repo. We download what's missing per-platform here.
-
-      - name: Download Mac x86_64 ffmpeg
-        if: matrix.platform == 'macos-latest' && contains(matrix.args, 'x86_64-apple-darwin')
-        run: |
-          # evermeet.cx serves the canonical Intel-only mac ffmpeg.
-          # Returns a 302 to the latest stable build.
-          curl -L -o ffmpeg.zip "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip"
-          unzip ffmpeg.zip
-          mv ffmpeg src-tauri/binaries/ffmpeg-x86_64-apple-darwin
-          chmod +x src-tauri/binaries/ffmpeg-x86_64-apple-darwin
 
       - name: Download Windows ffmpeg + exiftool + libheif
         if: matrix.platform == 'windows-latest'

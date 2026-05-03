@@ -11853,6 +11853,7 @@ const PATCH_NOTES = [
       ]},
       { h: 'Note', items: [
         'Fast vs Reliable export engines only affect VIDEO encoding — HEIC always routes through the same native helper (sips on Mac, heif-enc.exe on Windows). Engine choice doesn\'t change HEIC behavior.',
+        'Intel Mac builds dropped from CI — only Apple Silicon (.dmg) and Windows (.msi/.exe) are published going forward. If you\'re on Intel Mac, the auto-updater won\'t find a build for you.',
       ]},
     ]
   },
