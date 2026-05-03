@@ -570,6 +570,10 @@
   .carousel-card .crop-overlay{position:absolute;inset:0;pointer-events:none;}
   .carousel-card .crop-overlay svg{width:100%;height:100%;display:block;pointer-events:none;}
   .carousel-card.active .crop-overlay svg .crop-drag-handle{pointer-events:auto;touch-action:none;}
+  /* In grid view EVERY card is its own primary surface — direct hover-drag,
+     no need to click to "select" first. Matches Figma/Photos-style anchor
+     adjustment where the handle is always live. */
+  .carousel-rail.grid .carousel-card .crop-overlay svg .crop-drag-handle{pointer-events:auto;touch-action:none;}
 
   /* Stage navigation arrows */
   .stage-arrow{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.55);border:1px solid var(--border-strong);color:var(--text);width:44px;height:44px;border-radius:50%;cursor:pointer;font-size:26px;line-height:1;display:flex;align-items:center;justify-content:center;z-index:10;transition:all .15s;font-family:'JetBrains Mono',monospace;padding:0 0 3px 0;}
@@ -5312,7 +5316,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.0.1';
+const APP_VERSION = '4.0.2';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -6390,26 +6394,27 @@ function applyFilterTints(ctx, item, w, h) {
 // is centered in view; prev/next peek at the edges.
 // ============================================================================
 
-// Compute display size for a card. Uses the *target* aspect ratio (the export
-// dimensions, e.g. 1:1) — NOT the source image's ratio — so every card in the
-// rail has the same shape and size for visual consistency. The crop alignment
-// panel on the right is where users go to see source-vs-target differences.
-// `--card-size` lets the user shrink everything via the size slider.
+// Compute display size for a card. Uses the *source* image's aspect ratio so
+// users see the photo as-is; the crop overlay (stripe pattern) on top shows
+// what the target export aspect will cut out. `--card-size` lets the user
+// shrink everything via the size slider.
 function computeCardDisplaySize(item, stageRect) {
   const cardSize = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--card-size')) || 1;
-  // Cap so the card never feels overwhelming on huge displays
-  const maxH = Math.min(stageRect.height - 60, 720) * cardSize;
-  const maxW = stageRect.width * 0.6 * cardSize;
-  const targetRatio = (carouselState.targetW || 1) / (carouselState.targetH || 1);
+  // Tighter caps than before — the previous values let cards swallow the
+  // entire viewport on large displays. These keep the active card big enough
+  // to work with but leave room for the rest of the UI.
+  const maxH = Math.min(Math.max(stageRect.height - 100, 320), 560) * cardSize;
+  const maxW = Math.min(stageRect.width * 0.45, 640) * cardSize;
+  const srcRatio = (item.w || 1) / (item.h || 1);
   let dispH, dispW;
-  if (targetRatio > 1) {
+  if (srcRatio > 1) {
     dispW = maxW;
-    dispH = dispW / targetRatio;
-    if (dispH > maxH) { dispH = maxH; dispW = dispH * targetRatio; }
+    dispH = dispW / srcRatio;
+    if (dispH > maxH) { dispH = maxH; dispW = dispH * srcRatio; }
   } else {
     dispH = maxH;
-    dispW = dispH * targetRatio;
-    if (dispW > maxW) { dispW = maxW; dispH = dispW / targetRatio; }
+    dispW = dispH * srcRatio;
+    if (dispW > maxW) { dispW = maxW; dispH = dispW / srcRatio; }
   }
   return { w: Math.round(dispW), h: Math.round(dispH) };
 }
@@ -6422,27 +6427,22 @@ function drawSingleCard(cardEl, item) {
   const inner = cardEl.querySelector('.carousel-card-inner');
   if (!canvas || !overlay) return;
 
-  // BOTH carousel + grid view use uniform TARGET aspect for cells. Each card
-  // shows the full source contain-fit inside a target-aspect frame, with the
-  // dim/stripes pattern over the area that will be cropped out (including the
-  // letterbox gutters), so there are no pure-black bars anywhere.
-  const targetRatio = (carouselState.targetW || 1) / (carouselState.targetH || 1);
+  // Both views: card aspect = SOURCE aspect, source fills the cell. The crop
+  // overlay (stripe pattern) on top is what tells the user what'll be cut by
+  // the target aspect. No more stretching photos to fit a target frame.
+  //   - Grid: cell width comes from the auto-fit CSS column; height = width /
+  //     source aspect via aspect-ratio. Heights vary per source ratio.
+  //   - Carousel: dispW/H sized via computeCardDisplaySize (tighter caps).
+  const srcRatio = (item.w || 1) / (item.h || 1);
   let dispW, dispH;
   if (carouselState.viewMode === 'grid') {
-    canvas.style.width = '';
-    canvas.style.height = '';
-    if (inner) {
-      inner.style.width = '';
-      inner.style.height = '';
-      inner.style.aspectRatio = '';
-    }
     const cellW = cardEl.clientWidth;
     if (cellW <= 0) {
       requestAnimationFrame(() => drawSingleCard(cardEl, item));
       return;
     }
     dispW = cellW;
-    dispH = Math.round(dispW / targetRatio);
+    dispH = Math.round(dispW / srcRatio);
   } else {
     const stage = document.querySelector('.carousel-stage');
     const stageRect = stage.getBoundingClientRect();
@@ -6463,8 +6463,8 @@ function drawSingleCard(cardEl, item) {
     if (inner) {
       inner.style.width = '100%';
       inner.style.height = 'auto';
-      // Uniform aspect across grid → no irregular row heights / "leaking".
-      inner.style.aspectRatio = `${carouselState.targetW} / ${carouselState.targetH}`;
+      // Cell aspect mirrors the source so we never distort the photo.
+      inner.style.aspectRatio = `${item.w} / ${item.h}`;
     }
   } else {
     canvas.style.width = dispW + 'px';
@@ -6483,25 +6483,8 @@ function drawSingleCard(cardEl, item) {
   ctx.imageSmoothingQuality = 'high';
   ctx.clearRect(0, 0, dispW, dispH);
 
-  // Carousel view: card frame is target aspect (uniform), source letterboxed
-  // inside via fitX/Y/W/H. Grid view: card == source aspect (no letterbox),
-  // so fitX/Y = 0 and fitW/H = full canvas.
-  let fitW, fitH, fitX, fitY;
-  if (carouselState.viewMode === 'grid') {
-    fitW = dispW; fitH = dispH; fitX = 0; fitY = 0;
-  } else {
-    const srcRatio = item.w / item.h;
-    const frameRatio = dispW / dispH;
-    if (srcRatio > frameRatio) {
-      fitW = dispW;
-      fitH = dispW / srcRatio;
-    } else {
-      fitH = dispH;
-      fitW = dispH * srcRatio;
-    }
-    fitX = (dispW - fitW) / 2;
-    fitY = (dispH - fitH) / 2;
-  }
+  // Source fills the cell — no letterbox. Fit coords map to the whole canvas.
+  const fitW = dispW, fitH = dispH, fitX = 0, fitY = 0;
 
   const adj = item.adj;
   ctx.save();
@@ -11788,6 +11771,25 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.0.2',
+    date: '2026-05-03',
+    title: 'Carousel + grid view rework',
+    sections: [
+      { h: 'New', items: [
+        'Grid + carousel cards now show photos at their natural aspect — no more stretching to the export aspect',
+        'Crop overlay (stripe pattern) shows exactly what the export will cut',
+        'Hover-to-drag the crop anchor in grid view (no click-then-drag dance)',
+      ]},
+      { h: 'Fixed', items: [
+        'Carousel cards no longer fill the entire screen on Windows',
+        'Grid + carousel cards size sensibly across display sizes (tighter caps)',
+      ]},
+      { h: 'Under the hood', items: [
+        'CI matrix runs sequentially to prevent the "main" release race condition that broke v4.0.1\'s Mac signature',
+      ]},
+    ]
+  },
   {
     version: '4.0.1',
     date: '2026-05-03',

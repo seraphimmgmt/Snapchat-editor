@@ -12,6 +12,13 @@ jobs:
       contents: write
     strategy:
       fail-fast: false
+      # Run one platform at a time. The "main" release is shared across all
+      # matrix jobs and tauri-action's "delete asset → re-upload → patch
+      # latest.json" sequence races when jobs publish in parallel — that's
+      # what corrupted v4.0.1's Mac aarch64 signature. ~14 min total vs 10
+      # min parallel, but it's the difference between "auto-updater works"
+      # and "auto-updater silently breaks for half the users."
+      max-parallel: 1
       matrix:
         include:
           - platform: 'macos-latest'
