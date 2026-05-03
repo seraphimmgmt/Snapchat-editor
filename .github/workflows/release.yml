@@ -79,14 +79,27 @@ jobs:
           # with our MSVC-built tauri app.
           /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed mingw-w64-x86_64-libheif
           cp /c/msys64/mingw64/bin/heif-enc.exe src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe
-          # Copy the runtime DLLs heif-enc.exe needs. Glob broadly — pacman
-          # can pull in slightly different sets across versions.
-          for dll in libheif libde265 libx265 libaom libdav1d libsharpyuv \
-                     libjpeg libpng16 libwebp libtiff libopenh264 libsvtav1enc \
-                     libwinpthread libgcc_s libstdc \
-                     zlib1; do
-            cp /c/msys64/mingw64/bin/${dll}*.dll src-tauri/binaries/ 2>/dev/null || true
-          done
+          # Walk heif-enc.exe's full DLL dependency tree using objdump and
+          # copy every transitive dependency that exists in mingw64/bin.
+          # Hard-coded allowlists kept missing things (libjbig, libLerc,
+          # liblzma, etc — anything libtiff/libheif pull in), so this walks
+          # the actual import table instead.
+          MINGW_BIN=/c/msys64/mingw64/bin
+          OUT=src-tauri/binaries
+          declare -A SEEN
+          walk_deps() {
+            local exe="$1"
+            for dll in $("$MINGW_BIN/objdump.exe" -p "$exe" 2>/dev/null | awk '/DLL Name:/ {print $3}'); do
+              [ -n "${SEEN[$dll]:-}" ] && continue
+              SEEN[$dll]=1
+              local src="$MINGW_BIN/$dll"
+              [ -f "$src" ] || continue   # system DLLs (KERNEL32 etc) skipped
+              cp "$src" "$OUT/"
+              walk_deps "$src"
+            done
+          }
+          walk_deps "$OUT/heif-enc-x86_64-pc-windows-msvc.exe"
+          echo "Bundled $(ls $OUT/*.dll | wc -l) DLL(s) for heif-enc"
 
       - uses: tauri-apps/tauri-action@v0
         env:

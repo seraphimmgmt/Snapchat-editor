@@ -5371,7 +5371,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.0.3';
+const APP_VERSION = '4.0.4';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -11842,13 +11842,13 @@ function ensureSettingsModal() {
 // ============================================================================
 const PATCH_NOTES = [
   {
-    version: '4.0.3',
+    version: '4.0.4',
     date: '2026-05-03',
-    title: 'Windows fixes — OAuth, HEIC, grid sizing',
+    title: 'Windows fixes — OAuth, HEIC (full DLL chain), grid sizing',
     sections: [
       { h: 'Fixed', items: [
-        'Windows Google sign-in now works — Drive OAuth used to fail with "Access blocked: response_type missing" because cmd.exe was truncating the URL at the first &. Switched to rundll32 url.dll,FileProtocolHandler which is the canonical Windows URL opener and bypasses cmd entirely.',
-        'Windows HEIC export — heif-enc.exe was crashing with "libgcc_s_seh-1.dll not found" because its mingw runtime DLLs weren\'t on the DLL search path. DLLs now bundle alongside heif-enc.exe and the resource dir is prepended to PATH at invocation time.',
+        'Windows HEIC export — heif-enc.exe needed more runtime DLLs than my hard-coded allowlist included (libjbig, libLerc, liblzma, libdeflate, libzstd, etc — all transitive deps of libtiff). Workflow now walks heif-enc.exe\'s import table via objdump and recursively bundles every transitive DLL it actually depends on. Future libheif updates won\'t need allowlist tweaks.',
+        'Windows Google sign-in works — Drive OAuth used to fail with "Access blocked: response_type missing" because cmd.exe was truncating the URL at the first &. Switched to rundll32 url.dll,FileProtocolHandler which is the canonical Windows URL opener and bypasses cmd entirely.',
         'Grid view cards no longer expand to fill the entire row when there are only 2-3 photos. Switched the grid CSS from auto-fit (collapses empty tracks → existing items expand) to auto-fill with a 320px max column width.',
       ]},
       { h: 'Note', items: [
