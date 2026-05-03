@@ -78,11 +78,20 @@ jobs:
           fi
           cp "$EXIFTOOL_EXE" src-tauri/exiftool/exiftool.exe
           # libheif heif-enc.exe for Windows HEIC encoding (Mac uses sips).
-          curl -L -o libheif.zip https://github.com/strukturag/libheif/releases/download/v1.21.0/libheif-1.21.0-windows-x64.zip
-          7z x libheif.zip -olibheif-extract
-          cp libheif-extract/libheif-*/bin/heif-enc.exe src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe
-          # heif-enc needs its companion DLLs alongside it.
-          cp libheif-extract/libheif-*/bin/*.dll src-tauri/binaries/
+          # strukturag doesn't ship Windows binaries; use MSYS2 (preinstalled
+          # on windows-latest) to pull a prebuilt mingw libheif. heif-enc.exe
+          # runs as its own process, so the mingw runtime doesn't conflict
+          # with our MSVC-built tauri app.
+          /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed mingw-w64-x86_64-libheif
+          cp /c/msys64/mingw64/bin/heif-enc.exe src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe
+          # Copy the runtime DLLs heif-enc.exe needs. Glob broadly — pacman
+          # can pull in slightly different sets across versions.
+          for dll in libheif libde265 libx265 libaom libdav1d libsharpyuv \
+                     libjpeg libpng16 libwebp libtiff libopenh264 libsvtav1enc \
+                     libwinpthread libgcc_s libstdc \
+                     zlib1; do
+            cp /c/msys64/mingw64/bin/${dll}*.dll src-tauri/binaries/ 2>/dev/null || true
+          done
 
       - uses: tauri-apps/tauri-action@v0
         env:
