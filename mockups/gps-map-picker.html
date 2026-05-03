@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GPS — map picker mockup</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0c;--surface:#15151a;--surface-2:#1d1d24;--surface-3:#262630;
+  --border:#2a2a33;--border-strong:#3a3a48;
+  --text:#e8e8ec;--text-dim:#9c9ca8;--text-faint:#5e5e6c;
+  --accent:#d9c77a;--accent-hi:#e8d68a;
+  --red:#ef4444;--green:#5fd97e;--blue:#7fbbe3;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.5;padding:32px clamp(20px,3vw,48px);min-height:100vh;}
+h1{font-family:'Antonio',sans-serif;font-size:26px;letter-spacing:.18em;margin:0 0 6px;background:linear-gradient(90deg,#c0c0c0,#d9c77a 60%,#a99858);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.lede{color:var(--text-dim);font-size:12px;max-width:720px;margin-bottom:32px;}
+h2{font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.18em;color:var(--text-faint);margin:32px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+
+/* Two-column compare: sidebar before/after */
+.layout{display:grid;grid-template-columns:340px 1fr;gap:28px;align-items:flex-start;}
+@media(max-width:900px){.layout{grid-template-columns:1fr;}}
+
+/* Sidebar mock — mimics carousel-panel section */
+.side{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:18px;}
+.side-h{font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.18em;color:var(--text-dim);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;}
+.row{display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.04em;color:var(--text);margin-bottom:8px;}
+.row.section{font-size:9px;color:var(--text-faint);letter-spacing:.16em;text-transform:uppercase;margin-top:14px;margin-bottom:6px;border-top:1px solid var(--border);padding-top:14px;}
+.input{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;}
+.input:focus{outline:none;border-color:var(--accent);}
+.btn{background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:5px 10px;font-family:'Antonio',sans-serif;font-size:9px;font-weight:700;letter-spacing:.12em;border-radius:2px;cursor:pointer;text-transform:uppercase;}
+.btn:hover{color:var(--text);border-color:var(--accent);}
+.btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:700;}
+.btn.primary:hover{background:var(--accent-hi);}
+.btn.with-icon{display:flex;align-items:center;gap:6px;}
+.note{font-size:10px;color:var(--text-faint);margin-top:6px;line-height:1.5;}
+
+/* Right column: feature card + the map mockup */
+.feature{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:20px;margin-bottom:24px;}
+.feature h3{font-family:'Antonio',sans-serif;font-size:14px;letter-spacing:.18em;margin:0 0 10px;color:var(--accent);}
+.feature p{font-size:12px;color:var(--text-dim);margin:0 0 8px;line-height:1.6;}
+
+/* Map picker modal mockup */
+.map-modal{background:var(--surface);border:1px solid var(--border-strong);border-radius:6px;overflow:hidden;display:grid;grid-template-columns:1fr 280px;height:520px;box-shadow:0 24px 60px rgba(0,0,0,.5);}
+@media(max-width:900px){.map-modal{grid-template-columns:1fr;height:auto;}}
+.map-main{display:flex;flex-direction:column;min-width:0;}
+.map-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.map-head .ttl{font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.18em;font-weight:700;}
+.map-search{flex:1;display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:2px;padding:0 10px;}
+.map-search input{flex:1;background:transparent;border:none;color:var(--text);padding:6px 0;font-family:inherit;font-size:11px;outline:none;}
+.close-x{background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer;}
+
+/* The "map" area — fake but suggestive. CSS-only tile pattern + pin. */
+.map-canvas{position:relative;flex:1;min-height:340px;background:
+  radial-gradient(circle at 35% 40%, rgba(95,180,120,.16), transparent 220px),
+  radial-gradient(circle at 70% 65%, rgba(120,160,210,.18), transparent 280px),
+  linear-gradient(135deg, #1a2a2f 0%, #0e1a20 100%);
+overflow:hidden;}
+/* Fake "streets" — diagonal grid */
+.map-canvas::before{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(135deg, rgba(255,255,255,.04) 1px, transparent 1px),
+    linear-gradient(45deg,  rgba(255,255,255,.04) 1px, transparent 1px);
+  background-size: 38px 38px, 52px 52px;
+  opacity:.85;
+}
+/* Fake "water" blob */
+.map-canvas::after{
+  content:'';position:absolute;
+  width:240px;height:160px;left:8%;bottom:10%;
+  background:radial-gradient(ellipse at center, rgba(127,187,227,.45) 0%, rgba(127,187,227,.15) 60%, transparent 80%);
+  border-radius:50%;
+  filter:blur(2px);
+}
+/* Pin */
+.pin{position:absolute;left:50%;top:48%;transform:translate(-50%,-100%);z-index:2;}
+.pin svg{width:34px;height:48px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.6));}
+.pin .ring{position:absolute;left:50%;bottom:0;transform:translate(-50%,50%);width:90px;height:24px;border-radius:50%;background:radial-gradient(ellipse, rgba(217,199,122,.5), transparent 70%);animation:pulse 1.6s ease-out infinite;}
+@keyframes pulse{0%{transform:translate(-50%,50%) scale(.6);opacity:.9;}100%{transform:translate(-50%,50%) scale(1.6);opacity:0;}}
+
+/* Map controls overlay (zoom etc) */
+.map-ctrls{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;background:rgba(15,15,20,.85);border:1px solid var(--border);border-radius:3px;overflow:hidden;}
+.map-ctrls button{background:transparent;border:none;color:var(--text);width:30px;height:30px;cursor:pointer;border-bottom:1px solid var(--border);font-size:16px;}
+.map-ctrls button:last-child{border-bottom:none;}
+.map-ctrls button:hover{background:var(--surface-3);color:var(--accent);}
+
+/* Lat/Lng readout */
+.map-readout{position:absolute;bottom:12px;left:12px;background:rgba(15,15,20,.85);border:1px solid var(--border);border-radius:3px;padding:8px 12px;display:flex;flex-direction:column;gap:3px;font-family:'JetBrains Mono',monospace;}
+.map-readout .label{font-size:9px;color:var(--text-faint);letter-spacing:.12em;}
+.map-readout .place{font-size:12px;color:var(--text);font-weight:600;}
+.map-readout .coords{font-size:10px;color:var(--accent);}
+
+/* Footer with action button */
+.map-foot{padding:14px 16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface);}
+.foot-meta{font-size:10px;color:var(--text-faint);}
+
+/* Right rail: recents + nearby */
+.map-rail{background:var(--surface-2);border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;}
+.rail-section{padding:14px 16px;border-bottom:1px solid var(--border);}
+.rail-section h4{font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.16em;color:var(--text-faint);margin:0 0 10px;text-transform:uppercase;}
+.rail-item{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:2px;cursor:pointer;}
+.rail-item:hover{background:var(--surface-3);}
+.rail-item.active{background:rgba(217,199,122,.08);}
+.rail-pin{width:20px;height:20px;border-radius:50%;background:var(--surface-3);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--accent);flex-shrink:0;}
+.rail-pin.active{background:var(--accent);color:var(--bg);}
+.rail-text{flex:1;min-width:0;}
+.rail-name{font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rail-sub{font-size:9px;color:var(--text-faint);letter-spacing:.04em;}
+
+/* Save options */
+.save-row{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-dim);margin-top:6px;}
+.save-row input[type="text"]{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 7px;font-family:inherit;font-size:10px;border-radius:2px;}
+
+/* Banner */
+.banner{position:fixed;top:0;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--bg);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;padding:4px 14px;border-radius:0 0 4px 4px;z-index:200;text-transform:uppercase;}
+
+/* Compare panel */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:900px){.compare-grid{grid-template-columns:1fr;}}
+.compare-col h3{font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.18em;color:var(--text-faint);margin:0 0 10px;}
+.compare-col.now h3{color:var(--text-faint);}
+.compare-col.new h3{color:var(--accent);}
+
+/* Tag chip strip */
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.chip{background:var(--surface-3);color:var(--text-dim);font-size:9px;padding:3px 8px;border-radius:10px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border:1px solid transparent;}
+.chip:hover{color:var(--text);border-color:var(--border-strong);}
+.chip.active{background:var(--accent);color:var(--bg);font-weight:700;}
+
+</style>
+</head>
+<body>
+<div class="banner">MOCKUP — GPS MAP PICKER</div>
+
+<h1>GPS — MAP PICKER</h1>
+<p class="lede">Today: type-a-city + 250-entry built-in DB. Most actual locations the user wants aren't in there. Adding a <b>PICK ON MAP</b> button that opens a real map with click-to-drop pin, search-as-you-type geocoding, and saved locations. Backed by OpenStreetMap (free, MIT-licensed tiles) so no API keys or per-request fees.</p>
+
+<div class="compare-grid">
+
+  <!-- BEFORE -->
+  <div class="compare-col now">
+    <h3>NOW</h3>
+    <div class="side">
+      <div class="side-h"><span>📍 GPS LOCATION</span><span style="color:var(--text-faint);font-size:9px;">none</span></div>
+      <input class="input" placeholder="Type city — e.g. Miami, Tokyo, Paris" />
+      <div class="row" style="margin-top:8px;font-size:10px;color:var(--text-dim);">
+        <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" checked> randomize within 5 km</label>
+        <button class="btn" style="font-size:8px;">CLEAR</button>
+      </div>
+      <details style="margin-top:8px;"><summary style="font-size:9px;color:var(--text-faint);cursor:pointer;">Custom coordinates</summary>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;">
+          <input class="input" placeholder="Lat" style="font-size:10px;">
+          <input class="input" placeholder="Lng" style="font-size:10px;">
+        </div>
+      </details>
+      <div class="note">Limited to ~250 cities baked in the app. Anything outside that needs raw lat/lng.</div>
+    </div>
+  </div>
+
+  <!-- AFTER -->
+  <div class="compare-col new">
+    <h3>WITH MAP PICKER</h3>
+    <div class="side">
+      <div class="side-h"><span>📍 GPS LOCATION</span><span style="color:var(--green);font-size:9px;">CAIRO, EG</span></div>
+      <input class="input" placeholder="Type a city or address…" value="Cairo, Egypt" />
+      <button class="btn primary with-icon" style="width:100%;justify-content:center;margin-top:8px;padding:8px 12px;font-size:11px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"/></svg>
+        PICK ON MAP
+      </button>
+      <div class="row" style="margin-top:10px;font-size:10px;color:var(--text-dim);">
+        <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" checked> randomize within 5 km</label>
+        <button class="btn" style="font-size:8px;">CLEAR</button>
+      </div>
+      <div class="row section">SAVED PLACES</div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text);"><span>🏠 Home · Brooklyn</span><span style="color:var(--text-faint);font-size:9px;">40.6782, -73.9442</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text);"><span>📌 Studio · Manhattan</span><span style="color:var(--text-faint);font-size:9px;">40.7831, -73.9712</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--accent);"><span>📌 Cairo trip</span><span style="color:var(--text-faint);font-size:9px;">30.0444, 31.2357</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================== -->
+<h2>MAP PICKER MODAL · OPENS AFTER "PICK ON MAP"</h2>
+
+<div class="feature">
+  <h3>HOW IT WORKS</h3>
+  <p>1. Click anywhere on the map → pin drops, lat/lng updates, reverse-geocode pulls the place name.</p>
+  <p>2. Type in the search bar → live results from OpenStreetMap's free Nominatim service. Click a result → map pans + pin moves.</p>
+  <p>3. Right rail: <b>Recently used</b> (last 8) + <b>Saved places</b> (you can name + save the current pin).</p>
+  <p>4. Bottom-left readout shows the resolved place name + exact coords. <b>USE LOCATION</b> commits + closes.</p>
+</div>
+
+<div class="map-modal">
+  <div class="map-main">
+    <div class="map-head">
+      <div class="ttl">📍 PICK LOCATION</div>
+      <div class="map-search">
+        <span style="color:var(--text-faint);">🔍</span>
+        <input placeholder="Cairo, Egypt — Tahrir Square" value="Cairo, Egypt">
+      </div>
+      <button class="close-x">×</button>
+    </div>
+    <div class="map-canvas">
+      <div class="pin">
+        <svg viewBox="0 0 24 36"><path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24c0-6.6-5.4-12-12-12z" fill="#d9c77a" stroke="#a99858" stroke-width="1.4"/><circle cx="12" cy="12" r="4.5" fill="#0a0a0c"/></svg>
+        <div class="ring"></div>
+      </div>
+      <div class="map-ctrls">
+        <button title="Zoom in">+</button>
+        <button title="Zoom out">−</button>
+        <button title="Recenter">⌖</button>
+      </div>
+      <div class="map-readout">
+        <span class="label">SELECTED</span>
+        <span class="place">Cairo, Egypt</span>
+        <span class="coords">30.0444, 31.2357</span>
+      </div>
+    </div>
+    <div class="map-foot">
+      <span class="foot-meta">tiles © OpenStreetMap contributors · free</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="text" placeholder="Name to save (optional)" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 10px;font-family:inherit;font-size:11px;border-radius:2px;width:180px;outline:none;">
+        <button class="btn">SAVE</button>
+        <button class="btn primary">USE LOCATION</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT RAIL -->
+  <div class="map-rail">
+    <div class="rail-section">
+      <h4>SUGGESTIONS</h4>
+      <div class="rail-item">
+        <div class="rail-pin">📍</div>
+        <div class="rail-text"><div class="rail-name">Cairo, Egypt</div><div class="rail-sub">city · 30.04, 31.24</div></div>
+      </div>
+      <div class="rail-item">
+        <div class="rail-pin">📍</div>
+        <div class="rail-text"><div class="rail-name">Cairo, Illinois, US</div><div class="rail-sub">city · 37.00, -89.18</div></div>
+      </div>
+      <div class="rail-item">
+        <div class="rail-pin">📍</div>
+        <div class="rail-text"><div class="rail-name">El Cairo Restaurant, Brooklyn</div><div class="rail-sub">venue · 40.68, -73.94</div></div>
+      </div>
+    </div>
+    <div class="rail-section">
+      <h4>RECENTLY USED</h4>
+      <div class="rail-item active">
+        <div class="rail-pin active">●</div>
+        <div class="rail-text"><div class="rail-name">Cairo, Egypt</div><div class="rail-sub">5 min ago</div></div>
+      </div>
+      <div class="rail-item">
+        <div class="rail-pin">●</div>
+        <div class="rail-text"><div class="rail-name">Manhattan, NY</div><div class="rail-sub">2h ago</div></div>
+      </div>
+      <div class="rail-item">
+        <div class="rail-pin">●</div>
+        <div class="rail-text"><div class="rail-name">Lisbon, PT</div><div class="rail-sub">yesterday</div></div>
+      </div>
+      <div class="rail-item">
+        <div class="rail-pin">●</div>
+        <div class="rail-text"><div class="rail-name">Tulum, MX</div><div class="rail-sub">3 days ago</div></div>
+      </div>
+    </div>
+    <div class="rail-section">
+      <h4>SAVED PLACES</h4>
+      <div class="rail-item">
+        <div class="rail-pin">🏠</div>
+        <div class="rail-text"><div class="rail-name">Home · Brooklyn</div><div class="rail-sub">40.68, -73.94</div></div>
+      </div>
+      <div class="rail-item">
+        <div class="rail-pin">📌</div>
+        <div class="rail-text"><div class="rail-name">Studio · Manhattan</div><div class="rail-sub">40.78, -73.97</div></div>
+      </div>
+      <div class="rail-item">
+        <div class="rail-pin">📌</div>
+        <div class="rail-text"><div class="rail-name">Beach house · Tulum</div><div class="rail-sub">20.21, -87.46</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================== -->
+<h2>WHAT THE PIN ACTUALLY DROPS</h2>
+
+<div class="feature">
+  <p style="font-size:12px;color:var(--text);margin-bottom:14px;">When the user clicks <b>USE LOCATION</b>, we set:</p>
+  <div style="background:#0a0a0c;border:1px solid var(--border);border-radius:3px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);line-height:1.7;">
+<span style="color:var(--accent);">iphoneGpsState</span> = {<br>
+&nbsp;&nbsp;<span style="color:var(--blue);">lat</span>: <span style="color:var(--green);">30.044420</span>,<br>
+&nbsp;&nbsp;<span style="color:var(--blue);">lng</span>: <span style="color:var(--green);">31.235712</span>,<br>
+&nbsp;&nbsp;<span style="color:var(--blue);">label</span>: <span style="color:var(--green);">"Cairo, Egypt"</span>,&nbsp;&nbsp;<span style="color:var(--text-faint);">// reverse-geocoded for the sidebar status</span><br>
+&nbsp;&nbsp;<span style="color:var(--blue);">randomize</span>: <span style="color:var(--green);">true</span>,&nbsp;&nbsp;<span style="color:var(--text-faint);">// ±5km jitter on each export per existing behavior</span><br>
+}
+  </div>
+  <p style="font-size:12px;color:var(--text-dim);margin-top:14px;">EXIF write path doesn't change — same <code>getGpsForExport()</code> already converts these to GPSLatitude/GPSLongitude/GPSLatitudeRef/GPSLongitudeRef tags. The map picker only changes the UX of <i>setting</i> the lat/lng, not what gets written.</p>
+</div>
+
+<!-- ======================================================================== -->
+<h2>STACK CHOICE</h2>
+<div class="feature">
+  <h3>OPENSTREETMAP + LEAFLET (RECOMMENDED)</h3>
+  <p><b>Why:</b> tiles + geocoding are free, zero API keys, MIT-compatible. <a style="color:var(--accent);">tile.openstreetmap.org</a> serves PNG tiles directly; <a style="color:var(--accent);">nominatim.openstreetmap.org</a> does forward + reverse geocoding (1 req/sec rate limit, fine for one-user-at-a-time desktop app).</p>
+  <p><b>Render:</b> Leaflet.js (~40KB gzipped, MIT license) — drop-in interactive map. No build-step changes; just a script tag. The hidden Tauri webview (or main webview if we put the modal here) loads the tiles.</p>
+  <p><b>Caveat:</b> we should send a polite <code>User-Agent</code> header per OSM's usage policy and respect rate limits. Easy in the fetch call.</p>
+  <p style="margin-top:12px;font-size:11px;color:var(--text-faint);">Alternatives: Mapbox (free up to 50k loads/mo, then $$); Google Maps (paid); Apple MapKit JS (free with Apple Developer account, but JS API requires online verification). OSM/Leaflet is the only fully-free no-account option.</p>
+</div>
+
+</body>
+</html>

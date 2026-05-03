@@ -85,23 +85,26 @@ jobs:
           # which killed the script before bundling. Use `|| true` so we
           # tolerate that, then verify the binaries we need actually exist.
           /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed mingw-w64-x86_64-libheif mingw-w64-x86_64-ntldd-git || true
-          test -f /c/msys64/mingw64/bin/heif-enc.exe || { echo "heif-enc.exe not installed by pacman"; exit 1; }
-          test -f /c/msys64/mingw64/bin/ntldd.exe   || { echo "ntldd.exe not installed by pacman";   exit 1; }
-          cp /c/msys64/mingw64/bin/heif-enc.exe src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe
-          # Recursively list every DLL the binary depends on. ntldd outputs
-          # Windows-style paths (C:\msys64\mingw64\bin\…). v4.0.6 grep was
-          # matching the MSYS-style path (/c/msys64/…) which never appeared
-          # in ntldd output, so it bundled 0 DLLs. Switch to extracting the
-          # DLL basename from any line that mentions "msys64" (= DLLs that
-          # come from our MSYS2 install, not system DLLs like KERNEL32) and
-          # copying by name from the known mingw64/bin dir.
-          # Print the raw ntldd output for debugging too.
-          echo "--- ntldd raw output ---"
-          /c/msys64/mingw64/bin/ntldd.exe -R src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe 2>&1 | head -80
-          echo "------------------------"
+          test -f /c/msys64/mingw64/bin/heif-enc.exe     || { echo "heif-enc.exe not installed by pacman"; exit 1; }
+          test -f /c/msys64/mingw64/bin/heif-convert.exe || { echo "heif-convert.exe not installed by pacman"; exit 1; }
+          test -f /c/msys64/mingw64/bin/ntldd.exe        || { echo "ntldd.exe not installed by pacman"; exit 1; }
+          cp /c/msys64/mingw64/bin/heif-enc.exe     src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe
+          cp /c/msys64/mingw64/bin/heif-convert.exe src-tauri/binaries/heif-convert-x86_64-pc-windows-msvc.exe
+          # Recursively list every DLL each tool depends on. ntldd outputs
+          # Windows-style paths (C:\msys64\mingw64\bin\…) — extract basename
+          # and copy from the known bin dir. Walk BOTH heif-enc and
+          # heif-convert so we cover everything libheif's CLI tools touch
+          # (overlap is fine — sort -u dedupes).
+          echo "--- ntldd raw output (heif-enc) ---"
+          /c/msys64/mingw64/bin/ntldd.exe -R src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe 2>&1 | head -50
+          echo "--- ntldd raw output (heif-convert) ---"
+          /c/msys64/mingw64/bin/ntldd.exe -R src-tauri/binaries/heif-convert-x86_64-pc-windows-msvc.exe 2>&1 | head -50
+          echo "---------------------------------------"
           set +e
-          /c/msys64/mingw64/bin/ntldd.exe -R src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe 2>&1 \
-            | awk 'tolower($0) ~ /msys64/ {print $1}' \
+          {
+            /c/msys64/mingw64/bin/ntldd.exe -R src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe 2>&1
+            /c/msys64/mingw64/bin/ntldd.exe -R src-tauri/binaries/heif-convert-x86_64-pc-windows-msvc.exe 2>&1
+          } | awk 'tolower($0) ~ /msys64/ {print $1}' \
             | sort -u \
             | while read dll; do
                 src="/c/msys64/mingw64/bin/$dll"

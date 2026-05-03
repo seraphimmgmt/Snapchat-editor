@@ -5391,7 +5391,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.0.8';
+const APP_VERSION = '4.0.9';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -6317,6 +6317,31 @@ async function loadImageFromFile(file) {
   });
 }
 
+// Convert a HEIC/HEIF file to JPEG via the bundled Rust converter. Used on
+// Windows because WebView2 (Chromium) can't decode HEIC natively — without
+// this the <img> tag silently fails and the carousel stays empty after a
+// Drive import or drag-drop of HEIC files.
+async function convertHeicToJpegInBrowser(file) {
+  if (!window.__TAURI__) throw new Error('Tauri not available');
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const heicPath = await window.__TAURI__.core.invoke('save_temp_file', { name: file.name, bytes: Array.from(buf) });
+  let jpegPath;
+  try {
+    jpegPath = await window.__TAURI__.core.invoke('heic_to_jpeg', { path: heicPath });
+  } finally {
+    try { await window.__TAURI__.core.invoke('delete_temp_file', { path: heicPath }); } catch (_) {}
+  }
+  const jpegBytes = await window.__TAURI__.core.invoke('read_temp_file', { path: jpegPath });
+  try { await window.__TAURI__.core.invoke('delete_temp_file', { path: jpegPath }); } catch (_) {}
+  const jpegName = file.name.replace(/\.hei[cf]$/i, '.jpg');
+  return new File([new Uint8Array(jpegBytes)], jpegName, { type: 'image/jpeg' });
+}
+
+function isHeicFile(f) {
+  if (!f) return false;
+  return /^image\/heic|^image\/heif/i.test(f.type || '') || /\.hei[cf]$/i.test(f.name || '');
+}
+
 async function addCarouselFiles(fileList) {
   const wasEmpty = carouselState.images.length === 0;
   const remaining = CAROUSEL_MAX - carouselState.images.length;
@@ -6324,15 +6349,34 @@ async function addCarouselFiles(fileList) {
     alert(`Carousel is full (max ${CAROUSEL_MAX} images).`);
     return;
   }
-  const files = Array.from(fileList).filter(f => f.type.startsWith('image/')).slice(0, remaining);
-  for (const f of files) {
+  // Be permissive on the filter: accept anything matching image/* OR a known
+  // image extension. Drive sometimes returns application/octet-stream for
+  // less-common formats; the extension is the more reliable signal.
+  const isImage = (f) => f.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|hei[cf]|avif|tiff?)$/i.test(f.name || '');
+  const candidates = Array.from(fileList).filter(isImage).slice(0, remaining);
+  // On Windows the WebView can't decode HEIC. Convert HEIC files via Rust
+  // (sips on Mac path covers it natively, but Mac WebKit can decode HEIC
+  // anyway so this is purely a Windows fix).
+  const isWindows = /win/i.test(navigator.platform);
+  const failed = [];
+  for (const original of candidates) {
+    let f = original;
+    if (isWindows && isHeicFile(f)) {
+      try {
+        f = await convertHeicToJpegInBrowser(f);
+      } catch (e) {
+        console.warn('HEIC convert failed:', original.name, e);
+        failed.push({ name: original.name, reason: 'HEIC conversion failed' });
+        continue;
+      }
+    }
     try {
       const item = await loadImageFromFile(f);
-      // Apply align preset to new image's crop offset
       applyAlignToItem(item, carouselState.align);
       carouselState.images.push(item);
     } catch (e) {
       console.warn('Skipping unreadable image:', f.name, e);
+      failed.push({ name: original.name, reason: 'image decode failed' });
     }
   }
   if (carouselState.images.length > 0 && carouselState.activeIndex >= carouselState.images.length) {
@@ -6343,6 +6387,14 @@ async function addCarouselFiles(fileList) {
     carouselState.viewMode = carouselState.images.length >= 4 ? 'grid' : 'carousel';
   }
   syncCarouselView();
+  // Surface failures so the user knows why nothing showed up — was a silent
+  // console.warn before, which meant Drive imports of HEIC files looked like
+  // they vanished into thin air on Windows.
+  if (failed.length) {
+    const names = failed.slice(0, 3).map(x => x.name).join(', ');
+    const more = failed.length > 3 ? ` +${failed.length - 3} more` : '';
+    showToast(`${failed.length} file${failed.length === 1 ? '' : 's'} couldn't be loaded: ${names}${more}`);
+  }
 }
 
 function removeCarouselImage(index) {
@@ -11909,6 +11961,22 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.0.9',
+    date: '2026-05-04',
+    title: 'Windows Drive import — HEIC support + visible failures',
+    sections: [
+      { h: 'Fixed', items: [
+        'Drive import on Windows finished downloading but the carousel stayed empty. Root cause: HEIC files (most iPhone exports) couldn\'t be decoded by the Windows WebView (Chromium has no native HEIC decoder; macOS WebKit does). Now converts HEIC → JPEG via the bundled libheif heif-convert tool before handing the file to the canvas. Same fix applies to drag-dropped HEIC files on Windows, not just Drive.',
+        'Image-load failures used to be silent (just a console.warn) — Drive imports of unsupported formats vanished into thin air with no explanation. Now shows a toast naming the files that couldn\'t load.',
+        'Carousel file filter is more permissive — accepts any file with a recognized image extension (.heic, .heif, .avif, .tiff…) even if Drive returns application/octet-stream as the MIME type.',
+      ]},
+      { h: 'Under the hood', items: [
+        'New Rust command: heic_to_jpeg (sips on Mac, heif-convert on Windows).',
+        'New sidecar bundled: heif-convert.exe (the libheif decoder) — DLLs already covered by the existing walker.',
+      ]},
+    ]
+  },
   {
     version: '4.0.8',
     date: '2026-05-04',

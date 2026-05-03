@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Snap Caption Studio",
-  "version": "4.0.8",
+  "version": "4.0.9",
   "identifier": "com.seraphimmgmt.snapcaptionstudio",
   "build": {
     "frontendDist": "../dist"
@@ -35,7 +35,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/ffmpeg", "binaries/heif-enc"],
+    "externalBin": ["binaries/ffmpeg", "binaries/heif-enc", "binaries/heif-convert"],
     "resources": ["exiftool/**/*", "binaries/*.dll"],
     "createUpdaterArtifacts": true
   },

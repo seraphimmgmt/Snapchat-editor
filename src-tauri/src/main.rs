@@ -32,6 +32,7 @@ fn main() {
             pick_export_folder,
             save_export_to_path,
             reveal_in_folder,
+            heic_to_jpeg,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -654,6 +655,77 @@ async fn save_export_to_path(
         target.display()
     );
     Ok(target.to_string_lossy().to_string())
+}
+
+// HEIC → JPEG decode. Drive imports + drag-drops of .heic files were silently
+// dropping on Windows because the WebView (Chromium) has no native HEIC
+// decoder; macOS WebKit handles them natively. Convert on the Rust side
+// before handing the file back to the JS image pipeline.
+//   - macOS: `sips -s format jpeg` — built in, no extra install
+//   - Windows: `heif-convert` from libheif (already installed by the workflow
+//     for HEIC encoding); reuses the same DLL bundle as heif-enc.
+#[tauri::command]
+async fn heic_to_jpeg(app: AppHandle, path: String) -> Result<String, String> {
+    let p = std::path::PathBuf::from(&path);
+    if !p.exists() {
+        return Err(format!("input file not found: {}", path));
+    }
+    let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("converted");
+    let parent = p.parent().unwrap_or(std::path::Path::new("."));
+    let jpeg_path = parent.join(format!("{}_converted.jpg", stem));
+    let jpeg_str = jpeg_path.to_string_lossy().to_string();
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app;
+        let output = tokio::process::Command::new("sips")
+            .args(["-s", "format", "jpeg", &path, "--out", &jpeg_str])
+            .output()
+            .await
+            .map_err(|e| format!("sips: {e}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "sips HEIC decode failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use tauri_plugin_shell::ShellExt;
+        let mut sidecar = app
+            .shell()
+            .sidecar("heif-convert")
+            .map_err(|e| format!("heif-convert sidecar lookup: {e}"))?;
+        // Same PATH fix as jpeg_to_heic — heif-convert needs the mingw DLLs.
+        use tauri::Manager;
+        if let Ok(resource_dir) = app.path().resource_dir() {
+            let dll_dir = resource_dir.join("binaries");
+            if dll_dir.is_dir() {
+                let existing = std::env::var("PATH").unwrap_or_default();
+                let new_path = format!("{};{}", dll_dir.display(), existing);
+                sidecar = sidecar.env("PATH", new_path);
+            }
+        }
+        let output = sidecar
+            .args([&path, &jpeg_str])
+            .output()
+            .await
+            .map_err(|e| format!("heif-convert invoke: {e}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "heif-convert failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let _ = app;
+        return Err("HEIC decode not supported on Linux build".to_string());
+    }
+
+    Ok(jpeg_str)
 }
 
 // Reveal a file in the system file manager — Finder on macOS (`open -R`)
