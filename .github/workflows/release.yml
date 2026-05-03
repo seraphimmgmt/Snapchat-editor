@@ -1,0 +1,106 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            args: ''
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      # ---- Bundle native sidecars per platform ----
+      # Tauri sidecars are looked up by `name-<rust-triple>` (no extension on
+      # Mac/Linux, .exe on Windows). They MUST be in src-tauri/binaries/ before
+      # `tauri build` runs so they get embedded in the app bundle/installer.
+      #
+      # Mac aarch64 already has ffmpeg + perl-based exiftool committed to the
+      # repo. We download what's missing per-platform here.
+
+      - name: Download Mac x86_64 ffmpeg
+        if: matrix.platform == 'macos-latest' && contains(matrix.args, 'x86_64-apple-darwin')
+        run: |
+          curl -L -o ffmpeg.zip https://www.osxexperts.net/ffmpeg711intel.zip
+          unzip ffmpeg.zip
+          mv ffmpeg src-tauri/binaries/ffmpeg-x86_64-apple-darwin
+          chmod +x src-tauri/binaries/ffmpeg-x86_64-apple-darwin
+
+      - name: Download Linux ffmpeg
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          curl -L -o ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          mkdir -p ffmpeg-extract
+          tar -xJf ffmpeg.tar.xz -C ffmpeg-extract --strip-components=1
+          cp ffmpeg-extract/ffmpeg src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+          chmod +x src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+
+      - name: Download Windows ffmpeg + exiftool + libheif
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          set -e
+          mkdir -p src-tauri/binaries
+          # ffmpeg (gyan.dev essentials build)
+          curl -L -o ffmpeg.zip https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+          7z x ffmpeg.zip -offmpeg-extract
+          cp ffmpeg-extract/ffmpeg-*/bin/ffmpeg.exe src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
+          # exiftool standalone Windows (.exe). Replaces the perl distribution
+          # bundled in repo for the Mac side; Rust looks for .exe first on win32.
+          curl -L -o exiftool.zip https://exiftool.org/exiftool-13.57_64.zip
+          7z x exiftool.zip -oexiftool-extract
+          # exiftool ships as `exiftool(-k).exe` — rename to canonical name.
+          mv "exiftool-extract/exiftool(-k).exe" src-tauri/exiftool/exiftool.exe
+          # libheif heif-enc.exe for Windows HEIC encoding (Mac uses sips).
+          curl -L -o libheif.zip https://github.com/strukturag/libheif/releases/download/v1.21.0/libheif-1.21.0-windows-x64.zip
+          7z x libheif.zip -olibheif-extract
+          cp libheif-extract/libheif-*/bin/heif-enc.exe src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe
+          # heif-enc needs its companion DLLs alongside it.
+          cp libheif-extract/libheif-*/bin/*.dll src-tauri/binaries/
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Snap Caption Studio ${{ github.ref_name }}'
+          releaseBody: 'See assets below.'
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Stub: heif-enc is only invoked on Windows/Linux. On macOS jpeg_to_heic uses
+# the built-in `sips` tool, so this binary is bundled solely to satisfy
+# Tauri's externalBin requirement and is never actually executed.
+echo "heif-enc stub: sips is used on macOS" >&2
+exit 1

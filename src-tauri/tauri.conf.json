@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Snap Caption Studio",
+  "version": "4.0.0",
+  "identifier": "com.seraphimmgmt.snapcaptionstudio",
+  "build": {
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Snap Caption Studio",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "withGlobalTauri": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg", "app"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": ["binaries/ffmpeg", "binaries/heif-enc"],
+    "resources": ["exiftool/**/*"],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhEMUZERENEMzI4NTZCMTAKUldRUWE0VXl6ZDBmamQ3L1dYdFpYaENHb0d0N1ZJcCt1VXBONUt3aytCTjZkREtiZE1uSU5wUU4K",
+      "endpoints": [
+        "https://github.com/seraphimmgmt/Snapchat-editor/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

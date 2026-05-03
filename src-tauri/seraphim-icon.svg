@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="65%">
+      <stop offset="0%" stop-color="#1a1a1f"/>
+      <stop offset="60%" stop-color="#0d0d10"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+
+    <linearGradient id="silver" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="60%"  stop-color="#DCDCDC"/>
+      <stop offset="100%" stop-color="#888888"/>
+    </linearGradient>
+
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#C8B470"/>
+      <stop offset="50%"  stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#C8B470"/>
+    </linearGradient>
+
+    <radialGradient id="halo-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#FFD700" stop-opacity="0.55"/>
+      <stop offset="60%"  stop-color="#FFD700" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#FFD700" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="halo-blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+
+    <!-- Right wing — smooth banana-shaped feathers, all curling up and out
+         with rounded tips. Each feather is a closed curve so the silver
+         gradient fills it cleanly; the dark gaps between them come from the
+         spacing, not a stroke. -->
+    <g id="wing">
+      <!-- Feather 1 — innermost, smallest, gently curling up to the right -->
+      <path d="M 0 0
+               C 10 -60, 30 -130, 70 -180
+               C 90 -200, 105 -210, 120 -210
+               C 105 -180, 80 -120, 55 -55
+               C 40 -20, 25 5, 5 5 Z"
+            fill="url(#silver)"/>
+      <!-- Feather 2 -->
+      <path d="M 5 5
+               C 30 -60, 80 -150, 150 -220
+               C 175 -245, 200 -260, 220 -260
+               C 200 -220, 160 -160, 120 -90
+               C 95 -40, 65 5, 25 10 Z"
+            fill="url(#silver)"/>
+      <!-- Feather 3 -->
+      <path d="M 25 10
+               C 70 -50, 150 -150, 240 -220
+               C 270 -240, 300 -250, 320 -245
+               C 290 -200, 235 -135, 180 -70
+               C 140 -25, 90 15, 50 15 Z"
+            fill="url(#silver)"/>
+      <!-- Feather 4 — outermost, longest sweep, almost horizontal then curling up -->
+      <path d="M 50 15
+               C 130 -10, 250 -80, 360 -180
+               C 390 -210, 410 -225, 420 -215
+               C 380 -150, 310 -75, 230 -10
+               C 180 30, 120 30, 80 25 Z"
+            fill="url(#silver)"/>
+    </g>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="180" ry="180" fill="url(#bg)"/>
+
+  <!-- Halo: glow + thin gold ring + bright crescent highlight -->
+  <ellipse cx="512" cy="240" rx="160" ry="40" fill="url(#halo-glow)" filter="url(#halo-blur)"/>
+  <ellipse cx="512" cy="240" rx="105" ry="18" fill="none" stroke="url(#gold)" stroke-width="9" opacity="0.95"/>
+  <path d="M 422 238 Q 512 220 602 238" stroke="#FFFFFF" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- Wings — base anchored at center-low; curl upward and outward -->
+  <g transform="translate(512 700)">
+    <use href="#wing"/>
+    <use href="#wing" transform="scale(-1 1)"/>
+  </g>
+</svg>
