@@ -5391,7 +5391,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.0.6';
+const APP_VERSION = '4.0.7';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -11880,6 +11880,16 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.0.7',
+    date: '2026-05-03',
+    title: 'HEIC DLL walker — match Windows-style paths',
+    sections: [
+      { h: 'Fixed', items: [
+        'v4.0.6 ran ntldd successfully but the grep extracting DLL paths was looking for MSYS-style paths (/c/msys64/…) and ntldd outputs Windows-style paths (C:\\msys64\\…). Result: 0 DLLs bundled, build shipped without HEIC support. Now extracts DLL basenames from any line that mentions "msys64" and copies by name from the known bin dir. Workflow also dumps raw ntldd output so future failures are diagnosable from the log.',
+      ]},
+    ]
+  },
   {
     version: '4.0.6',
     date: '2026-05-03',

@@ -88,16 +88,25 @@ jobs:
           test -f /c/msys64/mingw64/bin/heif-enc.exe || { echo "heif-enc.exe not installed by pacman"; exit 1; }
           test -f /c/msys64/mingw64/bin/ntldd.exe   || { echo "ntldd.exe not installed by pacman";   exit 1; }
           cp /c/msys64/mingw64/bin/heif-enc.exe src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe
-          # Recursively list every DLL the binary depends on (and their deps,
-          # and so on), filter to mingw64/bin DLLs (skip system DLLs like
-          # KERNEL32), copy unique ones into binaries/. set +e around the
-          # pipeline because grep returning empty (no matches) shouldn't fail
-          # the build before we see the diagnostic listing.
+          # Recursively list every DLL the binary depends on. ntldd outputs
+          # Windows-style paths (C:\msys64\mingw64\bin\…). v4.0.6 grep was
+          # matching the MSYS-style path (/c/msys64/…) which never appeared
+          # in ntldd output, so it bundled 0 DLLs. Switch to extracting the
+          # DLL basename from any line that mentions "msys64" (= DLLs that
+          # come from our MSYS2 install, not system DLLs like KERNEL32) and
+          # copying by name from the known mingw64/bin dir.
+          # Print the raw ntldd output for debugging too.
+          echo "--- ntldd raw output ---"
+          /c/msys64/mingw64/bin/ntldd.exe -R src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe 2>&1 | head -80
+          echo "------------------------"
           set +e
           /c/msys64/mingw64/bin/ntldd.exe -R src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe 2>&1 \
-            | grep -oE '/c/msys64/mingw64/bin/[^ ]+\.dll' \
+            | awk 'tolower($0) ~ /msys64/ {print $1}' \
             | sort -u \
-            | while read src; do cp "$src" src-tauri/binaries/; done
+            | while read dll; do
+                src="/c/msys64/mingw64/bin/$dll"
+                if [ -f "$src" ]; then cp "$src" src-tauri/binaries/; fi
+              done
           set -e
           echo "Bundled $(ls -1 src-tauri/binaries/*.dll 2>/dev/null | wc -l) DLL(s) for heif-enc:"
           ls -1 src-tauri/binaries/*.dll 2>/dev/null | head -50 || echo "(none — DLL bundling failed)"
