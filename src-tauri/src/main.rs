@@ -296,11 +296,32 @@ async fn jpeg_to_heic(app: tauri::AppHandle, jpeg_path: String) -> Result<String
     {
         // libheif's heif-enc: -q quality, -p chroma=420 default. We pin q=92 to
         // roughly match sips' default visual quality.
+        //
+        // Windows: heif-enc.exe is a mingw build that links to libgcc_s_seh-1
+        // .dll, libheif.dll, libde265.dll, etc. Tauri places the sidecar at
+        // <install>/heif-enc.exe but bundle resources land in
+        // <install>/resources/binaries/*.dll — Windows' DLL search order
+        // doesn't include the resource dir, so the .exe crashes with "DLL not
+        // found" before doing any work. Prepending the resource binaries dir
+        // to PATH lets the loader find them.
         use tauri_plugin_shell::ShellExt;
-        let output = app
+        let mut sidecar = app
             .shell()
             .sidecar("heif-enc")
-            .map_err(|e| format!("heif-enc sidecar lookup: {e}"))?
+            .map_err(|e| format!("heif-enc sidecar lookup: {e}"))?;
+        #[cfg(target_os = "windows")]
+        {
+            use tauri::Manager;
+            if let Ok(resource_dir) = app.path().resource_dir() {
+                let dll_dir = resource_dir.join("binaries");
+                if dll_dir.is_dir() {
+                    let existing = std::env::var("PATH").unwrap_or_default();
+                    let new_path = format!("{};{}", dll_dir.display(), existing);
+                    sidecar = sidecar.env("PATH", new_path);
+                }
+            }
+        }
+        let output = sidecar
             .args(["-q", "92", &jpeg_path, "-o", &heic_str])
             .output()
             .await
@@ -427,8 +448,15 @@ fn open_url(url: String) -> Result<(), String> {
     };
     #[cfg(target_os = "windows")]
     let mut cmd = {
-        let mut c = std::process::Command::new("cmd");
-        c.args(["/C", "start", "", &url]);
+        // `cmd /C start "" "<url>"` looks correct but cmd.exe's command-line
+        // parser strips `&` even from quoted args, breaking any URL with
+        // multiple query params (Google OAuth: response_type=...&client_id=...
+        // gets truncated at the first `&`). rundll32 url.dll,FileProtocolHandler
+        // is the canonical Windows API for opening a URL — same path Explorer
+        // uses internally — and bypasses cmd entirely, so URL encoding stays
+        // intact.
+        let mut c = std::process::Command::new("rundll32.exe");
+        c.args(["url.dll,FileProtocolHandler", &url]);
         c
     };
     #[cfg(target_os = "linux")]

@@ -545,7 +545,10 @@
   .carousel-tools .tool-viewbtn.active{background:var(--accent);color:var(--bg);font-weight:700;}
   .carousel-tools .tool-viewbtn.active:hover{color:var(--bg);}
   /* Grid view layout — overrides rail flex behavior when active */
-  .carousel-rail.grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(calc(220px * var(--card-size, 1)), 1fr));gap:12px;padding:14px;align-items:start;justify-content:center;align-content:start;overflow-y:auto;overflow-x:hidden;scroll-snap-type:none;}
+  /* auto-FILL (not -fit) so two photos don't expand to occupy a 1900px-wide
+     row each. minmax caps the column at 320px so cards stay sensibly sized
+     even on ultrawide displays. */
+  .carousel-rail.grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(calc(220px * var(--card-size, 1)), calc(320px * var(--card-size, 1))));gap:12px;padding:14px;align-items:start;justify-content:center;align-content:start;overflow-y:auto;overflow-x:hidden;scroll-snap-type:none;}
   .carousel-rail.grid .carousel-card{transform:none;cursor:pointer;width:100%;overflow:hidden;border-radius:2px;}
   .carousel-rail.grid .carousel-card:not(.active):hover{outline:1px solid var(--border-strong);outline-offset:2px;}
   .carousel-rail.grid .carousel-card-inner{width:100%;}
@@ -5368,7 +5371,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.0.2';
+const APP_VERSION = '4.0.3';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -11838,6 +11841,21 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.0.3',
+    date: '2026-05-03',
+    title: 'Windows fixes — OAuth, HEIC, grid sizing',
+    sections: [
+      { h: 'Fixed', items: [
+        'Windows Google sign-in now works — Drive OAuth used to fail with "Access blocked: response_type missing" because cmd.exe was truncating the URL at the first &. Switched to rundll32 url.dll,FileProtocolHandler which is the canonical Windows URL opener and bypasses cmd entirely.',
+        'Windows HEIC export — heif-enc.exe was crashing with "libgcc_s_seh-1.dll not found" because its mingw runtime DLLs weren\'t on the DLL search path. DLLs now bundle alongside heif-enc.exe and the resource dir is prepended to PATH at invocation time.',
+        'Grid view cards no longer expand to fill the entire row when there are only 2-3 photos. Switched the grid CSS from auto-fit (collapses empty tracks → existing items expand) to auto-fill with a 320px max column width.',
+      ]},
+      { h: 'Note', items: [
+        'Fast vs Reliable export engines only affect VIDEO encoding — HEIC always routes through the same native helper (sips on Mac, heif-enc.exe on Windows). Engine choice doesn\'t change HEIC behavior.',
+      ]},
+    ]
+  },
   {
     version: '4.0.2',
     date: '2026-05-03',
