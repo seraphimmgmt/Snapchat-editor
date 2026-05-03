@@ -18,20 +18,12 @@ jobs:
             args: '--target aarch64-apple-darwin'
           - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
-          - platform: 'ubuntu-22.04'
-            args: ''
           - platform: 'windows-latest'
             args: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -54,19 +46,12 @@ jobs:
       - name: Download Mac x86_64 ffmpeg
         if: matrix.platform == 'macos-latest' && contains(matrix.args, 'x86_64-apple-darwin')
         run: |
-          curl -L -o ffmpeg.zip https://www.osxexperts.net/ffmpeg711intel.zip
+          # evermeet.cx serves the canonical Intel-only mac ffmpeg.
+          # Returns a 302 to the latest stable build.
+          curl -L -o ffmpeg.zip "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip"
           unzip ffmpeg.zip
           mv ffmpeg src-tauri/binaries/ffmpeg-x86_64-apple-darwin
           chmod +x src-tauri/binaries/ffmpeg-x86_64-apple-darwin
-
-      - name: Download Linux ffmpeg
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          curl -L -o ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-          mkdir -p ffmpeg-extract
-          tar -xJf ffmpeg.tar.xz -C ffmpeg-extract --strip-components=1
-          cp ffmpeg-extract/ffmpeg src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
-          chmod +x src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
 
       - name: Download Windows ffmpeg + exiftool + libheif
         if: matrix.platform == 'windows-latest'
@@ -78,12 +63,20 @@ jobs:
           curl -L -o ffmpeg.zip https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
           7z x ffmpeg.zip -offmpeg-extract
           cp ffmpeg-extract/ffmpeg-*/bin/ffmpeg.exe src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
-          # exiftool standalone Windows (.exe). Replaces the perl distribution
-          # bundled in repo for the Mac side; Rust looks for .exe first on win32.
+          # exiftool standalone Windows (.exe). Newer zips ship as
+          # exiftool-<ver>_64/exiftool(-k).exe with an exiftool_files/ sibling
+          # the exe needs at runtime — copy both.
           curl -L -o exiftool.zip https://exiftool.org/exiftool-13.57_64.zip
           7z x exiftool.zip -oexiftool-extract
-          # exiftool ships as `exiftool(-k).exe` — rename to canonical name.
-          mv "exiftool-extract/exiftool(-k).exe" src-tauri/exiftool/exiftool.exe
+          EXIFTOOL_EXE=$(find exiftool-extract -name "exiftool(-k).exe" -type f | head -1)
+          if [ -z "$EXIFTOOL_EXE" ]; then
+            echo "Could not locate exiftool(-k).exe in extracted zip"; ls -R exiftool-extract; exit 1
+          fi
+          EXIFTOOL_DIR=$(dirname "$EXIFTOOL_EXE")
+          if [ -d "$EXIFTOOL_DIR/exiftool_files" ]; then
+            cp -r "$EXIFTOOL_DIR/exiftool_files" src-tauri/exiftool/
+          fi
+          cp "$EXIFTOOL_EXE" src-tauri/exiftool/exiftool.exe
           # libheif heif-enc.exe for Windows HEIC encoding (Mac uses sips).
           curl -L -o libheif.zip https://github.com/strukturag/libheif/releases/download/v1.21.0/libheif-1.21.0-windows-x64.zip
           7z x libheif.zip -olibheif-extract
