@@ -947,7 +947,7 @@
 <div id="iphoneMetaOptions" style="margin-top:10px;display:none;">
 <div class="section-row" style="margin-top:6px;"><span>📅 CAPTURE DATE</span><button type="button" class="none-toggle" id="iphoneDateClearBtn" style="font-size:9px;padding:3px 8px;">RANDOM</button></div>
 <input type="datetime-local" id="iphoneCaptureDateInput" style="width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;box-sizing:border-box;margin-top:6px;">
-<p class="output-note" style="margin:6px 0 0;">Sets the EXIF DateTimeOriginal / CreateDate. Leave blank (RANDOM) for a random time within the last 7 days.</p>
+<p class="output-note" style="margin:6px 0 0;">Sets the EXIF DateTimeOriginal / CreateDate. Leave blank (RANDOM) for today's date with a time within ±8h of now.</p>
 </div>
 <div class="color-row" style="margin-top:14px;">
 <span>STRIP METADATA</span>
@@ -1164,7 +1164,7 @@ Pick from Google Drive
 <div id="carouselIphoneOptions" style="margin-top:10px;display:none;">
 <div class="section-row" style="margin-top:6px;"><span>📅 CAPTURE DATE (1ST IMAGE)</span><button type="button" class="none-toggle" id="carouselDateClearBtn" style="font-size:9px;padding:3px 8px;">RANDOM</button></div>
 <input type="datetime-local" id="carouselCaptureDateInput" style="width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;box-sizing:border-box;margin-top:6px;">
-<p class="output-note" style="margin:6px 0 0;">Anchor timestamp for the first image. Subsequent images stagger 1–4 min after. Leave blank (RANDOM) for a random anchor within the last 7 days.</p>
+<p class="output-note" style="margin:6px 0 0;">Anchor timestamp for the first image. Subsequent images stagger 1–4 min after. Leave blank (RANDOM) for today's date with a time within ±8h of now.</p>
 <div class="section-row" style="margin-top:14px;"><span>📍 GPS LOCATION</span><span id="carouselGpsStatus" style="color:var(--text-faint);font-size:9px;">none</span></div>
 <div style="position:relative;">
 <input type="text" id="carouselGpsSearch" placeholder="Type city — e.g. Miami, Tokyo, Paris" autocomplete="off" style="width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;box-sizing:border-box;">
@@ -2254,10 +2254,11 @@ function buildIphoneExif(width, height, captureDateOverride) {
 
   const now = new Date();
   // If caller passed a date (e.g. carousel render sequencing), use it.
-  // Otherwise: random offset within the last 7 days.
+  // Otherwise: today, time within ±8h of now (keeps the EXIF timestamp
+  // believable as a recent capture without straying from "today").
   const captureDate = captureDateOverride instanceof Date
     ? captureDateOverride
-    : new Date(now.getTime() - Math.random() * 7 * 24 * 60 * 60 * 1000);
+    : new Date(now.getTime() + (Math.random() - 0.5) * 16 * 60 * 60 * 1000);
   const exifDate = formatExifDate(captureDate);
 
   // Plausible randomized values
@@ -11631,9 +11632,11 @@ function ensureSettingsModal() {
             <span>Auto-check for updates (on launch + every 4 hours)</span>
             <button class="none-toggle" id="prefAutoUpdate">OFF</button>
           </div>
-          <div class="settings-row">
-            <span>Check for updates now</span>
-            <button class="none-toggle" id="prefManualCheckUpdate">CHECK</button>
+          <div class="settings-row" id="updateStatusRow" style="align-items:flex-start;flex-wrap:wrap;">
+            <span id="updateStatusLabel">Check for updates now</span>
+            <div id="updateStatusControl" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+              <button class="none-toggle" id="prefManualCheckUpdate">CHECK</button>
+            </div>
           </div>
         </div>
         <div class="settings-group">
@@ -11680,8 +11683,11 @@ function ensureSettingsModal() {
   document.getElementById('prefMetaClean').addEventListener('click', () => { PREFS.defaultMetaClean = !PREFS.defaultMetaClean; tog('prefMetaClean', PREFS.defaultMetaClean); savePrefs(); });
   document.getElementById('prefAutoUpdate').addEventListener('click', () => { PREFS.autoCheckUpdates = !PREFS.autoCheckUpdates; tog('prefAutoUpdate', PREFS.autoCheckUpdates); savePrefs(); });
   document.getElementById('prefManualCheckUpdate').addEventListener('click', () => {
-    if (typeof window.__manualCheckUpdate === 'function') window.__manualCheckUpdate();
-    else showToast('Updater only available in the desktop app.');
+    if (window.__TAURI__ && window.__TAURI__.core) {
+      startManualUpdateCheck();
+    } else {
+      showToast('Updater only available in the desktop app.');
+    }
   });
 
   document.getElementById('prefOpenLog').addEventListener('click', () => {
@@ -11851,26 +11857,127 @@ function ensureUpdateModal() {
   };
 }
 
+// Open the in-app update modal pre-populated with version + release notes.
+// Used both by the auto-poll (immediate) and the Settings "UPDATE NOW" button
+// (after the user reviews the inline status).
+function showUpdateModal(version, body) {
+  ensureUpdateModal();
+  document.getElementById('updateModalTitle').textContent = `Update available · v${version}`;
+  document.getElementById('updateBlurb').innerHTML =
+    `A new version of <b>Snap Caption Studio</b> is ready (<b>v${escapeHtml(String(version || ''))}</b>). Install now to get the latest fixes and features. The app will restart.`;
+  const notesEl = document.getElementById('updateNotes');
+  if (body && String(body).trim()) {
+    notesEl.textContent = String(body).trim();
+    notesEl.style.display = 'block';
+  } else {
+    notesEl.style.display = 'none';
+  }
+  document.getElementById('updateActions').style.display = 'flex';
+  document.getElementById('updateProgressWrap').style.display = 'none';
+  document.getElementById('updateError').style.display = 'none';
+  document.getElementById('updateCloseBtn').style.display = 'block';
+  document.getElementById('updateOverlay').classList.remove('hidden');
+}
+
+// ----------------------- Settings update-status row -----------------------
+// State machine driven by Rust events. updateCheckOrigin tells listeners
+// whether the latest check was triggered manually (Settings) — and so should
+// render inline — or by the auto-poll, which goes straight to the modal.
+let updateCheckOrigin = null; // 'manual' | 'auto' | null
+let lastUpdateInfo = null;    // { version, body } cached for the inline UI
+
+function setUpdateStatusIdle() {
+  const lbl = document.getElementById('updateStatusLabel');
+  const ctl = document.getElementById('updateStatusControl');
+  if (!lbl || !ctl) return;
+  lbl.textContent = 'Check for updates now';
+  lbl.className = '';
+  ctl.innerHTML = '<button class="none-toggle" id="prefManualCheckUpdate">CHECK</button>';
+  document.getElementById('prefManualCheckUpdate').onclick = startManualUpdateCheck;
+}
+
+function setUpdateStatusBusy() {
+  const lbl = document.getElementById('updateStatusLabel');
+  const ctl = document.getElementById('updateStatusControl');
+  if (!lbl || !ctl) return;
+  lbl.textContent = 'Checking for updates…';
+  lbl.className = 'upd-busy';
+  ctl.innerHTML = '<span class="upd-spinner" aria-hidden="true"></span>';
+}
+
+function setUpdateStatusOk() {
+  const lbl = document.getElementById('updateStatusLabel');
+  const ctl = document.getElementById('updateStatusControl');
+  if (!lbl || !ctl) return;
+  lbl.textContent = '✓ You are up to date';
+  lbl.className = 'upd-ok';
+  ctl.innerHTML = '<button class="upd-action-btn" id="prefManualCheckUpdate">CHECK AGAIN</button>';
+  document.getElementById('prefManualCheckUpdate').onclick = startManualUpdateCheck;
+}
+
+function setUpdateStatusAvailable(version, body) {
+  const lbl = document.getElementById('updateStatusLabel');
+  const ctl = document.getElementById('updateStatusControl');
+  if (!lbl || !ctl) return;
+  lastUpdateInfo = { version, body };
+  lbl.textContent = `⚠ Update ${version} is ready`;
+  lbl.className = 'upd-bad';
+  ctl.innerHTML = `
+    <button class="upd-action-btn" id="updRemindLaterBtn">REMIND ME LATER</button>
+    <button class="upd-action-btn primary" id="updInstallNowBtn">UPDATE NOW</button>`;
+  document.getElementById('updRemindLaterBtn').onclick = setUpdateStatusIdle;
+  document.getElementById('updInstallNowBtn').onclick = () => {
+    if (lastUpdateInfo) showUpdateModal(lastUpdateInfo.version, lastUpdateInfo.body);
+  };
+}
+
+function setUpdateStatusError(msg) {
+  const lbl = document.getElementById('updateStatusLabel');
+  const ctl = document.getElementById('updateStatusControl');
+  if (!lbl || !ctl) return;
+  lbl.textContent = `✗ ${msg || 'Update check failed'}`;
+  lbl.className = 'upd-bad';
+  ctl.innerHTML = '<button class="upd-action-btn" id="prefManualCheckUpdate">RETRY</button>';
+  document.getElementById('prefManualCheckUpdate').onclick = startManualUpdateCheck;
+}
+
+function startManualUpdateCheck() {
+  if (!window.__TAURI__ || !window.__TAURI__.core) return;
+  updateCheckOrigin = 'manual';
+  setUpdateStatusBusy();
+  window.__TAURI__.core.invoke('check_updates_now').catch((e) => {
+    console.warn('[updater] manual check failed:', e);
+    setUpdateStatusError('Check failed');
+    updateCheckOrigin = null;
+  });
+}
+
 if (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen) {
   const { listen } = window.__TAURI__.event;
   listen('update-available', (e) => {
-    ensureUpdateModal();
     const { version, body } = e.payload || {};
-    document.getElementById('updateModalTitle').textContent = `Update available · v${version}`;
-    document.getElementById('updateBlurb').innerHTML =
-      `A new version of <b>Snap Caption Studio</b> is ready (<b>v${escapeHtml(String(version || ''))}</b>). Install now to get the latest fixes and features. The app will restart.`;
-    const notesEl = document.getElementById('updateNotes');
-    if (body && body.trim()) {
-      notesEl.textContent = body.trim();
-      notesEl.style.display = 'block';
-    } else {
-      notesEl.style.display = 'none';
+    if (updateCheckOrigin === 'manual') {
+      setUpdateStatusAvailable(version, body);
+      updateCheckOrigin = null;
+      return;
     }
-    document.getElementById('updateActions').style.display = 'flex';
-    document.getElementById('updateProgressWrap').style.display = 'none';
-    document.getElementById('updateError').style.display = 'none';
-    document.getElementById('updateCloseBtn').style.display = 'block';
-    document.getElementById('updateOverlay').classList.remove('hidden');
+    // Auto-poll (or first-launch check) → straight to the modal.
+    showUpdateModal(version, body);
+  });
+  listen('update-not-available', () => {
+    if (updateCheckOrigin === 'manual') {
+      setUpdateStatusOk();
+      updateCheckOrigin = null;
+    }
+    // Auto-poll: stay quiet.
+  });
+  listen('update-check-error', (e) => {
+    const msg = e && e.payload && e.payload.message ? String(e.payload.message) : 'Update check failed';
+    if (updateCheckOrigin === 'manual') {
+      setUpdateStatusError(msg);
+      updateCheckOrigin = null;
+    }
+    // Auto-poll: stay quiet (logged on Rust side).
   });
   listen('update-progress', (e) => {
     const { percent } = e.payload || {};
@@ -11880,13 +11987,18 @@ if (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen)
     if (lbl && typeof percent === 'number') lbl.textContent = `Downloading… ${Math.round(percent)}%`;
   });
   listen('update-error', (e) => {
+    // Install-time errors only — check errors use update-check-error.
     const msg = (e && e.payload) ? String(e.payload) : 'Unknown error';
     document.getElementById('updateProgressWrap').style.display = 'none';
     const err = document.getElementById('updateError');
-    err.textContent = `Update failed: ${msg}`;
-    err.style.display = 'block';
-    document.getElementById('updateActions').style.display = 'flex';
-    document.getElementById('updateModalTitle').textContent = 'Update failed';
+    if (err) {
+      err.textContent = `Update failed: ${msg}`;
+      err.style.display = 'block';
+    }
+    const actions = document.getElementById('updateActions');
+    if (actions) actions.style.display = 'flex';
+    const title = document.getElementById('updateModalTitle');
+    if (title) title.textContent = 'Update failed';
   });
   listen('update-installed', () => {
     const lbl = document.getElementById('updateProgressLabel');
@@ -11897,27 +12009,22 @@ if (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen)
 // Auto-update check. Two passes: once on launch (after a short defer so the
 // UI is interactive first), then every UPDATE_POLL_HOURS while the app stays
 // open — so a release published mid-session still surfaces a modal without
-// requiring a restart. Both gated on the user's autoCheckUpdates pref.
+// requiring a restart. Both gated on the user's autoCheckUpdates pref. The
+// manual Settings check uses startManualUpdateCheck() above and renders inline.
 const UPDATE_POLL_HOURS = 4;
 function runUpdateCheck() {
   if (!PREFS.autoCheckUpdates) return;
   if (!window.__TAURI__ || !window.__TAURI__.core) return;
+  // Only set origin to 'auto' if no manual check is mid-flight.
+  if (updateCheckOrigin == null) updateCheckOrigin = 'auto';
   window.__TAURI__.core.invoke('check_updates_now').catch((e) => {
-    console.warn('[updater] check failed:', e);
+    console.warn('[updater] auto check failed:', e);
+    if (updateCheckOrigin === 'auto') updateCheckOrigin = null;
   });
 }
 if (window.__TAURI__ && window.__TAURI__.core) {
   setTimeout(runUpdateCheck, 1500);
   setInterval(runUpdateCheck, UPDATE_POLL_HOURS * 60 * 60 * 1000);
-  // Manual "Check now" button — wired up in Settings (see prefManualCheckUpdate).
-  window.__manualCheckUpdate = function () {
-    if (!window.__TAURI__ || !window.__TAURI__.core) return;
-    showToast('Checking for updates…');
-    window.__TAURI__.core.invoke('check_updates_now').catch((e) => {
-      console.warn('[updater] manual check failed:', e);
-      showToast('Update check failed');
-    });
-  };
 }
 </script>
 <style>
@@ -11931,6 +12038,15 @@ if (window.__TAURI__ && window.__TAURI__.core) {
   .settings-row select:focus{border-color:var(--accent);}
   .settings-row .none-toggle.danger{color:var(--red);border-color:rgba(239,68,68,.3);}
   .settings-row .none-toggle.danger:hover{background:rgba(239,68,68,.08);border-color:var(--red);}
+  /* Update status row — inline spinner + green/red text per check result. */
+  .upd-spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--border-strong);border-top-color:var(--accent);border-radius:50%;animation:updSpin .7s linear infinite;vertical-align:middle;}
+  @keyframes updSpin{to{transform:rotate(360deg);}}
+  #updateStatusLabel.upd-ok{color:#5fd97e;}
+  #updateStatusLabel.upd-bad{color:#ff6680;}
+  #updateStatusLabel.upd-busy{color:var(--text-dim);}
+  .upd-action-btn{background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:4px 10px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;border-radius:2px;cursor:pointer;}
+  .upd-action-btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:700;}
+  .upd-action-btn:hover{border-color:var(--accent);}
   .settings-note{margin-top:14px;font-size:10px;color:var(--text-faint);font-family:'JetBrains Mono',monospace;letter-spacing:.06em;text-align:center;}
   /* Patch notes modal */
   .pn-version{padding:0 0 18px;border-bottom:1px solid var(--border);margin-bottom:18px;}

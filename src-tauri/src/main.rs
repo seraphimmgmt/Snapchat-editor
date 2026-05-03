@@ -457,6 +457,13 @@ async fn check_for_updates(handle: tauri::AppHandle) {
         Ok(u) => u,
         Err(e) => {
             eprintln!("[updater] init failed: {e}");
+            // `update-check-error` is distinct from `update-error` (which the
+            // install modal owns) so the Settings-row spinner can react to
+            // check failures without clobbering install state.
+            let _ = handle.emit(
+                "update-check-error",
+                serde_json::json!({ "message": format!("init failed: {e}") }),
+            );
             return;
         }
     };
@@ -465,10 +472,15 @@ async fn check_for_updates(handle: tauri::AppHandle) {
         Ok(Some(u)) => u,
         Ok(None) => {
             eprintln!("[updater] no updates available");
+            let _ = handle.emit("update-not-available", serde_json::Value::Null);
             return;
         }
         Err(e) => {
             eprintln!("[updater] check failed: {e}");
+            let _ = handle.emit(
+                "update-check-error",
+                serde_json::json!({ "message": format!("check failed: {e}") }),
+            );
             return;
         }
     };
