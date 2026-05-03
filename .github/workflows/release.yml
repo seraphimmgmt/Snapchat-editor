@@ -80,21 +80,27 @@ jobs:
           # Install libheif AND ntldd. ntldd is the Windows equivalent of ldd
           # — given an .exe/.dll, it lists all transitive DLL deps with their
           # resolved paths. v4.0.4's hand-rolled bash recursion via objdump
-          # silently produced 1 result on the runner (likely Git Bash
-          # quirks with declare -A or objdump path), so DLLs after libheif's
-          # direct deps weren't getting bundled. ntldd is single-shot.
-          /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed mingw-w64-x86_64-libheif mingw-w64-x86_64-ntldd-git
+          # silently produced 1 result on the runner; v4.0.5's pacman call
+          # exited 1 (post-transaction hook quirk in the runner's MSYS2 env)
+          # which killed the script before bundling. Use `|| true` so we
+          # tolerate that, then verify the binaries we need actually exist.
+          /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed mingw-w64-x86_64-libheif mingw-w64-x86_64-ntldd-git || true
+          test -f /c/msys64/mingw64/bin/heif-enc.exe || { echo "heif-enc.exe not installed by pacman"; exit 1; }
+          test -f /c/msys64/mingw64/bin/ntldd.exe   || { echo "ntldd.exe not installed by pacman";   exit 1; }
           cp /c/msys64/mingw64/bin/heif-enc.exe src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe
           # Recursively list every DLL the binary depends on (and their deps,
           # and so on), filter to mingw64/bin DLLs (skip system DLLs like
-          # KERNEL32), copy unique ones into binaries/.
+          # KERNEL32), copy unique ones into binaries/. set +e around the
+          # pipeline because grep returning empty (no matches) shouldn't fail
+          # the build before we see the diagnostic listing.
+          set +e
           /c/msys64/mingw64/bin/ntldd.exe -R src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe 2>&1 \
             | grep -oE '/c/msys64/mingw64/bin/[^ ]+\.dll' \
             | sort -u \
             | while read src; do cp "$src" src-tauri/binaries/; done
-          echo "Bundled DLLs for heif-enc:"
-          ls -1 src-tauri/binaries/*.dll | wc -l
-          ls -1 src-tauri/binaries/*.dll | head -50
+          set -e
+          echo "Bundled $(ls -1 src-tauri/binaries/*.dll 2>/dev/null | wc -l) DLL(s) for heif-enc:"
+          ls -1 src-tauri/binaries/*.dll 2>/dev/null | head -50 || echo "(none — DLL bundling failed)"
 
       - uses: tauri-apps/tauri-action@v0
         env:

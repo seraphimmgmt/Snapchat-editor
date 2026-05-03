@@ -5391,7 +5391,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.0.5';
+const APP_VERSION = '4.0.6';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -11880,6 +11880,19 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.0.6',
+    date: '2026-05-03',
+    title: 'Pacman tolerance for HEIC DLL bundling',
+    sections: [
+      { h: 'Fixed', items: [
+        'v4.0.5\'s pacman install for libheif + ntldd was failing the Windows build with exit code 1 — the install itself succeeded but a post-transaction hook in MSYS2 errored and `set -e` killed the script before DLL bundling could run. Now wraps pacman in `|| true` and verifies heif-enc.exe + ntldd.exe physically exist before continuing. The DLL walker pipeline also runs with `set +e` so an empty grep doesn\'t kill the diagnostic listing.',
+      ]},
+      { h: 'Note', items: [
+        'Includes everything from v4.0.5 — encoder fix (preset medium, CRF 18, JPEG 0.95, bt709), CLEAR button on carousel strip, and the responsive layout pass — none of those reached Windows because the v4.0.5 Windows build never got past the DLL step.',
+      ]},
+    ]
+  },
   {
     version: '4.0.5',
     date: '2026-05-03',
