@@ -2135,6 +2135,9 @@ function deliverBlob(blob, filename, mimeOverride) {
 
 // Save an export blob to a user-chosen folder via Rust. Falls back to a
 // browser download if the Rust write fails (e.g. folder was deleted/moved).
+// On success, pops a small modal with the saved filename + "Show in folder"
+// button (Finder on Mac, Explorer on Windows — file is selected, not just
+// the parent dir).
 async function saveBlobToFolder(blob, filename, dir) {
   try {
     const buf = new Uint8Array(await blob.arrayBuffer());
@@ -2143,12 +2146,61 @@ async function saveBlobToFolder(blob, filename, dir) {
       bytes: Array.from(buf),
       dir,
     });
-    showToast(`Saved to ${finalPath}`);
+    showSavedModal(finalPath);
   } catch (e) {
     console.warn('[export] save to folder failed, falling back to download', e);
     showToast('Folder save failed — using Downloads instead');
     downloadBlob(blob, filename);
   }
+}
+
+// Tiny one-shot modal: confirms an export landed on disk and offers to
+// reveal it in the OS file manager. Built lazily — first save creates the
+// DOM, subsequent saves just toggle visibility + swap the path.
+function showSavedModal(finalPath) {
+  let overlay = document.getElementById('savedOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'savedOverlay';
+    overlay.className = 'picker-overlay hidden';
+    overlay.innerHTML = `
+      <div class="picker-modal" style="max-width:520px;width:520px;">
+        <div class="picker-head">
+          <span class="ttl">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Saved</span>
+          </span>
+          <button class="x" id="savedCloseBtn" aria-label="Close">×</button>
+        </div>
+        <div style="padding:18px 22px 22px;font-family:'JetBrains Mono',monospace;color:var(--text);">
+          <div style="font-size:11px;color:var(--text-faint);letter-spacing:.06em;margin-bottom:6px;">FILE</div>
+          <div id="savedPath" style="font-size:11px;line-height:1.5;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:2px;padding:10px 12px;word-break:break-all;"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;">
+            <button id="savedOkBtn" style="background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:8px 16px;font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.14em;text-transform:uppercase;border-radius:2px;cursor:pointer;">OK</button>
+            <button id="savedRevealBtn" style="background:var(--accent);border:none;color:var(--bg);padding:8px 18px;font-family:'Antonio',sans-serif;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;border-radius:2px;cursor:pointer;">SHOW IN FOLDER</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.classList.add('hidden');
+    document.getElementById('savedCloseBtn').onclick = close;
+    document.getElementById('savedOkBtn').onclick = close;
+    document.getElementById('savedRevealBtn').onclick = async () => {
+      const path = overlay.dataset.path;
+      if (!path || !window.__TAURI__) { close(); return; }
+      try {
+        await window.__TAURI__.core.invoke('reveal_in_folder', { path });
+      } catch (e) {
+        console.warn('[reveal] failed', e);
+        showToast('Could not open folder');
+      }
+      close();
+    };
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  }
+  overlay.dataset.path = finalPath;
+  document.getElementById('savedPath').textContent = finalPath;
+  overlay.classList.remove('hidden');
 }
 
 // Global cancellation flag for long-running exports
@@ -8709,14 +8761,17 @@ async function renderCarouselOutputs(onProgress) {
   // seed __iphoneFilenameSeq here — image #1 → IMG_X, image #2 → IMG_X+1, etc.
   const captureDates = [];
   if (useIphoneMeta) {
+    // Same RANDOM logic as buildIphoneExif: today, ±8h around now (16h
+    // window). This is the carousel-specific code path I missed in v4.0.1
+    // — single-image editor was fixed but the carousel kept using the old
+    // "anywhere in the last 7 days" formula.
+    const randomAnchor = () => new Date(Date.now() + (Math.random() - 0.5) * 16 * 60 * 60 * 1000);
     let cursor;
     if (carouselState.iphoneCaptureDate) {
       const d = new Date(carouselState.iphoneCaptureDate);
-      cursor = isNaN(d.getTime())
-        ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000)
-        : d;
+      cursor = isNaN(d.getTime()) ? randomAnchor() : d;
     } else {
-      cursor = new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000);
+      cursor = randomAnchor();
     }
     for (let i = 0; i < carouselState.images.length; i++) {
       captureDates.push(new Date(cursor.getTime()));
@@ -11446,6 +11501,15 @@ function bindEvents() {
   document.querySelectorAll('.view-tab').forEach(tab => {
     tab.addEventListener('click', () => switchView(tab.dataset.view));
   });
+  // Restore the tab the user was on if Save & Apply just reloaded the app.
+  // sessionStorage clears on quit, so this only triggers within a session.
+  try {
+    const restoreView = sessionStorage.getItem('snapcap-restore-view');
+    if (restoreView && ['editor', 'carousel', 'inspector'].includes(restoreView)) {
+      sessionStorage.removeItem('snapcap-restore-view');
+      switchView(restoreView);
+    }
+  } catch (_) {}
 
   // V3.3: Inspector
   setupInspector();
@@ -11759,8 +11823,11 @@ function ensureSettingsModal() {
   });
   // Save & Apply: prefs are already auto-saved on each change, so this just
   // reloads so default-state options (iPhone meta on by default, etc) take
-  // effect immediately rather than only on next launch.
+  // effect immediately rather than only on next launch. Stash the current
+  // tab in sessionStorage so we land back where we started instead of
+  // snapping to the editor on every reload.
   document.getElementById('prefApplyBtn').addEventListener('click', () => {
+    try { sessionStorage.setItem('snapcap-restore-view', currentView || 'editor'); } catch (_) {}
     location.reload();
   });
 }
@@ -11774,19 +11841,23 @@ const PATCH_NOTES = [
   {
     version: '4.0.2',
     date: '2026-05-03',
-    title: 'Carousel + grid view rework',
+    title: 'View rework + missed paths',
     sections: [
       { h: 'New', items: [
         'Grid + carousel cards now show photos at their natural aspect — no more stretching to the export aspect',
         'Crop overlay (stripe pattern) shows exactly what the export will cut',
         'Hover-to-drag the crop anchor in grid view (no click-then-drag dance)',
+        'Export "Saved" modal with SHOW IN FOLDER button (Finder on Mac, Explorer on Windows — selects the file, not just the parent dir)',
+        'Save & Apply now keeps you on the tab you were on instead of snapping back to the editor',
       ]},
       { h: 'Fixed', items: [
+        'Date randomizer ±8h logic now also applies to the carousel path (v4.0.1 only fixed the editor — the carousel had its own copy of the old code)',
         'Carousel cards no longer fill the entire screen on Windows',
         'Grid + carousel cards size sensibly across display sizes (tighter caps)',
       ]},
       { h: 'Under the hood', items: [
         'CI matrix runs sequentially to prevent the "main" release race condition that broke v4.0.1\'s Mac signature',
+        'New Rust commands: pick_export_folder, save_export_to_path, reveal_in_folder',
       ]},
     ]
   },

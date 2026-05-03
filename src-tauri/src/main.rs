@@ -31,6 +31,7 @@ fn main() {
             install_update,
             pick_export_folder,
             save_export_to_path,
+            reveal_in_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -625,4 +626,46 @@ async fn save_export_to_path(
         target.display()
     );
     Ok(target.to_string_lossy().to_string())
+}
+
+// Reveal a file in the system file manager — Finder on macOS (`open -R`)
+// or Explorer on Windows (`explorer /select`). The file gets selected/
+// highlighted, not just the parent dir, so the user sees what just landed.
+#[tauri::command]
+fn reveal_in_folder(path: String) -> Result<(), String> {
+    let p = std::path::PathBuf::from(&path);
+    if !p.exists() {
+        return Err(format!("path does not exist: {}", path));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(&p)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // /select, expects a backslash-style path. PathBuf already gives us
+        // the OS-native form on Windows.
+        let arg = format!("/select,{}", p.display());
+        std::process::Command::new("explorer")
+            .arg(arg)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(target_os = "linux")]
+    {
+        // Fall back to opening the parent dir; few Linux file managers
+        // support a select-on-launch flag that's universally available.
+        let parent = p.parent().unwrap_or(std::path::Path::new("."));
+        std::process::Command::new("xdg-open")
+            .arg(parent)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
 }
