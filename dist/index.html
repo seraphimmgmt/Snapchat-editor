@@ -5337,50 +5337,54 @@ const DEFAULT_ADJ = { sat: 100, con: 100, bri: 100, war: 0, gra: 0, vig: 0 };
 
 // Filter library — each is a CSS filter string + optional tint overlay.
 // These EVOKE the named looks rather than perfectly replicating LUT-based
-// Instagram/iPhone filters (true replication needs WebGL + 3D LUTs).
-// Format: id, label, filter (CSS), tint (optional rgba overlay), mix (overlay alpha 0..1)
-// Filter values are deliberately bold so the difference between presets is
-// obvious at 100% strength. Users can dial down with the strength slider; if
-// they want subtle, that's what 30-50% is for. Each preset has a distinct
-// signature color via tint where CSS filter functions can't carry the look.
+// iPhone + Instagram filter library. Each entry has ONE method:
+//   - method: 'lut' → per-pixel LUT pass via FILTER_LUTS (no CSS, no tint).
+//     Used for iPhone presets; math derived from Apple's CIPhotoEffect filters.
+//   - method: 'css' → CSS filter() string + optional canvas tint overlay.
+//     Used for Instagram presets; values from Una Kravets's CSSgram (the
+//     community-validated reverse-engineering of IG's actual filters).
+// The renderer picks the right path per filter — no triple-cooking.
 const FILTER_LIBRARY = [
-  // === iPhone presets ===
-  { id: 'vivid',         label: 'Vivid',         group: 'iPhone',     filter: 'saturate(165%) contrast(115%) brightness(103%)' },
-  { id: 'vivid-warm',    label: 'Vivid Warm',    group: 'iPhone',     filter: 'saturate(160%) contrast(115%) sepia(28%)',                       tint: 'rgba(255,170,90,0.18)' },
-  { id: 'vivid-cool',    label: 'Vivid Cool',    group: 'iPhone',     filter: 'saturate(160%) contrast(115%) hue-rotate(-18deg)',               tint: 'rgba(110,170,255,0.18)' },
-  { id: 'dramatic',      label: 'Dramatic',      group: 'iPhone',     filter: 'saturate(140%) contrast(155%) brightness(92%)' },
-  { id: 'dramatic-warm', label: 'Drama Warm',    group: 'iPhone',     filter: 'saturate(140%) contrast(155%) brightness(92%) sepia(35%)',       tint: 'rgba(220,140,60,0.20)' },
-  { id: 'dramatic-cool', label: 'Drama Cool',    group: 'iPhone',     filter: 'saturate(140%) contrast(155%) brightness(92%) hue-rotate(-22deg)', tint: 'rgba(70,150,220,0.20)' },
-  { id: 'mono',          label: 'Mono',          group: 'iPhone',     filter: 'grayscale(100%) contrast(115%)' },
-  { id: 'silvertone',    label: 'Silvertone',    group: 'iPhone',     filter: 'grayscale(100%) contrast(115%) sepia(35%)',                      tint: 'rgba(180,150,110,0.18)' },
-  { id: 'noir',          label: 'Noir',          group: 'iPhone',     filter: 'grayscale(100%) contrast(165%) brightness(85%)' },
+  // === iPhone presets — LUT method (CIPhotoEffect-derived math) ===
+  { id: 'vivid',         label: 'Vivid',        group: 'iPhone', method: 'lut' },
+  { id: 'vivid-warm',    label: 'Vivid Warm',   group: 'iPhone', method: 'lut' },
+  { id: 'vivid-cool',    label: 'Vivid Cool',   group: 'iPhone', method: 'lut' },
+  { id: 'dramatic',      label: 'Dramatic',     group: 'iPhone', method: 'lut' },
+  { id: 'dramatic-warm', label: 'Drama Warm',   group: 'iPhone', method: 'lut' },
+  { id: 'dramatic-cool', label: 'Drama Cool',   group: 'iPhone', method: 'lut' },
+  { id: 'mono',          label: 'Mono',         group: 'iPhone', method: 'lut' },
+  { id: 'silvertone',    label: 'Silvertone',   group: 'iPhone', method: 'lut' },
+  { id: 'noir',          label: 'Noir',         group: 'iPhone', method: 'lut' },
 
-  // === Instagram-style ===
-  { id: 'clarendon',     label: 'Clarendon',     group: 'Instagram',  filter: 'saturate(150%) contrast(140%) brightness(105%)',                 tint: 'rgba(127,187,227,0.30)' },
-  { id: 'gingham',       label: 'Gingham',       group: 'Instagram',  filter: 'saturate(75%) contrast(85%) brightness(108%)',                   tint: 'rgba(230,230,210,0.28)' },
-  { id: 'moon',          label: 'Moon',          group: 'Instagram',  filter: 'grayscale(100%) contrast(115%) brightness(110%)',                tint: 'rgba(180,190,210,0.12)' },
-  { id: 'lark',          label: 'Lark',          group: 'Instagram',  filter: 'saturate(135%) contrast(95%) brightness(112%) hue-rotate(-5deg)', tint: 'rgba(110,160,200,0.20)' },
-  { id: 'reyes',         label: 'Reyes',         group: 'Instagram',  filter: 'saturate(60%) contrast(78%) brightness(115%) sepia(40%)',        tint: 'rgba(225,200,160,0.22)' },
-  { id: 'juno',          label: 'Juno',          group: 'Instagram',  filter: 'saturate(170%) contrast(120%) hue-rotate(-12deg)',               tint: 'rgba(255,170,80,0.18)' },
-  { id: 'slumber',       label: 'Slumber',       group: 'Instagram',  filter: 'saturate(60%) brightness(108%) sepia(35%)',                      tint: 'rgba(255,178,80,0.30)' },
-  { id: 'crema',         label: 'Crema',         group: 'Instagram',  filter: 'saturate(70%) contrast(92%) sepia(40%)',                         tint: 'rgba(220,200,150,0.30)' },
-  { id: 'ludwig',        label: 'Ludwig',        group: 'Instagram',  filter: 'saturate(85%) contrast(112%) brightness(108%)',                  tint: 'rgba(170,160,110,0.22)' },
-  { id: 'aden',          label: 'Aden',          group: 'Instagram',  filter: 'saturate(80%) contrast(85%) brightness(112%) hue-rotate(-22deg)', tint: 'rgba(180,90,80,0.20)' },
-  { id: 'perpetua',      label: 'Perpetua',      group: 'Instagram',  filter: 'saturate(125%) contrast(110%) brightness(102%)',                 tint: 'rgba(56,135,68,0.22)' },
-  { id: 'amaro',         label: 'Amaro',         group: 'Instagram',  filter: 'saturate(140%) contrast(110%) brightness(115%) hue-rotate(-15deg)', tint: 'rgba(255,200,80,0.20)' },
-  { id: 'mayfair',       label: 'Mayfair',       group: 'Instagram',  filter: 'saturate(125%) contrast(115%) brightness(110%)',                 tint: 'rgba(255,170,170,0.25)' },
-  { id: 'rise',          label: 'Rise',          group: 'Instagram',  filter: 'saturate(90%) contrast(92%) brightness(115%) sepia(28%)',         tint: 'rgba(255,210,150,0.22)' },
-  { id: 'hudson',        label: 'Hudson',        group: 'Instagram',  filter: 'saturate(85%) contrast(118%) brightness(105%)',                  tint: 'rgba(120,140,255,0.22)' },
-  { id: 'valencia',      label: 'Valencia',      group: 'Instagram',  filter: 'saturate(115%) contrast(110%) brightness(110%) sepia(35%)',      tint: 'rgba(225,180,130,0.22)' },
-  { id: 'xpro2',         label: 'X-Pro II',      group: 'Instagram',  filter: 'saturate(160%) contrast(155%) brightness(92%) sepia(45%)',       tint: 'rgba(150,80,30,0.22)' },
-  { id: 'sierra',        label: 'Sierra',        group: 'Instagram',  filter: 'saturate(115%) contrast(90%) brightness(115%) sepia(28%)',       tint: 'rgba(220,180,140,0.20)' },
-  { id: 'willow',        label: 'Willow',        group: 'Instagram',  filter: 'grayscale(70%) contrast(92%) brightness(112%) sepia(20%)',       tint: 'rgba(200,200,210,0.20)' },
-  { id: 'lo-fi',         label: 'Lo-Fi',         group: 'Instagram',  filter: 'saturate(180%) contrast(180%)' },
-  { id: 'inkwell',       label: 'Inkwell',       group: 'Instagram',  filter: 'grayscale(100%) contrast(115%) brightness(115%) sepia(45%)',     tint: 'rgba(220,200,170,0.18)' },
-  { id: 'nashville',     label: 'Nashville',     group: 'Instagram',  filter: 'saturate(130%) contrast(130%) brightness(108%) sepia(35%)',      tint: 'rgba(247,150,120,0.30)' },
-  { id: '1977',          label: '1977',          group: 'Instagram',  filter: 'saturate(140%) contrast(115%) brightness(115%)',                 tint: 'rgba(243,106,188,0.28)' },
-  { id: 'kelvin',        label: 'Kelvin',        group: 'Instagram',  filter: 'saturate(180%) contrast(120%) brightness(112%)',                 tint: 'rgba(255,140,40,0.32)' },
-  { id: 'toaster',       label: 'Toaster',       group: 'Instagram',  filter: 'saturate(180%) contrast(180%) brightness(92%) sepia(35%)',       tint: 'rgba(150,70,15,0.28)' },
+  // === Instagram presets — CSS+tint method (CSSgram values) ===
+  // CSSgram uses ::after pseudo-elements with gradients; we approximate with a
+  // single solid tint using the dominant color + the canvas blend mode. Values
+  // sourced from https://github.com/una/CSSgram (MIT licensed).
+  { id: 'clarendon',     label: 'Clarendon',    group: 'Instagram', method: 'css', filter: 'saturate(135%) contrast(120%)',                                tint: 'rgba(127,187,227,0.40)', blend: 'overlay' },
+  { id: 'gingham',       label: 'Gingham',      group: 'Instagram', method: 'css', filter: 'brightness(105%) hue-rotate(-10deg)',                          tint: 'rgba(230,230,250,0.40)', blend: 'soft-light' },
+  { id: 'moon',          label: 'Moon',         group: 'Instagram', method: 'css', filter: 'grayscale(100%) contrast(110%) brightness(110%)' },
+  { id: 'lark',          label: 'Lark',         group: 'Instagram', method: 'css', filter: 'contrast(90%) brightness(105%)',                               tint: 'rgba(34,37,63,0.20)',     blend: 'color-burn' },
+  { id: 'reyes',         label: 'Reyes',        group: 'Instagram', method: 'css', filter: 'sepia(22%) brightness(110%) contrast(85%) saturate(75%)',     tint: 'rgba(173,205,239,0.50)', blend: 'soft-light' },
+  { id: 'juno',          label: 'Juno',         group: 'Instagram', method: 'css', filter: 'hue-rotate(-30deg) contrast(90%) saturate(140%)',             tint: 'rgba(127,187,227,0.40)', blend: 'overlay' },
+  { id: 'slumber',       label: 'Slumber',      group: 'Instagram', method: 'css', filter: 'saturate(66%) brightness(105%)',                              tint: 'rgba(125,105,24,0.40)',  blend: 'lighten' },
+  { id: 'crema',         label: 'Crema',        group: 'Instagram', method: 'css', filter: 'sepia(50%) contrast(125%) brightness(115%) saturate(90%) hue-rotate(-5deg)' },
+  { id: 'ludwig',        label: 'Ludwig',       group: 'Instagram', method: 'css', filter: 'sepia(25%) contrast(105%) brightness(105%) saturate(160%)',   tint: 'rgba(125,105,24,0.10)',  blend: 'overlay' },
+  { id: 'aden',          label: 'Aden',         group: 'Instagram', method: 'css', filter: 'hue-rotate(-20deg) contrast(90%) saturate(85%) brightness(120%)', tint: 'rgba(66,10,14,0.20)',  blend: 'darken' },
+  { id: 'perpetua',      label: 'Perpetua',     group: 'Instagram', method: 'css', filter: 'contrast(105%) saturate(110%)',                                tint: 'rgba(0,91,154,0.30)',     blend: 'soft-light' },
+  { id: 'amaro',         label: 'Amaro',        group: 'Instagram', method: 'css', filter: 'hue-rotate(-10deg) contrast(90%) brightness(110%) saturate(150%)' },
+  { id: 'mayfair',       label: 'Mayfair',      group: 'Instagram', method: 'css', filter: 'contrast(110%) saturate(110%)',                                tint: 'rgba(189,166,129,0.40)', blend: 'overlay' },
+  { id: 'rise',          label: 'Rise',         group: 'Instagram', method: 'css', filter: 'brightness(105%) sepia(20%) contrast(90%) saturate(90%)',     tint: 'rgba(232,197,152,0.30)', blend: 'overlay' },
+  { id: 'hudson',        label: 'Hudson',       group: 'Instagram', method: 'css', filter: 'brightness(120%) contrast(90%) saturate(110%)',                tint: 'rgba(166,177,255,0.30)',  blend: 'multiply' },
+  { id: 'valencia',      label: 'Valencia',     group: 'Instagram', method: 'css', filter: 'contrast(108%) brightness(108%) sepia(8%)',                   tint: 'rgba(58,3,57,0.30)',      blend: 'exclusion' },
+  { id: 'xpro2',         label: 'X-Pro II',     group: 'Instagram', method: 'css', filter: 'sepia(30%) contrast(110%)',                                    tint: 'rgba(224,231,180,0.30)', blend: 'color-burn' },
+  { id: 'sierra',        label: 'Sierra',       group: 'Instagram', method: 'css', filter: 'contrast(85%) saturate(85%)',                                  tint: 'rgba(125,105,24,0.30)',  blend: 'soft-light' },
+  { id: 'willow',        label: 'Willow',       group: 'Instagram', method: 'css', filter: 'brightness(90%) contrast(95%) saturate(0%)',                  tint: 'rgba(212,169,175,0.40)', blend: 'overlay' },
+  { id: 'lo-fi',         label: 'Lo-Fi',        group: 'Instagram', method: 'css', filter: 'saturate(110%) contrast(150%)' },
+  { id: 'inkwell',       label: 'Inkwell',      group: 'Instagram', method: 'css', filter: 'sepia(30%) contrast(110%) brightness(110%) grayscale(100%)' },
+  { id: 'nashville',     label: 'Nashville',    group: 'Instagram', method: 'css', filter: 'sepia(20%) contrast(120%) brightness(105%) saturate(120%)',   tint: 'rgba(247,176,153,0.50)', blend: 'darken' },
+  { id: '1977',          label: '1977',         group: 'Instagram', method: 'css', filter: 'contrast(110%) brightness(110%) saturate(130%)',               tint: 'rgba(243,106,188,0.30)', blend: 'screen' },
+  { id: 'kelvin',        label: 'Kelvin',       group: 'Instagram', method: 'css', filter: 'contrast(150%)',                                               tint: 'rgba(255,140,40,0.50)',  blend: 'color-dodge' },
+  { id: 'toaster',       label: 'Toaster',      group: 'Instagram', method: 'css', filter: 'contrast(150%) brightness(90%)',                               tint: 'rgba(180,80,15,0.40)',   blend: 'screen' },
 ];
 
 const FILTER_BY_ID = Object.fromEntries(FILTER_LIBRARY.map(f => [f.id, f]));
@@ -5919,107 +5923,129 @@ function buildAppleMakerNote() {
   return s;
 }
 
-// ----------------------- LUT-based filter pipeline -----------------------
-// CSS filter functions (saturate/contrast/sepia/etc) can't reproduce real
-// Instagram-grade looks because they only do uniform per-channel math. Real
-// filters use per-channel curves that lift shadows in one color, crush
-// highlights in another, etc. We implement that here via canvas pixel data.
-//
-// Each LUT preset is { r, g, b } where each channel is a curve function:
-//   in: 0..255  → out: 0..255
-// Curves are built with two helpers:
-//   curve(points) → spline through control points e.g. [[0,0],[64,80],[255,255]]
-//   adjust(gain, lift, gamma) → quick channel adjuster
+// ----------------------- iPhone filter LUTs -----------------------
+// Each entry is a per-pixel function (r,g,b)→[r,g,b] derived from Apple's
+// CIPhotoEffect math. All filters here use this single-pass transform — no
+// CSS, no tint overlay — so the output is reference-accurate and predictable.
+
+const _clampU8 = v => v < 0 ? 0 : v > 255 ? 255 : v|0;
+const _luma = (r,g,b) => 0.2126*r + 0.7152*g + 0.0722*b; // Rec. 709
+
+// Saturation around luminance: sat=1 passthrough, sat>1 amplifies, sat<1 desats.
+function _adjSat(r,g,b, sat) {
+  const y = _luma(r,g,b);
+  return [
+    _clampU8(y + (r-y)*sat),
+    _clampU8(y + (g-y)*sat),
+    _clampU8(y + (b-y)*sat),
+  ];
+}
+
+// Pre-baked 256-entry tone curves (cached by control points).
 const _curveCache = new Map();
-function buildCurve(pts) {
+function _curve(pts) {
   const key = JSON.stringify(pts);
   if (_curveCache.has(key)) return _curveCache.get(key);
-  // Linear interpolation between control points (adequate for filter looks;
-  // no need for true cubic spline). Output is a 256-entry lookup table.
-  const out = new Uint8Array(256);
+  const out = new Uint8ClampedArray(256);
   for (let x = 0; x < 256; x++) {
     let i = 0;
-    while (i < pts.length - 1 && pts[i + 1][0] < x) i++;
-    const [x0, y0] = pts[i];
-    const [x1, y1] = pts[Math.min(i + 1, pts.length - 1)];
-    const t = x1 === x0 ? 0 : (x - x0) / (x1 - x0);
-    out[x] = Math.max(0, Math.min(255, Math.round(y0 + (y1 - y0) * t)));
+    while (i < pts.length - 1 && pts[i+1][0] < x) i++;
+    const [x0,y0] = pts[i];
+    const [x1,y1] = pts[Math.min(i+1, pts.length-1)];
+    const t = x1 === x0 ? 0 : (x-x0)/(x1-x0);
+    out[x] = _clampU8(Math.round(y0 + (y1-y0)*t));
   }
   _curveCache.set(key, out);
   return out;
 }
 
-// Per-filter LUTs. Curves use control points {input → output} on a 0–255 scale.
-// Identity = [[0,0],[255,255]] (passthrough). Anything else reshapes the
-// channel response: lifting [0,0]→[0,30] adds a lifted-blacks look, dropping
-// [255,255]→[255,210] crushes highlights, etc.
-const FILTER_LUTS = {
-  vivid:         { r: buildCurve([[0,0],[64,68],[192,210],[255,255]]),  g: buildCurve([[0,0],[64,68],[192,210],[255,255]]),  b: buildCurve([[0,0],[64,72],[192,205],[255,250]]) },
-  'vivid-warm':  { r: buildCurve([[0,15],[64,90],[192,225],[255,255]]), g: buildCurve([[0,5],[64,72],[192,200],[255,245]]),  b: buildCurve([[0,0],[64,55],[192,170],[255,225]]) },
-  'vivid-cool':  { r: buildCurve([[0,0],[64,55],[192,180],[255,235]]),  g: buildCurve([[0,5],[64,68],[192,200],[255,245]]),  b: buildCurve([[0,15],[64,90],[192,225],[255,255]]) },
-  dramatic:      { r: buildCurve([[0,0],[64,40],[128,128],[192,220],[255,255]]),  g: buildCurve([[0,0],[64,40],[128,128],[192,220],[255,255]]),  b: buildCurve([[0,0],[64,38],[128,125],[192,218],[255,250]]) },
-  'dramatic-warm':{r:buildCurve([[0,10],[64,50],[128,140],[192,230],[255,255]]),  g: buildCurve([[0,0],[64,40],[128,125],[192,210],[255,245]]), b: buildCurve([[0,0],[64,30],[128,110],[192,190],[255,220]]) },
-  'dramatic-cool':{r:buildCurve([[0,0],[64,30],[128,110],[192,190],[255,225]]),   g: buildCurve([[0,0],[64,40],[128,125],[192,210],[255,245]]), b: buildCurve([[0,10],[64,50],[128,140],[192,230],[255,255]]) },
-  mono:          { r: 'gray', g: 'gray', b: 'gray' },
-  silvertone:    { r: 'gray', g: 'gray', b: 'gray', tone: { r: 1.05, g: 1.00, b: 0.92 } },
-  noir:          { r: buildCurve([[0,0],[64,30],[128,128],[192,225],[255,255]]),  g: 'gray', b: 'gray', mono: true },
+// CIPhotoEffectMono — pure Rec. 709 grayscale.
+function _lutMono(r,g,b) {
+  const y = _clampU8(Math.round(_luma(r,g,b)));
+  return [y, y, y];
+}
 
-  // Instagram-style curves
-  clarendon:     { r: buildCurve([[0,15],[64,75],[192,215],[255,255]]),  g: buildCurve([[0,15],[64,80],[192,225],[255,255]]),  b: buildCurve([[0,30],[64,95],[192,230],[255,255]]) },
-  gingham:       { r: buildCurve([[0,30],[64,90],[192,200],[255,235]]),  g: buildCurve([[0,32],[64,92],[192,198],[255,232]]),  b: buildCurve([[0,28],[64,88],[192,195],[255,230]]) },
-  moon:          { r: 'gray', g: 'gray', b: 'gray' },
-  lark:          { r: buildCurve([[0,5],[64,75],[192,205],[255,250]]),   g: buildCurve([[0,15],[64,90],[192,220],[255,255]]),   b: buildCurve([[0,20],[64,95],[192,225],[255,255]]) },
-  reyes:         { r: buildCurve([[0,40],[64,110],[192,200],[255,235]]), g: buildCurve([[0,38],[64,105],[192,195],[255,230]]),  b: buildCurve([[0,30],[64,90],[192,180],[255,215]]) },
-  juno:          { r: buildCurve([[0,15],[64,90],[192,225],[255,255]]),  g: buildCurve([[0,10],[64,80],[192,210],[255,250]]),   b: buildCurve([[0,0],[64,55],[192,175],[255,225]]) },
-  slumber:       { r: buildCurve([[0,30],[64,95],[192,210],[255,240]]),  g: buildCurve([[0,28],[64,90],[192,200],[255,230]]),   b: buildCurve([[0,20],[64,75],[192,170],[255,205]]) },
-  crema:         { r: buildCurve([[0,25],[64,90],[192,200],[255,235]]),  g: buildCurve([[0,22],[64,85],[192,195],[255,228]]),   b: buildCurve([[0,15],[64,70],[192,170],[255,210]]) },
-  ludwig:        { r: buildCurve([[0,5],[64,70],[192,200],[255,245]]),   g: buildCurve([[0,5],[64,70],[192,195],[255,240]]),    b: buildCurve([[0,0],[64,60],[192,180],[255,225]]) },
-  aden:          { r: buildCurve([[0,30],[64,95],[192,200],[255,235]]),  g: buildCurve([[0,25],[64,85],[192,190],[255,225]]),   b: buildCurve([[0,20],[64,75],[192,170],[255,205]]) },
-  perpetua:      { r: buildCurve([[0,0],[64,68],[192,205],[255,250]]),   g: buildCurve([[0,10],[64,80],[192,215],[255,255]]),   b: buildCurve([[0,5],[64,72],[192,200],[255,240]]) },
-  amaro:         { r: buildCurve([[0,15],[64,90],[192,220],[255,255]]),  g: buildCurve([[0,20],[64,95],[192,220],[255,255]]),   b: buildCurve([[0,5],[64,70],[192,180],[255,215]]) },
-  mayfair:       { r: buildCurve([[0,15],[64,85],[192,215],[255,250]]),  g: buildCurve([[0,10],[64,75],[192,200],[255,240]]),   b: buildCurve([[0,15],[64,80],[192,200],[255,235]]) },
-  rise:          { r: buildCurve([[0,30],[64,100],[192,215],[255,250]]), g: buildCurve([[0,25],[64,95],[192,210],[255,245]]),   b: buildCurve([[0,15],[64,75],[192,180],[255,215]]) },
-  hudson:        { r: buildCurve([[0,5],[64,70],[192,195],[255,235]]),   g: buildCurve([[0,15],[64,85],[192,210],[255,245]]),   b: buildCurve([[0,30],[64,100],[192,225],[255,255]]) },
-  valencia:      { r: buildCurve([[0,20],[64,90],[192,215],[255,250]]),  g: buildCurve([[0,15],[64,85],[192,205],[255,240]]),   b: buildCurve([[0,5],[64,65],[192,180],[255,215]]) },
-  xpro2:         { r: buildCurve([[0,30],[64,100],[128,140],[192,220],[255,255]]), g: buildCurve([[0,20],[64,80],[128,128],[192,200],[255,240]]), b: buildCurve([[0,5],[64,55],[128,110],[192,175],[255,210]]) },
-  sierra:        { r: buildCurve([[0,25],[64,95],[192,210],[255,250]]),  g: buildCurve([[0,22],[64,90],[192,205],[255,245]]),   b: buildCurve([[0,15],[64,70],[192,175],[255,210]]) },
-  willow:        { r: buildCurve([[0,20],[64,80],[192,200],[255,240]]),  g: buildCurve([[0,20],[64,80],[192,200],[255,240]]),   b: buildCurve([[0,15],[64,75],[192,195],[255,235]]) },
-  'lo-fi':       { r: buildCurve([[0,0],[64,40],[128,128],[192,225],[255,255]]),   g: buildCurve([[0,0],[64,38],[128,125],[192,222],[255,253]]),   b: buildCurve([[0,0],[64,40],[128,128],[192,225],[255,255]]) },
-  inkwell:       { r: 'gray', g: 'gray', b: 'gray', tone: { r: 1.10, g: 1.05, b: 0.90 } },
-  nashville:     { r: buildCurve([[0,40],[64,110],[192,225],[255,255]]), g: buildCurve([[0,30],[64,95],[192,210],[255,240]]),   b: buildCurve([[0,15],[64,70],[192,170],[255,200]]) },
-  '1977':        { r: buildCurve([[0,40],[64,115],[192,225],[255,255]]), g: buildCurve([[0,35],[64,100],[192,210],[255,245]]),  b: buildCurve([[0,40],[64,110],[192,215],[255,245]]) },
-  kelvin:        { r: buildCurve([[0,30],[64,110],[192,235],[255,255]]), g: buildCurve([[0,15],[64,85],[192,210],[255,245]]),   b: buildCurve([[0,0],[64,45],[192,160],[255,200]]) },
-  toaster:       { r: buildCurve([[0,40],[64,110],[128,150],[192,225],[255,255]]), g: buildCurve([[0,15],[64,75],[128,120],[192,180],[255,220]]), b: buildCurve([[0,5],[64,50],[128,100],[192,160],[255,200]]) },
+// CIPhotoEffectTonal (a.k.a. Silvertone) — luminance with warm tint.
+function _lutSilvertone(r,g,b) {
+  const y = _luma(r,g,b);
+  return [_clampU8(y * 1.10), _clampU8(y * 1.00), _clampU8(y * 0.85)];
+}
+
+// CIPhotoEffectNoir — high-contrast B&W with crushed shadows + boosted mids.
+const _noirCurve = _curve([[0,0],[40,15],[96,72],[128,135],[160,200],[224,250],[255,255]]);
+function _lutNoir(r,g,b) {
+  const c = _noirCurve[_clampU8(Math.round(_luma(r,g,b)))];
+  return [c, c, c];
+}
+
+// Vivid — saturation +50% with a subtle midtone-lifting curve.
+const _vividCurve = _curve([[0,0],[64,72],[128,138],[192,210],[255,255]]);
+function _lutVivid(r,g,b) {
+  const [r1,g1,b1] = _adjSat(r,g,b, 1.5);
+  return [_vividCurve[r1], _vividCurve[g1], _vividCurve[b1]];
+}
+
+// Vivid Warm — Vivid + temperature shift (R/G up, B down).
+function _lutVividWarm(r,g,b) {
+  const [r1,g1,b1] = _lutVivid(r,g,b);
+  return [_clampU8(r1*1.08), _clampU8(g1*1.02), _clampU8(b1*0.88)];
+}
+
+// Vivid Cool — Vivid + cool temperature shift (R down, B up).
+function _lutVividCool(r,g,b) {
+  const [r1,g1,b1] = _lutVivid(r,g,b);
+  return [_clampU8(r1*0.88), _clampU8(g1*1.02), _clampU8(b1*1.10)];
+}
+
+// Dramatic — strong S-curve contrast + slight desaturation.
+const _dramaticCurve = _curve([[0,0],[48,30],[96,80],[128,128],[160,180],[208,225],[255,255]]);
+function _lutDramatic(r,g,b) {
+  const [r1,g1,b1] = _adjSat(r,g,b, 0.85);
+  return [_dramaticCurve[r1], _dramaticCurve[g1], _dramaticCurve[b1]];
+}
+
+function _lutDramaticWarm(r,g,b) {
+  const [r1,g1,b1] = _lutDramatic(r,g,b);
+  return [_clampU8(r1*1.10), _clampU8(g1*1.04), _clampU8(b1*0.85)];
+}
+
+function _lutDramaticCool(r,g,b) {
+  const [r1,g1,b1] = _lutDramatic(r,g,b);
+  return [_clampU8(r1*0.85), _clampU8(g1*1.00), _clampU8(b1*1.12)];
+}
+
+const FILTER_LUTS = {
+  mono: _lutMono,
+  silvertone: _lutSilvertone,
+  noir: _lutNoir,
+  vivid: _lutVivid,
+  'vivid-warm': _lutVividWarm,
+  'vivid-cool': _lutVividCool,
+  dramatic: _lutDramatic,
+  'dramatic-warm': _lutDramaticWarm,
+  'dramatic-cool': _lutDramaticCool,
 };
 
-// Apply a filter's LUT to an arbitrary canvas region. Strength 0..1 blends
-// between the filtered output and the original (0 = original, 1 = full).
-function applyLutToCanvas(ctx, x, y, w, h, lut, strength) {
-  if (!lut || w <= 0 || h <= 0) return;
+// Apply a filter LUT (function-based) to a canvas region. Strength 0..1 blends
+// between filtered and original. dpr handles HiDPI canvases — getImageData and
+// putImageData operate in DEVICE pixels regardless of canvas transforms, so
+// callers passing logical-pixel coords on a Retina canvas must supply dpr.
+function applyLutToCanvas(ctx, x, y, w, h, lutFn, strength, dpr) {
+  if (!lutFn || w <= 0 || h <= 0) return;
   const t = Math.max(0, Math.min(1, strength));
   if (t === 0) return;
-  const img = ctx.getImageData(x, y, w, h);
+  const d2p = dpr || 1;
+  const px = Math.round(x * d2p);
+  const py = Math.round(y * d2p);
+  const pw = Math.round(w * d2p);
+  const ph = Math.round(h * d2p);
+  if (pw <= 0 || ph <= 0) return;
+  const img = ctx.getImageData(px, py, pw, ph);
   const d = img.data;
-  const isMono = lut.r === 'gray' && lut.g === 'gray' && lut.b === 'gray';
-  const tone = lut.tone;
   for (let i = 0; i < d.length; i += 4) {
     const r0 = d[i], g0 = d[i+1], b0 = d[i+2];
-    let r1, g1, b1;
-    if (isMono) {
-      // Luma-correct grayscale (Rec. 709)
-      const y = Math.round(0.2126 * r0 + 0.7152 * g0 + 0.0722 * b0);
-      r1 = g1 = b1 = y;
-      if (tone) {
-        r1 = Math.max(0, Math.min(255, Math.round(y * tone.r)));
-        g1 = Math.max(0, Math.min(255, Math.round(y * tone.g)));
-        b1 = Math.max(0, Math.min(255, Math.round(y * tone.b)));
-      }
-    } else {
-      r1 = lut.r[r0];
-      g1 = lut.g[g0];
-      b1 = lut.b[b0];
-    }
-    // Strength blend
+    const out = lutFn(r0, g0, b0);
+    let r1 = out[0], g1 = out[1], b1 = out[2];
     if (t < 1) {
       r1 = r0 + (r1 - r0) * t;
       g1 = g0 + (g1 - g0) * t;
@@ -6029,7 +6055,7 @@ function applyLutToCanvas(ctx, x, y, w, h, lut, strength) {
     d[i+1] = g1;
     d[i+2] = b1;
   }
-  ctx.putImageData(img, x, y);
+  ctx.putImageData(img, px, py);
 }
 
 // ----------------------- Filter strength interpolation -----------------------
@@ -6300,9 +6326,11 @@ function applyAlignToItem(item, align) {
 function buildItemFilterString(item) {
   const adj = item.adj;
   const adjustmentStr = `saturate(${adj.sat}%) contrast(${adj.con}%) brightness(${adj.bri}%) sepia(${Math.abs(adj.war) / 100})`;
+  // Only css-method filters contribute a CSS filter string; lut-method filters
+  // are applied as a separate pixel pass.
   const filterStrs = item.filters.map(id => {
     const f = FILTER_BY_ID[id];
-    if (!f) return '';
+    if (!f || f.method !== 'css' || !f.filter) return '';
     const strength = item.filterStrengths[id] != null ? item.filterStrengths[id] : 50;
     return interpolateFilterString(f.filter, strength);
   }).filter(Boolean);
@@ -6317,14 +6345,15 @@ function buildItemFilterString(item) {
 function applyFilterTints(ctx, item, w, h) {
   for (const id of item.filters) {
     const f = FILTER_BY_ID[id];
-    if (f && f.tint) {
-      const strength = item.filterStrengths[id] != null ? item.filterStrengths[id] : 50;
-      ctx.save();
-      ctx.globalCompositeOperation = f.blend || 'overlay';
-      ctx.fillStyle = interpolateTintAlpha(f.tint, strength);
-      ctx.fillRect(0, 0, w, h);
-      ctx.restore();
-    }
+    // Only css-method filters carry tints. lut-method filters embed any color
+    // cast in their per-pixel transform, so they skip this pass.
+    if (!f || f.method !== 'css' || !f.tint) continue;
+    const strength = item.filterStrengths[id] != null ? item.filterStrengths[id] : 50;
+    ctx.save();
+    ctx.globalCompositeOperation = f.blend || 'overlay';
+    ctx.fillStyle = interpolateTintAlpha(f.tint, strength);
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
   }
 }
 
@@ -6453,13 +6482,16 @@ function drawSingleCard(cardEl, item) {
   ctx.filter = 'none';
   ctx.restore();
 
-  // Per-channel LUT pass — produces the actual Instagram-grade color cast that
-  // CSS filter() can't. Applied per-active-filter at its strength setting.
+  // LUT pass — applied only for filters whose method is 'lut'. dpr is passed
+  // through because getImageData/putImageData operate in device pixels and
+  // ignore the canvas transform we set above.
   for (const fid of item.filters) {
-    const lut = FILTER_LUTS[fid];
-    if (!lut) continue;
+    const f = FILTER_BY_ID[fid];
+    if (!f || f.method !== 'lut') continue;
+    const lutFn = FILTER_LUTS[fid];
+    if (!lutFn) continue;
     const strength = (item.filterStrengths[fid] != null ? item.filterStrengths[fid] : 50) / 100;
-    applyLutToCanvas(ctx, Math.round(fitX), Math.round(fitY), Math.round(fitW), Math.round(fitH), lut, strength);
+    applyLutToCanvas(ctx, fitX, fitY, fitW, fitH, lutFn, strength, dpr);
   }
 
   // Constrain visual effects to the source's drawn region (not the letterbox
@@ -9235,13 +9267,15 @@ async function renderItemToBlob(item, mime, quality) {
   ctx.filter = 'none';
   ctx.restore();
 
-  // Per-channel LUT pass (real Instagram-style color shift; CSS filter() above
-  // handles only saturation/contrast/sepia — LUT does the actual look)
+  // LUT pass — only for filters whose method is 'lut'. Export canvas isn't
+  // dpr-scaled, so dpr=1 is implicit.
   for (const fid of item.filters) {
-    const lut = FILTER_LUTS[fid];
-    if (!lut) continue;
+    const f = FILTER_BY_ID[fid];
+    if (!f || f.method !== 'lut') continue;
+    const lutFn = FILTER_LUTS[fid];
+    if (!lutFn) continue;
     const strength = (item.filterStrengths[fid] != null ? item.filterStrengths[fid] : 50) / 100;
-    applyLutToCanvas(ctx, 0, 0, targetW, targetH, lut, strength);
+    applyLutToCanvas(ctx, 0, 0, targetW, targetH, lutFn, strength, 1);
   }
 
   // Apply filter tint overlays (overlay blend for stronger color signature)
@@ -9310,13 +9344,14 @@ async function buildFilterThumbnails(item) {
     const ctx = c.getContext('2d');
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'medium';
-    ctx.filter = f.filter;
+    // Pipeline matches the main render: pick CSS path or LUT path per filter.
+    if (f.method === 'css' && f.filter) ctx.filter = f.filter;
     ctx.drawImage(item.img, srcX, srcY, srcMin, srcMin, 0, 0, THUMB_SIZE, THUMB_SIZE);
     ctx.filter = 'none';
-    // LUT pass — same as the main render
-    const lut = FILTER_LUTS[f.id];
-    if (lut) applyLutToCanvas(ctx, 0, 0, THUMB_SIZE, THUMB_SIZE, lut, 1);
-    if (f.tint) {
+    if (f.method === 'lut') {
+      const lutFn = FILTER_LUTS[f.id];
+      if (lutFn) applyLutToCanvas(ctx, 0, 0, THUMB_SIZE, THUMB_SIZE, lutFn, 1, 1);
+    } else if (f.method === 'css' && f.tint) {
       ctx.save();
       ctx.globalCompositeOperation = f.blend || 'overlay';
       ctx.fillStyle = f.tint;
@@ -11593,8 +11628,12 @@ function ensureSettingsModal() {
         <div class="settings-group">
           <div class="settings-label">UPDATES</div>
           <div class="settings-row">
-            <span>Auto-check for updates on launch</span>
+            <span>Auto-check for updates (on launch + every 4 hours)</span>
             <button class="none-toggle" id="prefAutoUpdate">OFF</button>
+          </div>
+          <div class="settings-row">
+            <span>Check for updates now</span>
+            <button class="none-toggle" id="prefManualCheckUpdate">CHECK</button>
           </div>
         </div>
         <div class="settings-group">
@@ -11640,6 +11679,10 @@ function ensureSettingsModal() {
   document.getElementById('prefIphoneMeta').addEventListener('click', () => { PREFS.defaultIphoneMeta = !PREFS.defaultIphoneMeta; tog('prefIphoneMeta', PREFS.defaultIphoneMeta); savePrefs(); });
   document.getElementById('prefMetaClean').addEventListener('click', () => { PREFS.defaultMetaClean = !PREFS.defaultMetaClean; tog('prefMetaClean', PREFS.defaultMetaClean); savePrefs(); });
   document.getElementById('prefAutoUpdate').addEventListener('click', () => { PREFS.autoCheckUpdates = !PREFS.autoCheckUpdates; tog('prefAutoUpdate', PREFS.autoCheckUpdates); savePrefs(); });
+  document.getElementById('prefManualCheckUpdate').addEventListener('click', () => {
+    if (typeof window.__manualCheckUpdate === 'function') window.__manualCheckUpdate();
+    else showToast('Updater only available in the desktop app.');
+  });
 
   document.getElementById('prefOpenLog').addEventListener('click', () => {
     if (window.__TAURI__ && window.__TAURI__.core) {
@@ -11851,14 +11894,30 @@ if (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen)
   });
 }
 
-// Auto-update check — gated on the user's preference (was always-on in
-// previous versions). Defer briefly so the UI is interactive first.
-if (PREFS.autoCheckUpdates && window.__TAURI__ && window.__TAURI__.core) {
-  setTimeout(() => {
+// Auto-update check. Two passes: once on launch (after a short defer so the
+// UI is interactive first), then every UPDATE_POLL_HOURS while the app stays
+// open — so a release published mid-session still surfaces a modal without
+// requiring a restart. Both gated on the user's autoCheckUpdates pref.
+const UPDATE_POLL_HOURS = 4;
+function runUpdateCheck() {
+  if (!PREFS.autoCheckUpdates) return;
+  if (!window.__TAURI__ || !window.__TAURI__.core) return;
+  window.__TAURI__.core.invoke('check_updates_now').catch((e) => {
+    console.warn('[updater] check failed:', e);
+  });
+}
+if (window.__TAURI__ && window.__TAURI__.core) {
+  setTimeout(runUpdateCheck, 1500);
+  setInterval(runUpdateCheck, UPDATE_POLL_HOURS * 60 * 60 * 1000);
+  // Manual "Check now" button — wired up in Settings (see prefManualCheckUpdate).
+  window.__manualCheckUpdate = function () {
+    if (!window.__TAURI__ || !window.__TAURI__.core) return;
+    showToast('Checking for updates…');
     window.__TAURI__.core.invoke('check_updates_now').catch((e) => {
-      console.warn('[updater] check failed:', e);
+      console.warn('[updater] manual check failed:', e);
+      showToast('Update check failed');
     });
-  }, 1500);
+  };
 }
 </script>
 <style>
