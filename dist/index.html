@@ -5593,7 +5593,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.1.2';
+const APP_VERSION = '4.1.3';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -11977,7 +11977,7 @@ function ensureSettingsModal() {
   overlay.id = 'settingsOverlay';
   overlay.className = 'picker-overlay hidden';
   overlay.innerHTML = `
-    <div class="picker-modal" style="max-width:min(560px,calc(100vw - 32px));width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);">
+    <div class="picker-modal" style="max-width:min(720px,calc(100vw - 32px));width:min(720px,calc(100vw - 32px));max-height:calc(100vh - 48px);">
       <div class="picker-head">
         <span class="ttl">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--accent);"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -11985,8 +11985,18 @@ function ensureSettingsModal() {
         </span>
         <button class="x" id="settingsCloseBtn" aria-label="Close">×</button>
       </div>
-      <div style="padding:18px 22px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);overflow-y:auto;flex:1;min-height:0;">
-        <div class="settings-group">
+      <div class="settings-shell" style="display:grid;grid-template-columns:160px 1fr;flex:1;min-height:0;overflow:hidden;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);">
+        <!-- Sidebar nav -->
+        <nav class="settings-nav" style="background:var(--surface-2);border-right:1px solid var(--border);padding:14px 0;display:flex;flex-direction:column;gap:2px;overflow-y:auto;">
+          <button class="settings-nav-btn active" data-cat="export"     data-no-sfx>↗ EXPORT</button>
+          <button class="settings-nav-btn"        data-cat="metadata"   data-no-sfx>📷 METADATA</button>
+          <button class="settings-nav-btn"        data-cat="sounds"     data-no-sfx>🔔 SOUNDS</button>
+          <button class="settings-nav-btn"        data-cat="updates"    data-no-sfx>↻ UPDATES</button>
+          <button class="settings-nav-btn"        data-cat="diagnostics" data-no-sfx>🔧 DIAGNOSTICS</button>
+        </nav>
+        <!-- Content panel — only the active category is visible -->
+        <div class="settings-panel" style="padding:18px 22px;overflow-y:auto;min-height:0;">
+        <div class="settings-group" data-cat="export">
           <div class="settings-label">EXPORT DEFAULTS</div>
           <div class="settings-row">
             <span>Default resolution</span>
@@ -12025,7 +12035,7 @@ function ensureSettingsModal() {
             </span>
           </div>
         </div>
-        <div class="settings-group">
+        <div class="settings-group" data-cat="metadata">
           <div class="settings-label">METADATA</div>
           <div class="settings-row">
             <span>iPhone metadata ON by default</span>
@@ -12036,7 +12046,7 @@ function ensureSettingsModal() {
             <button class="none-toggle" id="prefMetaClean">OFF</button>
           </div>
         </div>
-        <div class="settings-group">
+        <div class="settings-group" data-cat="sounds">
           <div class="settings-label">SOUNDS</div>
           <div class="settings-row">
             <span>All UI sounds</span>
@@ -12059,7 +12069,7 @@ function ensureSettingsModal() {
             <button class="none-toggle" id="prefSoundNotify">ON</button>
           </div>
         </div>
-        <div class="settings-group">
+        <div class="settings-group" data-cat="updates">
           <div class="settings-label">UPDATES</div>
           <div class="settings-row">
             <span>Auto-check for updates (on launch + every 4 hours)</span>
@@ -12072,7 +12082,7 @@ function ensureSettingsModal() {
             </div>
           </div>
         </div>
-        <div class="settings-group">
+        <div class="settings-group" data-cat="diagnostics">
           <div class="settings-label">DIAGNOSTICS</div>
           <div class="settings-row">
             <span>Open debug log file</span>
@@ -12083,7 +12093,8 @@ function ensureSettingsModal() {
             <button class="none-toggle danger" id="prefReset">RESET</button>
           </div>
         </div>
-      </div>
+        </div><!-- /.settings-panel -->
+      </div><!-- /.settings-shell -->
       <div style="padding:14px 22px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;">
         <p class="settings-note" style="margin:0 0 10px;">Most settings save instantly. Hit <b>Save &amp; Apply</b> to reload the app and apply default-state changes (iPhone meta, resolution, etc).</p>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
@@ -12096,6 +12107,21 @@ function ensureSettingsModal() {
 
   document.getElementById('settingsCloseBtn').onclick = () => overlay.classList.add('hidden');
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.add('hidden'); });
+
+  // Sidebar nav — show only the selected category. Default to 'export'.
+  // Persists last-active category in sessionStorage so reopening the
+  // settings modal lands on the same category you were in.
+  const showSettingsCat = (cat) => {
+    overlay.querySelectorAll('.settings-group').forEach(g => g.classList.toggle('settings-active', g.dataset.cat === cat));
+    overlay.querySelectorAll('.settings-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+    try { sessionStorage.setItem('snapcap-settings-cat', cat); } catch (_) {}
+  };
+  overlay.querySelectorAll('.settings-nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => showSettingsCat(btn.dataset.cat));
+  });
+  let initialCat = 'export';
+  try { initialCat = sessionStorage.getItem('snapcap-settings-cat') || 'export'; } catch (_) {}
+  showSettingsCat(initialCat);
 
   // Reflect saved values into UI
   document.getElementById('prefDefaultRes').value = PREFS.defaultRes;
@@ -12212,6 +12238,17 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.1.3',
+    date: '2026-05-04',
+    title: 'Settings categorized — sidebar nav, no more scrolling',
+    sections: [
+      { h: 'New', items: [
+        'Settings modal redesigned — left-side category nav (EXPORT · METADATA · SOUNDS · UPDATES · DIAGNOSTICS) replaces the long scroll. Click a category to switch panels. Last-active category is remembered for the rest of the session, so reopening Settings drops you back where you were.',
+        'Modal also widens from 560px → 720px to fit the sidebar without cramping the content. Below 640px viewport width the sidebar collapses to a horizontal tab strip across the top.',
+      ]},
+    ]
+  },
   {
     version: '4.1.2',
     date: '2026-05-04',
@@ -13124,7 +13161,24 @@ if (window.__TAURI__ && window.__TAURI__.core) {
 }
 </script>
 <style>
-  .settings-group{padding:14px 0;border-bottom:1px solid var(--border);}
+  /* Categorized Settings — only the active category is visible. JS toggles
+     the .settings-active flag on the matching .settings-group + .settings-nav-btn. */
+  .settings-group{padding:14px 0;border-bottom:1px solid var(--border);display:none;}
+  .settings-group.settings-active{display:block;}
+  .settings-group.settings-active:first-child{padding-top:0;}
+  .settings-group.settings-active:only-child,
+  .settings-group.settings-active{border-bottom:none;}
+  .settings-nav-btn{background:transparent;border:none;border-left:2px solid transparent;color:var(--text-dim);font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;padding:10px 16px;cursor:pointer;text-align:left;text-transform:uppercase;transition:all .12s;display:flex;align-items:center;gap:8px;}
+  .settings-nav-btn:hover{color:var(--text);background:var(--surface-3);}
+  .settings-nav-btn.active{color:var(--accent);border-left-color:var(--accent);background:var(--surface-3);}
+  /* When the modal squeezes to a small viewport, collapse the sidebar to a
+     horizontal strip across the top so it remains usable. */
+  @media (max-width: 640px) {
+    .settings-shell{grid-template-columns:1fr !important;grid-template-rows:auto 1fr;}
+    .settings-nav{flex-direction:row !important;overflow-x:auto;overflow-y:hidden;border-right:none !important;border-bottom:1px solid var(--border);padding:8px 12px !important;gap:0 !important;}
+    .settings-nav-btn{border-left:none;border-bottom:2px solid transparent;padding:8px 12px;white-space:nowrap;}
+    .settings-nav-btn.active{border-left-color:transparent;border-bottom-color:var(--accent);}
+  }
   .settings-group:first-child{padding-top:0;}
   .settings-group:last-of-type{border-bottom:none;}
   .settings-label{font-size:9px;color:var(--text-faint);letter-spacing:.16em;margin-bottom:10px;}
