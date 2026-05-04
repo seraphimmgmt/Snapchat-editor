@@ -1997,13 +1997,96 @@ function detectMediaType(file) {
   return null;
 }
 
-function showToast(msg) {
+function showToast(msg, type) {
   const t = document.createElement('div');
   t.className = 'toast';
   t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2400);
+  // Play the matching sound for the toast type. Default is 'notify'.
+  // Callers can pass 'success' or 'error' explicitly. SFX is no-op if
+  // muted in Settings or not initialized yet.
+  if (typeof SFX !== 'undefined') {
+    if (type === 'success') SFX.success();
+    else if (type === 'error') SFX.error();
+    else SFX.notify();
+  }
 }
+
+// =====================================================================
+// SFX — Web Audio synthesis for click/success/error/notification feedback
+// =====================================================================
+// Synthesized in-browser, no audio files. Mute toggles persisted in PREFS
+// (settings → SOUNDS). Click sound auto-fires on any <button> click via
+// document-level delegation (throttled so rapid clicks don't machine-gun).
+const SFX = (() => {
+  let _ctx = null;
+  let _lastClick = 0;
+  function ctx() {
+    if (!_ctx) {
+      try { _ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { return null; }
+    }
+    if (_ctx && _ctx.state === 'suspended') _ctx.resume();
+    return _ctx;
+  }
+  function isOn(cat) {
+    if (typeof PREFS === 'undefined' || !PREFS.sounds) return true; // default-on until prefs load
+    if (!PREFS.sounds.master) return false;
+    return PREFS.sounds[cat] !== false;
+  }
+  function tone({ type='sine', freq=440, freqEnd=null, dur=0.1, vol=0.3, attack=0.005, when=0 } = {}) {
+    const c = ctx(); if (!c) return;
+    const t0 = c.currentTime + when;
+    const osc = c.createOscillator();
+    const g = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (freqEnd != null) osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g).connect(c.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+  }
+  return {
+    // BUBBLE — round downward pop, friendly UI click
+    click: () => {
+      if (!isOn('click')) return;
+      const now = performance.now();
+      if (now - _lastClick < 50) return; // throttle rapid clicks
+      _lastClick = now;
+      tone({ type: 'sine', freq: 600, freqEnd: 320, dur: 0.1, vol: 0.22 });
+    },
+    // COIN — quick double-ding for success / completion
+    success: () => {
+      if (!isOn('success')) return;
+      tone({ freq: 880, dur: 0.08, vol: 0.2 });
+      tone({ freq: 1175, dur: 0.18, vol: 0.2, when: 0.07 });
+    },
+    // DROP — falling pitch, polite "no"
+    error: () => {
+      if (!isOn('error')) return;
+      tone({ freq: 600, freqEnd: 200, dur: 0.18, vol: 0.22 });
+    },
+    // BLOOP — soft midrange, neutral "fyi"
+    notify: () => {
+      if (!isOn('notify')) return;
+      tone({ freq: 600, freqEnd: 500, dur: 0.1, vol: 0.18 });
+    },
+  };
+})();
+
+// Document-level click delegation — plays the click sound for any
+// <button> tag (most interactive surface in the app). Skips elements
+// explicitly opted out via [data-no-sfx] so one-off cases (e.g. the
+// sound-preview buttons in Settings → Sounds) can disable it.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  if (btn.hasAttribute('data-no-sfx')) return;
+  SFX.click();
+}, true);  // capture phase so we beat any e.stopPropagation()
 
 async function handleFile(file) {
   if (!file) return;
@@ -2272,7 +2355,7 @@ async function saveBlobToFolder(blob, filename, dir) {
     showSavedModal(finalPath);
   } catch (e) {
     console.warn('[export] save to folder failed, falling back to download', e);
-    showToast('Folder save failed — using Downloads instead');
+    showToast('Folder save failed — using Downloads instead', 'error');
     downloadBlob(blob, filename);
   }
 }
@@ -2315,7 +2398,7 @@ function showSavedModal(finalPath) {
         await window.__TAURI__.core.invoke('reveal_in_folder', { path });
       } catch (e) {
         console.warn('[reveal] failed', e);
-        showToast('Could not open folder');
+        showToast('Could not open folder', 'error');
       }
       close();
     };
@@ -2324,6 +2407,8 @@ function showSavedModal(finalPath) {
   overlay.dataset.path = finalPath;
   document.getElementById('savedPath').textContent = finalPath;
   overlay.classList.remove('hidden');
+  // Saved-to-folder is a success completion — same SFX as export-finished.
+  if (typeof SFX !== 'undefined') SFX.success();
 }
 
 // Global cancellation flag for long-running exports
@@ -2356,9 +2441,19 @@ function buildStepHtml() {
 function setExportStatus(msg, type = 'info', progress = null, options = {}) {
   const { indeterminate = false, showCancel = false, showSteps = true } = options;
   const el = document.getElementById('exportStatus');
+  // Detect transitions to success / error so we ring the SFX once per
+  // change (not every progress tick that's also flagged success).
+  const wasSuccess = el.classList.contains('success');
+  const wasError = el.classList.contains('error');
   el.classList.remove('hidden', 'success', 'error');
-  if (type === 'success') el.classList.add('success');
-  if (type === 'error') el.classList.add('error');
+  if (type === 'success') {
+    el.classList.add('success');
+    if (!wasSuccess && typeof SFX !== 'undefined') SFX.success();
+  }
+  if (type === 'error') {
+    el.classList.add('error');
+    if (!wasError && typeof SFX !== 'undefined') SFX.error();
+  }
 
   const cancelBtn = showCancel
     ? `<button class="cancel-btn" id="exportCancelBtn">CANCEL</button>`
@@ -5498,7 +5593,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.1.1';
+const APP_VERSION = '4.1.2';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -6500,7 +6595,7 @@ async function addCarouselFiles(fileList) {
   if (failed.length) {
     const names = failed.slice(0, 3).map(x => x.name).join(', ');
     const more = failed.length > 3 ? ` +${failed.length - 3} more` : '';
-    showToast(`${failed.length} file${failed.length === 1 ? '' : 's'} couldn't be loaded: ${names}${more}`);
+    showToast(`${failed.length} file${failed.length === 1 ? '' : 's'} couldn't be loaded: ${names}${more}`, 'error');
   }
 }
 
@@ -11826,6 +11921,8 @@ const PREFS = (() => {
     defaultExportFolder: '',      // empty = browser default download (~/Downloads)
     autoCheckUpdates: true,
     showDebugLog: false,
+    // SFX: master + per-category mute. Default everything ON. Settings → SOUNDS.
+    sounds: { master: true, click: true, success: true, error: true, notify: true },
   };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
@@ -11940,6 +12037,29 @@ function ensureSettingsModal() {
           </div>
         </div>
         <div class="settings-group">
+          <div class="settings-label">SOUNDS</div>
+          <div class="settings-row">
+            <span>All UI sounds</span>
+            <button class="none-toggle" id="prefSoundMaster">ON</button>
+          </div>
+          <div class="settings-row">
+            <span>Click — Bubble <button class="upd-action-btn" id="prefSoundTestClick" data-no-sfx style="margin-left:6px;">▶</button></span>
+            <button class="none-toggle" id="prefSoundClick">ON</button>
+          </div>
+          <div class="settings-row">
+            <span>Success — Coin <button class="upd-action-btn" id="prefSoundTestSuccess" data-no-sfx style="margin-left:6px;">▶</button></span>
+            <button class="none-toggle" id="prefSoundSuccess">ON</button>
+          </div>
+          <div class="settings-row">
+            <span>Error — Drop <button class="upd-action-btn" id="prefSoundTestError" data-no-sfx style="margin-left:6px;">▶</button></span>
+            <button class="none-toggle" id="prefSoundError">ON</button>
+          </div>
+          <div class="settings-row">
+            <span>Notification — Bloop <button class="upd-action-btn" id="prefSoundTestNotify" data-no-sfx style="margin-left:6px;">▶</button></span>
+            <button class="none-toggle" id="prefSoundNotify">ON</button>
+          </div>
+        </div>
+        <div class="settings-group">
           <div class="settings-label">UPDATES</div>
           <div class="settings-row">
             <span>Auto-check for updates (on launch + every 4 hours)</span>
@@ -11989,6 +12109,13 @@ function ensureSettingsModal() {
   tog('prefIphoneMeta', PREFS.defaultIphoneMeta);
   tog('prefMetaClean', PREFS.defaultMetaClean);
   tog('prefAutoUpdate', PREFS.autoCheckUpdates);
+  // SOUNDS — defensive defaults in case PREFS was loaded from an older version
+  if (!PREFS.sounds) PREFS.sounds = { master: true, click: true, success: true, error: true, notify: true };
+  tog('prefSoundMaster',  PREFS.sounds.master);
+  tog('prefSoundClick',   PREFS.sounds.click);
+  tog('prefSoundSuccess', PREFS.sounds.success);
+  tog('prefSoundError',   PREFS.sounds.error);
+  tog('prefSoundNotify',  PREFS.sounds.notify);
 
   // Wire change handlers — each updates PREFS and persists immediately.
   document.getElementById('prefDefaultRes').addEventListener('change', (e) => { PREFS.defaultRes = e.target.value; savePrefs(); });
@@ -11997,6 +12124,23 @@ function ensureSettingsModal() {
   document.getElementById('prefIphoneMeta').addEventListener('click', () => { PREFS.defaultIphoneMeta = !PREFS.defaultIphoneMeta; tog('prefIphoneMeta', PREFS.defaultIphoneMeta); savePrefs(); });
   document.getElementById('prefMetaClean').addEventListener('click', () => { PREFS.defaultMetaClean = !PREFS.defaultMetaClean; tog('prefMetaClean', PREFS.defaultMetaClean); savePrefs(); });
   document.getElementById('prefAutoUpdate').addEventListener('click', () => { PREFS.autoCheckUpdates = !PREFS.autoCheckUpdates; tog('prefAutoUpdate', PREFS.autoCheckUpdates); savePrefs(); });
+  // Sound toggle wiring — flips the matching field in PREFS.sounds and persists.
+  const soundToggle = (id, key) => document.getElementById(id).addEventListener('click', () => {
+    PREFS.sounds[key] = !PREFS.sounds[key];
+    tog(id, PREFS.sounds[key]);
+    savePrefs();
+  });
+  soundToggle('prefSoundMaster',  'master');
+  soundToggle('prefSoundClick',   'click');
+  soundToggle('prefSoundSuccess', 'success');
+  soundToggle('prefSoundError',   'error');
+  soundToggle('prefSoundNotify',  'notify');
+  // Preview buttons — the data-no-sfx attribute tells the global click
+  // delegation to skip them so we don't double-play.
+  document.getElementById('prefSoundTestClick').addEventListener('click',   () => SFX.click());
+  document.getElementById('prefSoundTestSuccess').addEventListener('click', () => SFX.success());
+  document.getElementById('prefSoundTestError').addEventListener('click',   () => SFX.error());
+  document.getElementById('prefSoundTestNotify').addEventListener('click',  () => SFX.notify());
   document.getElementById('prefManualCheckUpdate').addEventListener('click', () => {
     if (window.__TAURI__ && window.__TAURI__.core) {
       startManualUpdateCheck();
@@ -12068,6 +12212,23 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.1.2',
+    date: '2026-05-04',
+    title: 'UI sounds — Bubble · Coin · Drop · Bloop',
+    sections: [
+      { h: 'New', items: [
+        'UI sound feedback. Bubble on every button click, Coin when an export completes, Drop when something fails, Bloop when a notification toast appears.',
+        'Settings → SOUNDS — master mute + per-category mute (click / success / error / notify) + ▶ preview button next to each. All on by default; toggle off any you don\'t want.',
+        'All sounds synthesized in-browser via Web Audio API — zero audio files bundled, zero size impact.',
+      ]},
+      { h: 'Under the hood', items: [
+        'showToast(msg, type) extended to accept "success" / "error" / "notify" — automatically plays the matching SFX. Existing call sites updated (folder-save fail, drive open-folder fail, file-load fail, auto-save announce, recovery restored).',
+        'setExportStatus rings success/error SFX exactly once per state transition (not on every progress tick).',
+        'Click delegation runs in capture phase so SFX still fires even when handlers stopPropagation. Buttons can opt out with [data-no-sfx].',
+      ]},
+    ]
+  },
   {
     version: '4.1.1',
     date: '2026-05-04',
@@ -12359,7 +12520,7 @@ function autosaveState() {
     // First save in this session: tell the user once so they know it's on.
     if (!_autosaveAnnounced && typeof showToast === 'function') {
       _autosaveAnnounced = true;
-      showToast('Auto-save on — your edits will be recoverable');
+      showToast('Auto-save on — your edits will be recoverable', 'notify');
     }
   } catch (_) {}
 }
@@ -12431,7 +12592,7 @@ function showRecoveryPrompt(snap, ts) {
     }
     clearRecovery();
     close();
-    if (typeof showToast === 'function') showToast('Editor state restored');
+    if (typeof showToast === 'function') showToast('Editor state restored', 'success');
   };
 }
 

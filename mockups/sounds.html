@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UI sounds — pick a set</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0c;--surface:#15151a;--surface-2:#1d1d24;--surface-3:#262630;
+  --border:#2a2a33;--border-strong:#3a3a48;
+  --text:#e8e8ec;--text-dim:#9c9ca8;--text-faint:#5e5e6c;
+  --accent:#d9c77a;--accent-hi:#e8d68a;
+  --green:#5fd97e;--red:#ef4444;--blue:#7fbbe3;--orange:#ffa257;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;padding:32px clamp(20px,3vw,50px);min-height:100vh;}
+h1{font-family:'Antonio',sans-serif;font-size:28px;letter-spacing:.18em;margin:0 0 6px;background:linear-gradient(90deg,#c0c0c0,#d9c77a 60%,#a99858);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.lede{color:var(--text-dim);font-size:13px;max-width:780px;margin-bottom:28px;}
+
+/* Master volume bar */
+.master{display:flex;align-items:center;gap:18px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px 20px;margin-bottom:28px;flex-wrap:wrap;}
+.master .label{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.18em;color:var(--text-dim);}
+.master input[type="range"]{flex:1;min-width:200px;accent-color:var(--accent);}
+.master .value{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);min-width:36px;text-align:right;}
+.master .demo-btn{background:var(--accent);color:var(--bg);border:none;padding:7px 14px;font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;border-radius:2px;cursor:pointer;text-transform:uppercase;}
+
+h2{font-family:'Antonio',sans-serif;font-size:14px;letter-spacing:.16em;color:var(--accent);margin:32px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:baseline;}
+h2 .sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);font-weight:400;letter-spacing:.06em;text-transform:none;}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:8px;}
+
+.sound-card{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:16px;display:flex;flex-direction:column;gap:8px;position:relative;cursor:pointer;transition:all .12s;}
+.sound-card:hover{border-color:var(--accent);transform:translateY(-1px);}
+.sound-card.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:rgba(217,199,122,.04);}
+.sound-card .name{font-family:'Antonio',sans-serif;font-size:14px;font-weight:700;letter-spacing:.06em;}
+.sound-card .desc{font-size:11px;color:var(--text-dim);line-height:1.5;}
+.sound-card .row{display:flex;justify-content:space-between;align-items:center;margin-top:auto;}
+.play-btn{background:var(--accent);color:var(--bg);border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;}
+.play-btn:hover{background:var(--accent-hi);}
+.play-btn svg{width:14px;height:14px;}
+.use-btn{background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:5px 12px;font-family:'Antonio',sans-serif;font-size:9px;font-weight:700;letter-spacing:.14em;border-radius:2px;cursor:pointer;text-transform:uppercase;}
+.use-btn:hover{color:var(--accent);border-color:var(--accent);}
+.use-btn.selected{background:var(--accent);color:var(--bg);border-color:var(--accent);}
+
+.summary{background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:24px;margin-top:32px;}
+.summary h2{margin-top:0;border-bottom:none;padding-bottom:0;display:block;}
+.picks{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px;}
+.pick{background:var(--surface-2);border:1px solid var(--border);border-radius:3px;padding:10px 12px;}
+.pick .l{font-size:9px;color:var(--text-faint);letter-spacing:.14em;margin-bottom:4px;}
+.pick .v{font-family:'Antonio',sans-serif;font-size:14px;font-weight:700;color:var(--text);}
+.pick .v.empty{color:var(--text-faint);font-weight:400;font-style:italic;}
+
+/* Mockup banner */
+.banner{position:fixed;top:0;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--bg);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;padding:4px 14px;border-radius:0 0 4px 4px;z-index:200;}
+
+</style>
+</head>
+<body>
+<div class="banner">UI SOUNDS — PICK A SET</div>
+
+<h1>UI SOUNDS</h1>
+<p class="lede">All synthesized in-browser via Web Audio API — no audio files needed. Click any card to play. Pick one favorite per category, then I'll wire them into Snap Caption Studio for click / success / error / notification feedback.</p>
+
+<div class="master">
+  <span class="label">MASTER VOLUME</span>
+  <input type="range" min="0" max="100" value="35" id="masterVol">
+  <span class="value" id="masterVolDisplay">35%</span>
+  <button class="demo-btn" id="demoBtn">▶ DEMO ALL CATEGORIES</button>
+</div>
+
+<!-- ============================== CLICK ============================== -->
+<h2><span>① CLICK / TAP</span><span class="sub">button presses, toggles, list selection — fired on most interactions</span></h2>
+<div class="grid">
+  <div class="sound-card" data-cat="click" data-id="pebble">
+    <div class="name">Pebble</div>
+    <div class="desc">Soft sine plop. Quiet, friendly, doesn't fatigue over a long session.</div>
+    <div class="row"><button class="use-btn" data-cat="click" data-id="pebble">USE THIS</button><button class="play-btn" data-play="pebble"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+  <div class="sound-card" data-cat="click" data-id="tick">
+    <div class="name">Tick</div>
+    <div class="desc">Crisp mechanical. Like a typewriter key — feels precise and tactile.</div>
+    <div class="row"><button class="use-btn" data-cat="click" data-id="tick">USE THIS</button><button class="play-btn" data-play="tick"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+  <div class="sound-card" data-cat="click" data-id="tap">
+    <div class="name">Tap</div>
+    <div class="desc">Tiny upward pitch chirp. Modern app-y, similar to Apple's tap feedback.</div>
+    <div class="row"><button class="use-btn" data-cat="click" data-id="tap">USE THIS</button><button class="play-btn" data-play="tap"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+  <div class="sound-card" data-cat="click" data-id="bubble">
+    <div class="name">Bubble</div>
+    <div class="desc">Round downward pop. Playful — leans toward consumer apps over pro tools.</div>
+    <div class="row"><button class="use-btn" data-cat="click" data-id="bubble">USE THIS</button><button class="play-btn" data-play="bubble"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+</div>
+
+<!-- ============================== SUCCESS ============================== -->
+<h2><span>② SUCCESS / CONFIRM</span><span class="sub">export complete, save committed, restore done — positive completion</span></h2>
+<div class="grid">
+  <div class="sound-card" data-cat="success" data-id="chime">
+    <div class="name">Chime</div>
+    <div class="desc">Three-note major arpeggio (C-E-G). Clear "done" feeling without being saccharine.</div>
+    <div class="row"><button class="use-btn" data-cat="success" data-id="chime">USE THIS</button><button class="play-btn" data-play="chime"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+  <div class="sound-card" data-cat="success" data-id="lift">
+    <div class="name">Lift</div>
+    <div class="desc">Single note sliding upward. Subtle and elegant — used on Save / OK actions.</div>
+    <div class="row"><button class="use-btn" data-cat="success" data-id="lift">USE THIS</button><button class="play-btn" data-play="lift"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+  <div class="sound-card" data-cat="success" data-id="bell">
+    <div class="name">Bell</div>
+    <div class="desc">Resonant ding with harmonic shimmer. Clean, slightly classical.</div>
+    <div class="row"><button class="use-btn" data-cat="success" data-id="bell">USE THIS</button><button class="play-btn" data-play="bell"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+  <div class="sound-card" data-cat="success" data-id="coin">
+    <div class="name">Coin</div>
+    <div class="desc">Two-beat "ding-ding". Game-y. Use sparingly — fun for one-off rewards.</div>
+    <div class="row"><button class="use-btn" data-cat="success" data-id="coin">USE THIS</button><button class="play-btn" data-play="coin"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+</div>
+
+<!-- ============================== ERROR ============================== -->
+<h2><span>③ ERROR / FAIL</span><span class="sub">export failed, file rejected, network error — negative without being harsh</span></h2>
+<div class="grid">
+  <div class="sound-card" data-cat="error" data-id="drop">
+    <div class="name">Drop</div>
+    <div class="desc">Pitch slides from high to low. Clear "that didn't work" without being aggressive.</div>
+    <div class="row"><button class="use-btn" data-cat="error" data-id="drop">USE THIS</button><button class="play-btn" data-play="drop"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+  <div class="sound-card" data-cat="error" data-id="buzz">
+    <div class="name">Buzz</div>
+    <div class="desc">Short sawtooth grunt. Warning-tone, like a soft buzzer.</div>
+    <div class="row"><button class="use-btn" data-cat="error" data-id="buzz">USE THIS</button><button class="play-btn" data-play="buzz"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+  <div class="sound-card" data-cat="error" data-id="donk">
+    <div class="name">Donk</div>
+    <div class="desc">Single dull thump. Very polite — feels like a shake-of-the-head.</div>
+    <div class="row"><button class="use-btn" data-cat="error" data-id="donk">USE THIS</button><button class="play-btn" data-play="donk"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+  <div class="sound-card" data-cat="error" data-id="nope">
+    <div class="name">Nope</div>
+    <div class="desc">Two-note minor descending interval. Subtle "no" without being a klaxon.</div>
+    <div class="row"><button class="use-btn" data-cat="error" data-id="nope">USE THIS</button><button class="play-btn" data-play="nope"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+</div>
+
+<!-- ============================== NOTIFICATION ============================== -->
+<h2><span>④ NOTIFICATION</span><span class="sub">toast appears, update available, background event — informational</span></h2>
+<div class="grid">
+  <div class="sound-card" data-cat="notify" data-id="bloop">
+    <div class="name">Bloop</div>
+    <div class="desc">Soft midrange round tone. Quiet "fyi" — doesn't demand attention.</div>
+    <div class="row"><button class="use-btn" data-cat="notify" data-id="bloop">USE THIS</button><button class="play-btn" data-play="bloop"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+  <div class="sound-card" data-cat="notify" data-id="ping">
+    <div class="name">Ping</div>
+    <div class="desc">Bright high sine. Notification-app classic. Catches your eye without being loud.</div>
+    <div class="row"><button class="use-btn" data-cat="notify" data-id="ping">USE THIS</button><button class="play-btn" data-play="ping"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+  <div class="sound-card" data-cat="notify" data-id="chirp">
+    <div class="name">Chirp</div>
+    <div class="desc">Quick upward sweep. Bird-like, friendly, energetic.</div>
+    <div class="row"><button class="use-btn" data-cat="notify" data-id="chirp">USE THIS</button><button class="play-btn" data-play="chirp"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+  <div class="sound-card" data-cat="notify" data-id="thud">
+    <div class="name">Thud</div>
+    <div class="desc">Low sine bump. Tactile — "something just landed". Good for downloads finishing.</div>
+    <div class="row"><button class="use-btn" data-cat="notify" data-id="thud">USE THIS</button><button class="play-btn" data-play="thud"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg></button></div>
+  </div>
+</div>
+
+<!-- ============================== Selected set ============================== -->
+<div class="summary">
+  <h2 style="margin-bottom:6px;">YOUR PICKS</h2>
+  <p style="font-size:11px;color:var(--text-dim);margin:0 0 10px;">Pick one favorite per category. I'll wire them into the app for clicks, exports finishing, errors, and notification toasts. You can also disable a category by clicking its USE THIS again to deselect.</p>
+  <div class="picks" id="picksDisplay">
+    <div class="pick"><div class="l">CLICK</div><div class="v empty" id="pick-click">— not picked —</div></div>
+    <div class="pick"><div class="l">SUCCESS</div><div class="v empty" id="pick-success">— not picked —</div></div>
+    <div class="pick"><div class="l">ERROR</div><div class="v empty" id="pick-error">— not picked —</div></div>
+    <div class="pick"><div class="l">NOTIFICATION</div><div class="v empty" id="pick-notify">— not picked —</div></div>
+  </div>
+  <p style="font-size:11px;color:var(--text-faint);margin:18px 0 0;font-style:italic;">When you're done picking, just message me which set you went with — e.g. "click: Tap, success: Lift, error: Donk, notify: Bloop" — and I'll bake them into the next release. All sounds are also tagged with a "global mute" toggle in Settings → Sounds so users who don't want them can turn them off.</p>
+</div>
+
+<script>
+// ============================================================
+// Web Audio API sound library — all synthesized, no files
+// ============================================================
+let audioCtx = null;
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // Some browsers need resume() after user gesture
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+const masterSlider = document.getElementById('masterVol');
+const masterDisplay = document.getElementById('masterVolDisplay');
+function getMasterGain() { return parseInt(masterSlider.value) / 100; }
+masterSlider.addEventListener('input', () => { masterDisplay.textContent = masterSlider.value + '%'; });
+
+// ---------- Primitives ----------
+function tone({ type='sine', freq=440, freqEnd=null, dur=0.1, vol=0.3, attack=0.005, decay=null, when=0 } = {}) {
+  const ctx = getCtx();
+  const t0 = ctx.currentTime + when;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if (freqEnd != null) osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t0 + dur);
+  const peak = vol * getMasterGain();
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(peak, t0 + attack);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.05);
+}
+
+function noise({ dur=0.05, vol=0.2, lpf=null, hpf=null, when=0 } = {}) {
+  const ctx = getCtx();
+  const t0 = ctx.currentTime + when;
+  const buffer = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  let node = src;
+  if (hpf) { const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hpf; node.connect(f); node = f; }
+  if (lpf) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lpf; node.connect(f); node = f; }
+  const gain = ctx.createGain();
+  const peak = vol * getMasterGain();
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.linearRampToValueAtTime(peak, t0 + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  node.connect(gain).connect(ctx.destination);
+  src.start(t0);
+  src.stop(t0 + dur + 0.05);
+}
+
+// ---------- Sound library ----------
+const sounds = {
+  // CLICK
+  pebble:  () => tone({ freq: 700, freqEnd: 500, dur: 0.08, vol: 0.28 }),
+  tick:    () => { noise({ dur: 0.025, vol: 0.18, hpf: 1200 }); tone({ freq: 1500, freqEnd: 800, dur: 0.04, vol: 0.18 }); },
+  tap:     () => tone({ freq: 380, freqEnd: 540, dur: 0.06, vol: 0.3 }),
+  bubble:  () => tone({ type: 'sine', freq: 600, freqEnd: 320, dur: 0.1, vol: 0.32 }),
+
+  // SUCCESS
+  chime:   () => { tone({ freq: 523, dur: 0.18, vol: 0.22 }); tone({ freq: 659, dur: 0.18, vol: 0.22, when: 0.06 }); tone({ freq: 784, dur: 0.28, vol: 0.22, when: 0.12 }); },
+  lift:    () => tone({ freq: 500, freqEnd: 800, dur: 0.22, vol: 0.28 }),
+  bell:    () => { tone({ freq: 880, dur: 0.45, vol: 0.22 }); tone({ freq: 1320, dur: 0.4, vol: 0.1 }); tone({ freq: 1760, dur: 0.3, vol: 0.04 }); },
+  coin:    () => { tone({ freq: 880, dur: 0.08, vol: 0.26 }); tone({ freq: 1175, dur: 0.18, vol: 0.26, when: 0.07 }); },
+
+  // ERROR
+  drop:    () => tone({ freq: 600, freqEnd: 200, dur: 0.18, vol: 0.28 }),
+  buzz:    () => tone({ type: 'sawtooth', freq: 200, dur: 0.1, vol: 0.18 }),
+  donk:    () => tone({ type: 'sine', freq: 150, dur: 0.16, vol: 0.32 }),
+  nope:    () => { tone({ freq: 440, dur: 0.12, vol: 0.24 }); tone({ freq: 370, dur: 0.16, vol: 0.24, when: 0.1 }); },
+
+  // NOTIFICATION
+  bloop:   () => tone({ freq: 600, freqEnd: 500, dur: 0.1, vol: 0.22 }),
+  ping:    () => tone({ freq: 1320, dur: 0.32, vol: 0.16 }),
+  chirp:   () => tone({ freq: 800, freqEnd: 1500, dur: 0.14, vol: 0.18 }),
+  thud:    () => tone({ freq: 200, dur: 0.18, vol: 0.32 }),
+};
+
+// ---------- Wire play buttons ----------
+document.querySelectorAll('[data-play]').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const id = btn.dataset.play;
+    if (sounds[id]) sounds[id]();
+  });
+});
+// Click anywhere on the card also plays
+document.querySelectorAll('.sound-card').forEach(card => {
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.use-btn')) return;
+    if (e.target.closest('.play-btn')) return;
+    const id = card.dataset.id;
+    if (sounds[id]) sounds[id]();
+  });
+});
+
+// ---------- Pick / Use This wiring ----------
+const picks = { click: null, success: null, error: null, notify: null };
+
+document.querySelectorAll('.use-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const cat = btn.dataset.cat;
+    const id = btn.dataset.id;
+    // Toggle: clicking the active pick clears it
+    if (picks[cat] === id) {
+      picks[cat] = null;
+    } else {
+      picks[cat] = id;
+    }
+    refreshPicks();
+    // Play the chosen sound for confirmation
+    if (picks[cat] && sounds[id]) sounds[id]();
+  });
+});
+
+function refreshPicks() {
+  // Update USE THIS button states
+  document.querySelectorAll('.use-btn').forEach(btn => {
+    const isActive = picks[btn.dataset.cat] === btn.dataset.id;
+    btn.classList.toggle('selected', isActive);
+    btn.textContent = isActive ? '✓ SELECTED' : 'USE THIS';
+  });
+  // Card highlight
+  document.querySelectorAll('.sound-card').forEach(card => {
+    card.classList.toggle('selected', picks[card.dataset.cat] === card.dataset.id);
+  });
+  // Summary box
+  for (const cat of ['click','success','error','notify']) {
+    const el = document.getElementById('pick-' + cat);
+    if (picks[cat]) {
+      el.textContent = picks[cat].toUpperCase();
+      el.classList.remove('empty');
+    } else {
+      el.textContent = '— not picked —';
+      el.classList.add('empty');
+    }
+  }
+}
+
+// ---------- DEMO ALL ----------
+document.getElementById('demoBtn').addEventListener('click', () => {
+  const seq = ['pebble','chime','drop','bloop'];
+  seq.forEach((id, i) => setTimeout(() => sounds[id] && sounds[id](), i * 700));
+});
+
+</script>
+</body>
+</html>
