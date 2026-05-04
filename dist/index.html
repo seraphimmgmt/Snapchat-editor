@@ -4628,7 +4628,12 @@ async function exportVideoFast() {
     fastStart: 'in-memory',
   });
 
-  const bitrate = Math.max((w * h * targetFps * 0.15) | 0, 4_000_000);
+  // Bits-per-pixel target. 0.25 bpp at 1080p24 = ~12.4 Mbps, matching what
+  // YouTube/Vimeo recommend for visually-clean 1080p H.264. The previous 0.15
+  // produced ~7.5 Mbps target and ~5.8 Mbps actual output (VBR rate control
+  // undershoots) — visibly worse than typical iPhone source video (~11-17 Mbps).
+  // Floor is 6 Mbps so 720p exports don't end up grainy either.
+  const bitrate = Math.max((w * h * targetFps * 0.25) | 0, 6_000_000);
   let encoderError = null;
   let encodedFrameCount = 0;
 
@@ -5188,7 +5193,9 @@ async function exportVideo() {
 
   const isMp4 = mimeType.startsWith('video/mp4');
   const ext = isMp4 ? 'mp4' : 'webm';
-  const bitrate = Math.max((w * h * fpsTarget * 0.15) | 0, 4_000_000);
+  // Match the WebCodecs path's bitrate target — 0.25 bpp / 6 Mbps floor.
+  // See companion comment in the WebCodecs export above.
+  const bitrate = Math.max((w * h * fpsTarget * 0.25) | 0, 6_000_000);
 
   let recorder;
   try {
@@ -5944,7 +5951,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.3';
+const APP_VERSION = '4.2.4';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12618,6 +12625,21 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.4',
+    date: '2026-05-04',
+    title: 'Video export quality bump — no more "clunky/laggy" exports',
+    sections: [
+      { h: 'Fixed', items: [
+        'Video exports were targeting 0.15 bits-per-pixel (≈7.5 Mbps for 1080p24) and rate-control undershoot pushed actual output down to ~5.8 Mbps — about half of typical iPhone/Kling source video (11-17 Mbps). The compression noise was visible as block artifacts in motion and gradient banding in shadows.',
+        'Bumped to 0.25 bpp with a 6 Mbps floor. 1080p24 now targets ~12.4 Mbps, 1080p30 ~15.5 Mbps, 4K30 ~62 Mbps. Roughly matches YouTube/Vimeo recommendations for visually-clean H.264 and aligns with the bitrates iPhone uses for its native captures.',
+        'Applies to both the Fast (WebCodecs) and Legacy (MediaRecorder) export paths.',
+      ]},
+      { h: 'Tradeoff', items: [
+        'Files get ~67% larger at the same resolution (0.25/0.15). A 7s 1080p clip goes from ~6 MB to ~10 MB — same ballpark as the source it came from. No size cap or quality preset added yet; if you want a smaller-file mode shout and we\'ll surface a slider in v4.3.0 polish.',
+      ]},
+    ]
+  },
   {
     version: '4.2.3',
     date: '2026-05-04',
