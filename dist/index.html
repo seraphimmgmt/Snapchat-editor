@@ -1835,8 +1835,107 @@ function schedulePreviewRender() {
   requestAnimationFrame(async () => {
     renderScheduled = false;
     await renderPreview();
+    // After every render, queue a history snapshot. Debounced inside
+    // historyMaybePush so a long slider drag = one undoable step.
+    if (typeof historyMaybePush === 'function') historyMaybePush();
   });
 }
+
+// =====================================================================
+// UNDO / REDO — editor state history
+// =====================================================================
+// Snapshots a curated subset of `state` (the user-tweakable bits — caption,
+// adjustments, filter UI; not media handles or transient export flags).
+// Pushes are debounced to ~350ms after the last render so a slider drag =
+// one undoable step rather than 50. Restores ignore the debounce and replay
+// the snapshot atomically while suppressing further pushes.
+const HISTORY_MAX = 60;
+const HISTORY_DEBOUNCE_MS = 350;
+const editorHistory = { past: [], future: [], paused: false, last: null };
+
+function snapshotEditorState() {
+  return {
+    caption: state.caption,
+    captionY: state.captionY,
+    fontIndex: state.fontIndex,
+    captionSize: state.captionSize,
+    bgOpacity: state.bgOpacity,
+    textColor: state.textColor,
+    outlineColor: state.outlineColor,
+    outlineWidth: state.outlineWidth,
+    outlineEnabled: state.outlineEnabled,
+    saturation: state.saturation,
+    contrast: state.contrast,
+    brightness: state.brightness,
+    warmth: state.warmth,
+    grain: state.grain,
+    vignette: state.vignette,
+    mirror: state.mirror,
+  };
+}
+
+function applyEditorSnapshot(snap) {
+  Object.assign(state, snap);
+  if (typeof syncUIToState === 'function') syncUIToState();
+  schedulePreviewRender();
+}
+
+let _historyDebounceTimer = null;
+function historyMaybePush() {
+  if (editorHistory.paused) return;
+  clearTimeout(_historyDebounceTimer);
+  _historyDebounceTimer = setTimeout(() => {
+    const snap = snapshotEditorState();
+    const sig = JSON.stringify(snap);
+    if (editorHistory.last === sig) return;  // unchanged
+    if (editorHistory.last !== null) {
+      // Push the PREVIOUS snapshot onto the past stack — the first valid
+      // snapshot becomes the "starting state" baseline. After every change
+      // we record the prior state so undo replays it.
+      editorHistory.past.push(editorHistory.last);
+      if (editorHistory.past.length > HISTORY_MAX) editorHistory.past.shift();
+      editorHistory.future.length = 0;
+    }
+    editorHistory.last = sig;
+  }, HISTORY_DEBOUNCE_MS);
+}
+
+function historyUndo() {
+  if (editorHistory.past.length === 0) return false;
+  const prevSig = editorHistory.past.pop();
+  editorHistory.future.push(editorHistory.last);
+  editorHistory.last = prevSig;
+  editorHistory.paused = true;
+  try { applyEditorSnapshot(JSON.parse(prevSig)); } finally { editorHistory.paused = false; }
+  if (typeof showToast === 'function') showToast('↶ Undo');
+  return true;
+}
+
+function historyRedo() {
+  if (editorHistory.future.length === 0) return false;
+  const nextSig = editorHistory.future.pop();
+  editorHistory.past.push(editorHistory.last);
+  editorHistory.last = nextSig;
+  editorHistory.paused = true;
+  try { applyEditorSnapshot(JSON.parse(nextSig)); } finally { editorHistory.paused = false; }
+  if (typeof showToast === 'function') showToast('↷ Redo');
+  return true;
+}
+
+// Cmd+Z / Cmd+Shift+Z keybind. Skips when an input is focused and the
+// browser would handle native field undo (typing in caption etc).
+document.addEventListener('keydown', (e) => {
+  const meta = e.metaKey || e.ctrlKey;
+  if (!meta) return;
+  if (e.key !== 'z' && e.key !== 'Z') return;
+  // Allow native undo inside text inputs/areas — they have their own ring
+  // buffer that's better for typing. Editor undo still works elsewhere.
+  const t = e.target;
+  const isField = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+  if (isField) return;
+  e.preventDefault();
+  if (e.shiftKey) historyRedo(); else historyUndo();
+});
 
 const PREVIEW_MAX_DIM = 900;
 
@@ -5391,7 +5490,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.0.9';
+const APP_VERSION = '4.0.10';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -11961,6 +12060,24 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.0.10',
+    date: '2026-05-04',
+    title: 'Drive HEIC build fix + Undo/Redo + window state',
+    sections: [
+      { h: 'Fixed', items: [
+        'v4.0.9 Windows build failed because libheif 1.21+ renamed heif-convert → heif-dec — workflow now tries both names and copies whichever exists as the canonical heif-convert sidecar. Drive imports of HEIC files on Windows now actually work end-to-end.',
+      ]},
+      { h: 'New (early v4.1 Foundation)', items: [
+        'Undo / Redo for editor state — ⌘Z / ⌃Z to undo, ⌘⇧Z / ⌃⇧Z to redo. Covers caption text/position, all adjustment sliders (sat/con/bri/warm/grain/vignette), font/size/color/outline/bg, and mirror. Throttled so a long slider drag = one undoable step. Skips when an input field is focused so native field-undo still works for typing.',
+        'Window state remembered — size, position, and maximized state restored from your last quit. Multi-monitor setups stay where you put them. Powered by tauri-plugin-window-state, no JS needed.',
+      ]},
+      { h: 'Coming in v4.1.0', items: [
+        'Auto-save + crash recovery (restore caption + filter state if the app was killed mid-edit)',
+        'GPS map picker (Leaflet + OpenStreetMap, click to drop pin, saved places)',
+      ]},
+    ]
+  },
   {
     version: '4.0.9',
     date: '2026-05-04',

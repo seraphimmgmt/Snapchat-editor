@@ -11,6 +11,10 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        // Auto-saves window position/size/maximized to a state file at quit;
+        // restores them on launch. No JS code needed — the plugin hooks
+        // window events itself. v4.1 Foundation: window state remembered.
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             start_oauth_listener,
             open_url,

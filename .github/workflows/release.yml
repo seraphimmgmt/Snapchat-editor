@@ -85,11 +85,23 @@ jobs:
           # which killed the script before bundling. Use `|| true` so we
           # tolerate that, then verify the binaries we need actually exist.
           /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed mingw-w64-x86_64-libheif mingw-w64-x86_64-ntldd-git || true
-          test -f /c/msys64/mingw64/bin/heif-enc.exe     || { echo "heif-enc.exe not installed by pacman"; exit 1; }
-          test -f /c/msys64/mingw64/bin/heif-convert.exe || { echo "heif-convert.exe not installed by pacman"; exit 1; }
-          test -f /c/msys64/mingw64/bin/ntldd.exe        || { echo "ntldd.exe not installed by pacman"; exit 1; }
-          cp /c/msys64/mingw64/bin/heif-enc.exe     src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe
-          cp /c/msys64/mingw64/bin/heif-convert.exe src-tauri/binaries/heif-convert-x86_64-pc-windows-msvc.exe
+          test -f /c/msys64/mingw64/bin/heif-enc.exe || { echo "heif-enc.exe not installed by pacman"; exit 1; }
+          test -f /c/msys64/mingw64/bin/ntldd.exe    || { echo "ntldd.exe not installed by pacman"; exit 1; }
+          # libheif 1.21+ renamed heif-convert → heif-dec. Try both names so
+          # we work across mingw64 versions; the sidecar always lands as
+          # heif-convert-<triple>.exe so the Rust side uses one canonical name.
+          HEIF_DECODER=""
+          for cand in heif-convert heif-dec; do
+            if [ -f "/c/msys64/mingw64/bin/${cand}.exe" ]; then HEIF_DECODER="$cand"; break; fi
+          done
+          if [ -z "$HEIF_DECODER" ]; then
+            echo "No heif decoder tool found in mingw64/bin. Available heif-* binaries:"
+            ls /c/msys64/mingw64/bin/heif* 2>&1 || true
+            exit 1
+          fi
+          echo "Using $HEIF_DECODER as the HEIC decoder sidecar"
+          cp /c/msys64/mingw64/bin/heif-enc.exe        src-tauri/binaries/heif-enc-x86_64-pc-windows-msvc.exe
+          cp "/c/msys64/mingw64/bin/${HEIF_DECODER}.exe" src-tauri/binaries/heif-convert-x86_64-pc-windows-msvc.exe
           # Recursively list every DLL each tool depends on. ntldd outputs
           # Windows-style paths (C:\msys64\mingw64\bin\…) — extract basename
           # and copy from the known bin dir. Walk BOTH heif-enc and
