@@ -137,5 +137,93 @@ jobs:
           releaseBody: 'See assets below.'
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
+          # We write latest.json ourselves in the publish-latest-json job
+          # below — tauri-action's "Signature not found" bug silently skipped
+          # the latest.json update for v4.1.0/4.1.1/4.1.2 leaving auto-updates
+          # broken. Set to false here so it doesn't try and fail.
+          includeUpdaterJson: false
           args: ${{ matrix.args }}
+
+  # ============================================================
+  # Build latest.json from the actually-uploaded .sig files. Runs ONCE
+  # after the matrix completes, regardless of pass/fail per platform —
+  # if a platform failed, we skip its entry instead of breaking the
+  # whole updater. Replaces tauri-action's broken updater-json logic.
+  # ============================================================
+  publish-latest-json:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine version
+        id: ver
+        run: |
+          VER=$(grep -m1 '"version"' src-tauri/tauri.conf.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
+          echo "version=$VER" >> $GITHUB_OUTPUT
+          echo "Version: $VER"
+      - name: Build + upload latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          VER="${{ steps.ver.outputs.version }}"
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+          DIR=$(mktemp -d)
+
+          # Pull each platform's .sig from the release. Names match what
+          # tauri-action uploads (mac is unversioned, Windows is versioned).
+          MAC_SIG="$DIR/Snap.Caption.Studio_aarch64.app.tar.gz.sig"
+          WIN_MSI_SIG="$DIR/Snap.Caption.Studio_${VER}_x64_en-US.msi.sig"
+          WIN_NSIS_SIG="$DIR/Snap.Caption.Studio_${VER}_x64-setup.exe.sig"
+
+          # `gh release download` exits non-zero if a file is missing,
+          # which is fine for individual platforms — we want to know.
+          # Use || true so the absence of one platform doesn't kill the
+          # script before we check the others.
+          gh release download "$TAG" -R "$REPO" -D "$DIR" \
+            -p "Snap.Caption.Studio_aarch64.app.tar.gz.sig" --clobber 2>/dev/null || true
+          gh release download "$TAG" -R "$REPO" -D "$DIR" \
+            -p "Snap.Caption.Studio_${VER}_x64_en-US.msi.sig" --clobber 2>/dev/null || true
+          gh release download "$TAG" -R "$REPO" -D "$DIR" \
+            -p "Snap.Caption.Studio_${VER}_x64-setup.exe.sig" --clobber 2>/dev/null || true
+
+          python3 <<EOF > "$DIR/latest.json"
+          import json, datetime, pathlib, os
+          plats = {}
+          mac = pathlib.Path(r"$MAC_SIG")
+          if mac.exists():
+              sig = mac.read_text().strip()
+              plats["darwin-aarch64"]     = {"signature": sig, "url": f"$BASE/Snap.Caption.Studio_aarch64.app.tar.gz"}
+              plats["darwin-aarch64-app"] = {"signature": sig, "url": f"$BASE/Snap.Caption.Studio_aarch64.app.tar.gz"}
+          wmsi = pathlib.Path(r"$WIN_MSI_SIG")
+          if wmsi.exists():
+              sig = wmsi.read_text().strip()
+              plats["windows-x86_64"]     = {"signature": sig, "url": f"$BASE/Snap.Caption.Studio_${VER}_x64_en-US.msi"}
+              plats["windows-x86_64-msi"] = {"signature": sig, "url": f"$BASE/Snap.Caption.Studio_${VER}_x64_en-US.msi"}
+          wnsis = pathlib.Path(r"$WIN_NSIS_SIG")
+          if wnsis.exists():
+              sig = wnsis.read_text().strip()
+              plats["windows-x86_64-nsis"] = {"signature": sig, "url": f"$BASE/Snap.Caption.Studio_${VER}_x64-setup.exe"}
+          if not plats:
+              print(json.dumps({"error": "no platforms had signatures — aborting"}))
+              exit(1)
+          data = {
+              "version":  "$VER",
+              "notes":    "See assets below.",
+              "pub_date": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+              "platforms": plats,
+          }
+          print(json.dumps(data, indent=2))
+          EOF
+
+          echo "--- latest.json content ---"
+          cat "$DIR/latest.json"
+          echo "---------------------------"
+
+          gh release upload "$TAG" "$DIR/latest.json" -R "$REPO" --clobber
+          echo "✓ latest.json uploaded for v${VER}"

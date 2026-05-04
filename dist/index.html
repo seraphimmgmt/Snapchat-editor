@@ -5593,7 +5593,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.1.3';
+const APP_VERSION = '4.1.4';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12238,6 +12238,18 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.1.4',
+    date: '2026-05-04',
+    title: 'Workflow fix — auto-update will work for every release going forward',
+    sections: [
+      { h: 'Fixed', items: [
+        'tauri-action has been silently skipping the latest.json upload since v4.1.0 ("Signature not found for the updater JSON" — a known issue when an existing latest.json on the release has stale platform entries from a previous matrix run). That meant v4.1.0 / v4.1.1 / v4.1.2 / v4.1.3 all required a manual hand-upload of latest.json before the in-app updater could see them.',
+        'Replaced tauri-action\'s broken updater-json logic with a dedicated workflow job (publish-latest-json) that runs after the matrix completes, downloads the freshly-uploaded .sig files from the release, builds latest.json itself, and uploads it. Skips platforms whose .sig is missing instead of dying — partial releases still get a valid updater manifest.',
+        'Going forward: every release auto-publishes a correct latest.json. The "did the update show up?" check stops being a per-release ritual.',
+      ]},
+    ]
+  },
   {
     version: '4.1.3',
     date: '2026-05-04',
