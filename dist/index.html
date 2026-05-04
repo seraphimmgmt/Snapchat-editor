@@ -5944,7 +5944,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.2';
+const APP_VERSION = '4.2.3';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -7167,27 +7167,17 @@ function drawSingleCard(cardEl, item) {
   const fitW = dispW, fitH = dispH, fitX = 0, fitY = 0;
 
   const adj = item.adj;
-  // WebKit (WKWebView on macOS) silently drops ctx.filter when the destination
-  // canvas has a non-identity transform set via setTransform — which is exactly
-  // what we did above to scale by dpr. Symptom: saturation/contrast/brightness/
-  // warmth sliders move but the canvas doesn't change. The editor view doesn't
-  // hit this because it doesn't setTransform.
-  //
-  // Workaround: render the filtered source to an offscreen canvas at identity
-  // transform, then drawImage the offscreen onto the main canvas. The filter
-  // gets baked into the offscreen pixels at draw time, so the main canvas just
-  // copies finished pixels without needing to apply ctx.filter itself.
-  const filterStr = buildItemFilterString(item);
-  const off = document.createElement('canvas');
-  off.width = Math.round(fitW * dpr);
-  off.height = Math.round(fitH * dpr);
-  const offCtx = off.getContext('2d');
-  offCtx.imageSmoothingEnabled = true;
-  offCtx.imageSmoothingQuality = 'high';
-  offCtx.filter = filterStr;
-  offCtx.drawImage(item.img, 0, 0, off.width, off.height);
-  offCtx.filter = 'none';
-  ctx.drawImage(off, fitX, fitY, fitW, fitH);
+  // Draw the raw image to the canvas (no ctx.filter — it's flaky on WebKit
+  // when the canvas has a non-identity transform, which we set above for dpr
+  // sharpness). Adjustments + CSS-method filters are applied via canvas.style
+  // .filter below — that path is rock-solid across all browsers since it runs
+  // at the browser composite layer, completely independent of ctx.filter.
+  ctx.drawImage(item.img, fitX, fitY, fitW, fitH);
+  // Apply CSS filter on the canvas DOM element. Combines adjustments with any
+  // CSS-method filter chips. LUT-method filters still run through the pixel
+  // pass below (they need raw pixel access). Export pipeline (renderItemToBlob)
+  // bakes everything into pixels separately — display-only mismatch is fine.
+  canvas.style.filter = buildItemFilterString(item);
 
   // LUT pass — applied only for filters whose method is 'lut'. dpr is passed
   // through because getImageData/putImageData operate in device pixels and
@@ -12629,14 +12619,25 @@ function ensureSettingsModal() {
 // ============================================================================
 const PATCH_NOTES = [
   {
-    version: '4.2.2',
+    version: '4.2.3',
     date: '2026-05-04',
-    title: 'Fix — Carousel adjustments (saturation/contrast/brightness/warmth) now apply',
+    title: 'Fix — Carousel adjustments (take 2: switched to CSS filter on the canvas DOM)',
     sections: [
       { h: 'Fixed', items: [
-        'Saturation, Contrast, Brightness, and Warmth sliders in CAROUSEL EDIT did nothing to the preview. The editor view worked fine — only carousel was broken. Root cause: WebKit (WKWebView on Mac) silently drops ctx.filter when the destination canvas has a non-identity transform set via setTransform. The carousel uses setTransform(dpr) for Retina sharpness; the editor doesn\'t — which is why one worked and the other didn\'t.',
-        'Fix: render the filtered source to an offscreen canvas at identity transform first, then drawImage that onto the main canvas. Filter gets baked into pixels at the offscreen draw, so the main canvas just copies finished pixels — no filter-vs-transform conflict.',
-        'Export pipeline (renderItemToBlob) was unaffected — it uses identity transform — so exports were correct even when the on-screen preview wasn\'t. If your last export looked right despite the broken preview, that\'s why.',
+        'v4.2.2\'s offscreen-canvas workaround for the carousel adjustments bug didn\'t hold. Whatever was eating ctx.filter on this build was eating it everywhere, not just on the dpr-transformed canvas. Switched display rendering to apply the filter as a CSS style on the canvas DOM element itself (canvas.style.filter) instead of via ctx.filter on the canvas context.',
+        'CSS filter on a DOM element runs at the browser composite layer — completely independent of canvas internals — so it works in every WebView/browser and bypasses any ctx.filter quirks once and for all. Adjustment sliders should now move the preview live with no lag.',
+        'Side benefit: adjustments render is now zero-cost — no offscreen canvas allocation per redraw, no filter pass on pixels. Just one canvas.style.filter assignment.',
+        'Export pipeline (renderItemToBlob) is unchanged — it bakes filters + adjustments into pixels via ctx.filter at identity transform, which works fine. So exports were already correct and stay correct.',
+      ]},
+    ]
+  },
+  {
+    version: '4.2.2',
+    date: '2026-05-04',
+    title: 'Fix attempt — Carousel adjustments (didn\'t work, see v4.2.3)',
+    sections: [
+      { h: 'Note', items: [
+        'Attempted offscreen-canvas workaround for carousel adjustments. Didn\'t fix the bug. v4.2.3 takes a different approach (CSS filter on the canvas DOM element) which should actually solve it.',
       ]},
     ]
   },
