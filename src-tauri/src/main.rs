@@ -15,6 +15,9 @@ fn main() {
         // restores them on launch. No JS code needed — the plugin hooks
         // window events itself. v4.1 Foundation: window state remembered.
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        // OS-level notifications for export completion (v4.2.1). JS calls
+        // window.__TAURI__.notification.sendNotification() directly.
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             start_oauth_listener,
             open_url,

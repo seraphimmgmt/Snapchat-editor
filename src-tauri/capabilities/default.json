@@ -7,6 +7,10 @@
     "core:default",
     "updater:default",
     "process:default",
-    "dialog:default"
+    "dialog:default",
+    "notification:default",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-notify"
   ]
 }

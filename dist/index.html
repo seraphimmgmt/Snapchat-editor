@@ -837,6 +837,12 @@
 <div class="logo"><img class="logo-mark" src="logo.png" alt=""><h1>SNAP CAPTION STUDIO</h1></div>
 <div class="header-meta" id="headerMeta">v4.0.0 · EDITOR</div>
 <div class="header-actions">
+<div class="recents-wrap" style="position:relative;">
+<button class="header-cog" id="recentsBtn" type="button" title="Recent files" aria-label="Recent files" data-no-sfx>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/><polyline points="12 7 12 12 16 14"/></svg>
+</button>
+<div id="recentsDropdown" class="hidden" style="position:absolute;top:calc(100% + 6px);right:0;background:var(--surface-2);border:1px solid var(--border);min-width:280px;max-width:340px;z-index:9000;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:6px 0;font-family:'JetBrains Mono',monospace;"></div>
+</div>
 <button class="header-cog" id="patchNotesBtn" type="button" title="What's new" aria-label="Open patch notes">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
 </button>
@@ -1365,18 +1371,32 @@ EXPORT TO DRIVE
       setHover(null);
       if (!paths.length) return;
 
-      // Materialize each dropped path into a real File
+      // Materialize each dropped path into a real File. Pair files with paths
+      // so we can later record paths in Recents (file picker uploads have no
+      // path, but Tauri drops do).
       const files = [];
+      const filePaths = [];
       for (const p of paths) {
         try {
           const bytes = await invoke('read_user_file', { path: p });
           const name = p.split(/[\\/]/).pop() || 'dropped';
           files.push(new File([new Uint8Array(bytes)], name, { type: guessMime(name) }));
+          filePaths.push(p);
         } catch (err) {
           console.error('[drop] could not read', p, err);
         }
       }
       if (!files.length) return;
+
+      const recordRecent = (target, idxs) => {
+        try {
+          for (const i of idxs) {
+            const p = filePaths[i];
+            const f = files[i];
+            if (p && f && typeof addRecent === 'function') addRecent(p, f.name, target);
+          }
+        } catch (_) {}
+      };
 
       // 1) Specific zone under cursor wins
       const zone = findZoneAt(pos.x, pos.y);
@@ -1384,17 +1404,20 @@ EXPORT TO DRIVE
         if ((zone.id === 'carouselDropZone' || zone.id === 'carouselStrip')
             && typeof addCarouselFiles === 'function') {
           addCarouselFiles(files);
+          recordRecent('carousel', files.map((_, i) => i));
           return;
         }
         if (zone.classList.contains('inspector-slot')) {
           const idx = parseInt(zone.dataset.slot || '0', 10);
           if (typeof loadInspectorFile === 'function') {
             loadInspectorFile(idx, files[0]);
+            recordRecent('inspector', [0]);
             return;
           }
         }
         if (zone.id === 'uploadZone' && typeof handleFile === 'function') {
           handleFile(files[0]);
+          recordRecent('editor', [0]);
           return;
         }
       }
@@ -1405,6 +1428,7 @@ EXPORT TO DRIVE
       const view = (typeof currentView !== 'undefined' && currentView) || 'editor';
       if (view === 'carousel' && typeof addCarouselFiles === 'function') {
         addCarouselFiles(files);
+        recordRecent('carousel', files.map((_, i) => i));
         return;
       }
       if (view === 'inspector' && typeof loadInspectorFile === 'function') {
@@ -1415,10 +1439,12 @@ EXPORT TO DRIVE
           if (i === slots.length - 1) target = i; // all full → overwrite last
         }
         loadInspectorFile(target, files[0]);
+        recordRecent('inspector', [0]);
         return;
       }
       // Default (editor)
       if (typeof handleFile === 'function') handleFile(files[0]);
+      recordRecent('editor', [0]);
     });
   })();
 
@@ -2283,6 +2309,123 @@ document.addEventListener('click', (e) => {
   SFX.click();
 }, true);  // capture phase so we beat any e.stopPropagation()
 
+// =====================================================================
+// OS NOTIFICATIONS — desktop notification on export complete (when bg)
+// =====================================================================
+// Wraps tauri-plugin-notification. First call requests permission; subsequent
+// calls send. No-op outside Tauri or when permission denied. Title shows in
+// the OS notification center; body is the detail line. Action buttons aren't
+// supported by the basic API — clicking the notification just focuses our
+// window.
+async function osNotify(title, body) {
+  if (!window.__TAURI__ || !window.__TAURI__.notification) return;
+  try {
+    const n = window.__TAURI__.notification;
+    let granted = await n.isPermissionGranted();
+    if (!granted) {
+      const perm = await n.requestPermission();
+      granted = perm === 'granted';
+    }
+    if (!granted) return;
+    n.sendNotification({ title, body });
+  } catch (e) {
+    console.warn('[osNotify]', e);
+  }
+}
+
+// =====================================================================
+// RECENTS — last 10 files loaded into editor or carousel
+// =====================================================================
+// Drag-drops via Tauri have file paths (we capture them in the drag-drop
+// handler). File-picker uploads do NOT have paths in browser-land, so they
+// can't be re-opened — those entries skip the recents list. A click on a
+// recent reads the file via the existing read_user_file Rust command and
+// hands it to handleFile (editor) or addCarouselFiles (carousel).
+const RECENTS_KEY = 'snapcap_recents';
+const RECENTS_MAX = 10;
+
+function getRecents() {
+  try { return JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]'); }
+  catch { return []; }
+}
+function addRecent(path, name, target) {
+  if (!path) return;
+  try {
+    const list = getRecents().filter(r => r.path !== path);
+    list.unshift({ path, name: name || path.split(/[\\/]/).pop(), target: target || 'editor', ts: Date.now() });
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(list.slice(0, RECENTS_MAX)));
+    refreshRecentsUI();
+  } catch (_) {}
+}
+function clearRecents() {
+  try { localStorage.removeItem(RECENTS_KEY); } catch {}
+  refreshRecentsUI();
+}
+async function reopenRecent(rec) {
+  if (!window.__TAURI__ || !window.__TAURI__.core) {
+    showToast('Recents only work in the desktop app', 'error');
+    return;
+  }
+  try {
+    const bytes = await window.__TAURI__.core.invoke('read_user_file', { path: rec.path });
+    const file = new File([new Uint8Array(bytes)], rec.name,
+      { type: typeof guessMime === 'function' ? guessMime(rec.name) : '' });
+    if (rec.target === 'carousel' && typeof addCarouselFiles === 'function') {
+      addCarouselFiles([file]);
+      if (typeof switchView === 'function') switchView('carousel');
+    } else if (typeof handleFile === 'function') {
+      handleFile(file);
+    }
+  } catch (e) {
+    console.warn('[recents] reopen failed', e);
+    showToast(`Couldn't reopen ${rec.name} — file may have moved`, 'error');
+    // Drop the dead entry from recents
+    try {
+      const list = getRecents().filter(r => r.path !== rec.path);
+      localStorage.setItem(RECENTS_KEY, JSON.stringify(list));
+      refreshRecentsUI();
+    } catch (_) {}
+  }
+}
+function refreshRecentsUI() {
+  // Update both the header dropdown and any other surfaces that render recents.
+  const dd = document.getElementById('recentsDropdown');
+  if (dd && !dd.classList.contains('hidden')) renderRecentsDropdown();
+}
+function renderRecentsDropdown() {
+  const dd = document.getElementById('recentsDropdown');
+  if (!dd) return;
+  const items = getRecents();
+  if (!items.length) {
+    dd.innerHTML = '<div style="padding:14px 16px;color:var(--text-faint);font-size:11px;font-style:italic;">No recent files yet — drag-drop to add</div>';
+    return;
+  }
+  dd.innerHTML =
+    items.map((r, i) => `
+      <div class="recents-item" data-i="${i}" style="padding:8px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.name)}</div>
+          <div style="font-size:9px;color:var(--text-faint);">${humanAgo(r.ts)} · ${r.target}</div>
+        </div>
+        <span style="font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.08em;">↺</span>
+      </div>`).join('') +
+    `<div style="border-top:1px solid var(--border);margin-top:4px;"><button id="recentsClearBtn" data-no-sfx style="width:100%;background:transparent;border:none;color:var(--text-faint);padding:8px 14px;font-family:inherit;font-size:10px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;text-align:left;">Clear recents</button></div>`;
+  dd.querySelectorAll('.recents-item').forEach(el => {
+    el.onmouseenter = () => el.style.background = 'var(--surface-3)';
+    el.onmouseleave = () => el.style.background = 'transparent';
+    el.onclick = () => {
+      const idx = parseInt(el.dataset.i);
+      const rec = getRecents()[idx];
+      if (rec) {
+        reopenRecent(rec);
+        document.getElementById('recentsDropdown').classList.add('hidden');
+      }
+    };
+  });
+  const clearBtn = document.getElementById('recentsClearBtn');
+  if (clearBtn) clearBtn.onclick = () => { clearRecents(); document.getElementById('recentsDropdown').classList.add('hidden'); };
+}
+
 async function handleFile(file) {
   if (!file) return;
   const type = detectMediaType(file);
@@ -2643,11 +2786,24 @@ function setExportStatus(msg, type = 'info', progress = null, options = {}) {
   el.classList.remove('hidden', 'success', 'error');
   if (type === 'success') {
     el.classList.add('success');
-    if (!wasSuccess && typeof SFX !== 'undefined') SFX.success();
+    if (!wasSuccess) {
+      if (typeof SFX !== 'undefined') SFX.success();
+      // OS-level notification only when the window isn't focused (so we
+      // don't spam users actively watching the export). The SFX still
+      // plays in-window for foreground completions.
+      if (!document.hasFocus() && typeof osNotify === 'function') {
+        osNotify('Export complete', msg.replace(/[……]/g, '').slice(0, 140));
+      }
+    }
   }
   if (type === 'error') {
     el.classList.add('error');
-    if (!wasError && typeof SFX !== 'undefined') SFX.error();
+    if (!wasError) {
+      if (typeof SFX !== 'undefined') SFX.error();
+      if (!document.hasFocus() && typeof osNotify === 'function') {
+        osNotify('Export failed', msg.slice(0, 140));
+      }
+    }
   }
 
   const cancelBtn = showCancel
@@ -5788,7 +5944,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.0';
+const APP_VERSION = '4.2.1';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12457,6 +12613,21 @@ function ensureSettingsModal() {
 // ============================================================================
 const PATCH_NOTES = [
   {
+    version: '4.2.1',
+    date: '2026-05-03',
+    title: 'SPEED part 2 — Recents menu + OS export notifications',
+    sections: [
+      { h: 'New', items: [
+        '↺ Recents button in the header (next to the cog) — last 10 files dragged into the editor / carousel / metadata inspector. Click any entry to re-open it instantly. Tracks where it landed (editor / carousel / inspector) so it goes back to the same place.',
+        '🔔 OS notification when an export finishes (or fails) while the app is in the background. Triggers only when the window is unfocused — no double-buzz when you\'re already watching the progress bar. First export prompts for OS-level permission; nothing fires until you grant it.',
+      ]},
+      { h: 'Notes', items: [
+        'Recents only captures drag-dropped files (those carry a real disk path). Files added via the file picker stay in the picker history but don\'t show up in Recents — browser security strips the path before the page sees it.',
+        'Reopening a recent that\'s been moved or deleted shows an error toast and drops the dead entry from the list automatically.',
+      ]},
+    ]
+  },
+  {
     version: '4.2.0',
     date: '2026-05-04',
     title: 'SPEED — keyboard shortcuts, context menu, export presets',
@@ -12764,6 +12935,22 @@ document.addEventListener('DOMContentLoaded', () => {
     ensurePatchNotesModal();
     document.getElementById('patchNotesOverlay').classList.remove('hidden');
   });
+  // Recents dropdown — toggle on click, close when clicking outside.
+  const rb = document.getElementById('recentsBtn');
+  const rd = document.getElementById('recentsDropdown');
+  if (rb && rd) {
+    rb.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = rd.classList.contains('hidden');
+      rd.classList.toggle('hidden');
+      if (willOpen && typeof renderRecentsDropdown === 'function') renderRecentsDropdown();
+    });
+    document.addEventListener('click', (e) => {
+      if (rd.classList.contains('hidden')) return;
+      if (e.target === rb || rb.contains(e.target) || rd.contains(e.target)) return;
+      rd.classList.add('hidden');
+    });
+  }
 });
 // Apply persisted defaults to fresh state once init() has constructed it.
 applyPrefsToFreshState();
