@@ -940,7 +940,13 @@
 <div class="control-section" data-section-id="output">
 <button class="section-header"><h3>OUTPUT <span class="section-badge hidden">0</span></h3><span class="section-chevron">›</span></button>
 <div class="section-content">
-<div class="caption-options" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--text-dim);">RESOLUTION</div>
+<div class="caption-options" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--text-dim);">EXPORT PRESET</div>
+<div class="resolution-grid" style="grid-template-columns:repeat(3,1fr);">
+<button class="res-btn preset-btn" data-preset="social" title="1080p · h264 · q92 · best for IG/TikTok/X">SOCIAL</button>
+<button class="res-btn preset-btn" data-preset="web" title="2K · h264 · q85 · smaller files for web/email">WEB</button>
+<button class="res-btn preset-btn" data-preset="print" title="4K · max quality · for print/archive">PRINT</button>
+</div>
+<div class="caption-options" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--text-dim);margin-top:14px;">RESOLUTION</div>
 <div class="resolution-grid">
 <button class="res-btn active" data-res="1080">1080P</button>
 <button class="res-btn" data-res="2k">2K</button>
@@ -1943,6 +1949,195 @@ document.addEventListener('keydown', (e) => {
   if (isField) return;
   e.preventDefault();
   if (e.shiftKey) historyRedo(); else historyUndo();
+});
+
+// =====================================================================
+// KEYBOARD SHORTCUTS — global registry + ? cheat sheet
+// =====================================================================
+// Ships with Cmd/Ctrl+E export, Cmd+, settings, Cmd+1/2/3 tabs,
+// Cmd+Shift+R trial reel, Esc closes topmost modal, ? shows the cheat
+// sheet. Cmd+Z / Cmd+Shift+Z for undo/redo are handled separately above.
+//
+// Each entry has `keys` (array of bindings to match), `label` (cheat sheet
+// title), `desc` (explanatory line), and `action` (fired on match). Entries
+// without an action are list-only (e.g. browser-handled stuff like Cmd+Z
+// shown for completeness in the cheat sheet).
+const SHORTCUTS = [
+  { keys: ['cmd+e','ctrl+e'], label: 'Export', desc: 'Trigger the active tab\'s export', action: () => {
+      // Editor first, then carousel — whichever button is active and enabled.
+      const ed = document.getElementById('exportBtn');
+      if (ed && !ed.disabled && ed.offsetParent !== null) { ed.click(); return; }
+      const ca = document.getElementById('carouselExportBtn');
+      if (ca && !ca.disabled && ca.offsetParent !== null) ca.click();
+    }},
+  { keys: ['cmd+,','ctrl+,'], label: 'Open Settings', desc: 'Settings modal', action: () => {
+      document.getElementById('settingsBtn')?.click();
+    }},
+  { keys: ['cmd+1','ctrl+1'], label: 'Editor', desc: 'Switch to the Editor tab',
+      action: () => typeof switchView === 'function' && switchView('editor') },
+  { keys: ['cmd+2','ctrl+2'], label: 'Carousel Edit', desc: 'Switch to the Carousel tab',
+      action: () => typeof switchView === 'function' && switchView('carousel') },
+  { keys: ['cmd+3','ctrl+3'], label: 'Metadata Inspector', desc: 'Switch to the Inspector tab',
+      action: () => typeof switchView === 'function' && switchView('inspector') },
+  { keys: ['cmd+shift+r','ctrl+shift+r'], label: 'Trial Reel', desc: 'Randomize editor caption + filters',
+      action: () => document.getElementById('trialReelBtn')?.click() },
+  { keys: ['cmd+z','ctrl+z'], label: 'Undo', desc: 'Editor state — sliders, filters, caption (handled separately)', action: null },
+  { keys: ['cmd+shift+z','ctrl+shift+z'], label: 'Redo', desc: '', action: null },
+  { keys: ['esc','escape'], label: 'Close modal', desc: 'Closes the topmost open modal', action: () => closeTopmostModal() },
+  { keys: ['?','shift+?'],   label: 'Show shortcuts', desc: 'This cheat sheet', action: () => showShortcutsCheatSheet() },
+];
+
+function shortcutMatches(e, keyStr) {
+  const parts = keyStr.toLowerCase().split('+');
+  const wantMeta = parts.includes('cmd') || parts.includes('ctrl');
+  const wantShift = parts.includes('shift');
+  const wantKey = parts[parts.length - 1];
+  const meta = e.metaKey || e.ctrlKey;
+  if (wantMeta !== meta) return false;
+  // Shift gets special handling for `?` since it's typed as Shift+/ on US
+  // keyboards but e.key is already '?'. So if wantKey === '?', only check
+  // the resolved key, not the modifier.
+  if (wantKey !== '?' && wantKey !== 'escape' && wantKey !== 'esc' && wantShift !== e.shiftKey) return false;
+  const k = e.key.toLowerCase();
+  return k === wantKey || (wantKey === 'esc' && k === 'escape');
+}
+
+document.addEventListener('keydown', (e) => {
+  const t = e.target;
+  const isField = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+  for (const s of SHORTCUTS) {
+    if (!s.action) continue;
+    // Esc still fires inside fields (so you can dismiss a modal while typing)
+    const isEsc = s.keys.some(k => k === 'esc' || k === 'escape');
+    if (isField && !isEsc) continue;
+    if (s.keys.some(k => shortcutMatches(e, k))) {
+      e.preventDefault();
+      s.action();
+      return;
+    }
+  }
+}, true);  // capture phase so we beat any field-level handlers
+
+function closeTopmostModal() {
+  const open = [...document.querySelectorAll('.picker-overlay')].filter(o => !o.classList.contains('hidden') && o.style.display !== 'none');
+  if (!open.length) return;
+  const top = open[open.length - 1];
+  // Trigger the close button if there is one (preserves close-side-effects)
+  const closeBtn = top.querySelector('.x, [aria-label="Close"]');
+  if (closeBtn) closeBtn.click();
+  else top.classList.add('hidden');
+}
+
+function showShortcutsCheatSheet() {
+  // Lazy build — append once, then toggle visibility
+  let overlay = document.getElementById('shortcutsOverlay');
+  if (!overlay) {
+    const isMac = /mac/i.test(navigator.platform);
+    const fmtKey = (k) => k
+      .replace('cmd', isMac ? '⌘' : 'Ctrl')
+      .replace('ctrl', isMac ? '⌃' : 'Ctrl')
+      .replace('shift', isMac ? '⇧' : 'Shift')
+      .replace('escape', 'Esc')
+      .replace('esc', 'Esc')
+      .split('+')
+      .map(p => p.length === 1 ? p.toUpperCase() : p)
+      .map(p => `<span class="kbd-key">${p}</span>`)
+      .join(' ');
+    // Show only the first binding (mac form on mac, ctrl form on win)
+    const firstKey = (s) => isMac
+      ? s.keys.find(k => k.startsWith('cmd') || !k.includes('+')) || s.keys[0]
+      : s.keys.find(k => k.startsWith('ctrl') || !k.includes('+')) || s.keys[0];
+    const rows = SHORTCUTS.map(s => `
+      <div class="kbd-row">
+        <div>
+          <div class="kbd-label">${s.label}</div>
+          ${s.desc ? `<div class="kbd-desc">${s.desc}</div>` : ''}
+        </div>
+        <div class="kbd-keys">${fmtKey(firstKey(s))}</div>
+      </div>`).join('');
+    overlay = document.createElement('div');
+    overlay.id = 'shortcutsOverlay';
+    overlay.className = 'picker-overlay hidden';
+    overlay.innerHTML = `
+      <div class="picker-modal" style="max-width:min(560px,calc(100vw - 32px));width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);">
+        <div class="picker-head">
+          <span class="ttl">⌨ Keyboard shortcuts</span>
+          <button class="x" id="kbdCloseBtn" aria-label="Close">×</button>
+        </div>
+        <div style="padding:14px 22px;overflow-y:auto;flex:1;min-height:0;">
+          ${rows}
+          <p style="font-size:10px;color:var(--text-faint);margin:14px 0 0;font-style:italic;">Tip: press <span class="kbd-key">?</span> anywhere to reopen this list.</p>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    document.getElementById('kbdCloseBtn').onclick = () => overlay.classList.add('hidden');
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.add('hidden'); });
+  }
+  overlay.classList.remove('hidden');
+}
+
+// =====================================================================
+// CONTEXT MENU — right-click reveal-in-folder + copy path
+// =====================================================================
+// Wires a custom context menu to elements with [data-revealable] (or a
+// fallback selector for thumbs). Lazy: builds the menu DOM on first use.
+function showContextMenu(x, y, items) {
+  let menu = document.getElementById('appContextMenu');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.id = 'appContextMenu';
+    menu.style.cssText = 'position:fixed;background:var(--surface);border:1px solid var(--border-strong);border-radius:3px;box-shadow:0 12px 28px rgba(0,0,0,.6);padding:4px 0;z-index:2000;min-width:180px;font-family:JetBrains Mono,monospace;font-size:11px;color:var(--text);';
+    document.body.appendChild(menu);
+    // Click anywhere outside closes it
+    document.addEventListener('click', () => { menu.style.display = 'none'; });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menu.style.display = 'none'; });
+  }
+  menu.innerHTML = items.map((it, i) => it.divider
+    ? `<div style="height:1px;background:var(--border);margin:4px 0;"></div>`
+    : `<div class="ctx-item" data-i="${i}" style="padding:7px 14px;cursor:pointer;${it.danger ? 'color:var(--red);' : ''}">${it.label}</div>`
+  ).join('');
+  // Position — keep on screen
+  const w = 200, h = 30 * items.filter(x => !x.divider).length + 8;
+  const px = Math.min(x, window.innerWidth - w - 8);
+  const py = Math.min(y, window.innerHeight - h - 8);
+  menu.style.left = px + 'px';
+  menu.style.top = py + 'px';
+  menu.style.display = 'block';
+  menu.querySelectorAll('.ctx-item').forEach(el => {
+    const i = parseInt(el.dataset.i);
+    el.onmouseenter = () => el.style.background = 'var(--surface-3)';
+    el.onmouseleave = () => el.style.background = 'transparent';
+    el.onclick = (e) => { e.stopPropagation(); menu.style.display = 'none'; if (items[i].action) items[i].action(); };
+  });
+}
+
+// Right-click on revealable elements pops the menu. Currently the only
+// surface is the carousel thumb strip — extend with [data-revealable]
+// on other elements as more reveal targets are added.
+document.addEventListener('contextmenu', (e) => {
+  // Find a thumb that contains a path on its dataset (set by carousel + drive)
+  const thumb = e.target.closest('.carousel-thumb');
+  if (!thumb) return;
+  const idx = parseInt(thumb.dataset.index);
+  if (isNaN(idx)) return;
+  const item = (typeof carouselState !== 'undefined') ? carouselState.images[idx] : null;
+  if (!item) return;
+  e.preventDefault();
+  const items = [];
+  // Reveal in folder only if we have a real path (Tauri-loaded files do)
+  if (item.path && window.__TAURI__ && window.__TAURI__.core) {
+    items.push({ label: '📂 Reveal in ' + (/win/i.test(navigator.platform) ? 'Explorer' : 'Finder'),
+      action: async () => {
+        try { await window.__TAURI__.core.invoke('reveal_in_folder', { path: item.path }); }
+        catch (err) { showToast('Could not reveal: ' + err, 'error'); }
+      }});
+    items.push({ label: '⧉ Copy path',
+      action: () => { navigator.clipboard?.writeText(item.path); showToast('Path copied'); }});
+    items.push({ divider: true });
+  }
+  items.push({ label: '✕ Remove', danger: true,
+    action: () => { if (typeof removeCarouselImage === 'function') removeCarouselImage(idx); }});
+  showContextMenu(e.clientX, e.clientY, items);
 });
 
 const PREVIEW_MAX_DIM = 900;
@@ -5593,7 +5788,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.1.4';
+const APP_VERSION = '4.2.0';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -11701,14 +11896,37 @@ function bindEvents() {
     schedulePreviewRender();
   });
 
-  document.querySelectorAll('.res-btn').forEach(btn => {
+  document.querySelectorAll('.res-btn[data-res]').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.res-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.res-btn[data-res]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       state.exportRes = btn.dataset.res;
       const lbl = document.getElementById('exportResLabel');
       if (lbl) lbl.textContent = btn.dataset.res.toUpperCase().replace('1080', '1080P');
       updateBadges();
+    });
+  });
+
+  // Export presets — 1-tap quality bundles. Each one sets resolution + FPS
+  // (and could later set codec / quality if those become user-tweakable).
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const preset = btn.dataset.preset;
+      let res = '1080', fps = 30;
+      if (preset === 'social') { res = '1080'; fps = 30; }
+      else if (preset === 'web') { res = '2k'; fps = 30; }
+      else if (preset === 'print') { res = '4k'; fps = 60; }
+      state.exportRes = res;
+      state.exportFps = fps;
+      // Sync the resolution + FPS button strips
+      document.querySelectorAll('.res-btn[data-res]').forEach(b => b.classList.toggle('active', b.dataset.res === res));
+      document.querySelectorAll('.fps-btn').forEach(b => b.classList.toggle('active', String(b.dataset.fps) === String(fps)));
+      // Visual feedback on the preset buttons themselves
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b === btn));
+      const lbl = document.getElementById('exportResLabel');
+      if (lbl) lbl.textContent = res.toUpperCase().replace('1080', '1080P');
+      updateBadges();
+      showToast(`Preset: ${preset.toUpperCase()}`, 'notify');
     });
   });
 
@@ -12238,6 +12456,21 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.0',
+    date: '2026-05-04',
+    title: 'SPEED — keyboard shortcuts, context menu, export presets',
+    sections: [
+      { h: 'New', items: [
+        '⌨ Keyboard shortcuts: ⌘E export · ⌘, settings · ⌘1/2/3 switch tabs · ⌘⇧R trial reel · Esc closes any modal. ⌘Z / ⌘⇧Z undo/redo (already shipped). Press ? anywhere to see the full cheat sheet.',
+        '📂 Right-click context menu on carousel thumbnails: Reveal in Finder/Explorer · Copy path · Remove. (Reveal works for files with a known disk path; drag-dropped files still get Remove.)',
+        '⚡ Export presets in editor → OUTPUT: SOCIAL (1080p/30fps) · WEB (2K/30fps) · PRINT (4K/60fps). One click sets resolution + FPS.',
+      ]},
+      { h: 'Note', items: [
+        'Recents menu (last 10 source files) and OS-level export-complete notifications coming in v4.2.1 — they touched more file-tracking infra than fit in this batch.',
+      ]},
+    ]
+  },
   {
     version: '4.1.4',
     date: '2026-05-04',
@@ -13173,6 +13406,14 @@ if (window.__TAURI__ && window.__TAURI__.core) {
 }
 </script>
 <style>
+  /* Keyboard cheat sheet rows */
+  .kbd-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .kbd-row:last-child{border-bottom:none;}
+  .kbd-label{font-size:12px;color:var(--text);font-weight:600;}
+  .kbd-desc{font-size:10px;color:var(--text-faint);margin-top:2px;line-height:1.4;}
+  .kbd-keys{display:flex;gap:4px;align-items:center;flex-shrink:0;}
+  .kbd-key{display:inline-block;background:var(--surface-3);border:1px solid var(--border-strong);border-radius:3px;padding:2px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);min-width:22px;text-align:center;}
+
   /* Categorized Settings — only the active category is visible. JS toggles
      the .settings-active flag on the matching .settings-group + .settings-nav-btn. */
   .settings-group{padding:14px 0;border-bottom:1px solid var(--border);display:none;}
