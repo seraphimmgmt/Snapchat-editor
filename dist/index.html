@@ -1901,6 +1901,10 @@ function historyMaybePush() {
       editorHistory.future.length = 0;
     }
     editorHistory.last = sig;
+    // Also persist for crash recovery — fires on every change, not just the
+    // 30s background interval. v4.1.0 only saved every 30s which meant
+    // quick edits before quit were lost. autosaveState is no-op safe.
+    if (typeof autosaveState === 'function') autosaveState();
   }, HISTORY_DEBOUNCE_MS);
 }
 
@@ -5494,7 +5498,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.1.0';
+const APP_VERSION = '4.1.1';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12065,6 +12069,17 @@ function ensureSettingsModal() {
 // ============================================================================
 const PATCH_NOTES = [
   {
+    version: '4.1.1',
+    date: '2026-05-04',
+    title: 'Auto-save fires on every change (was 30s interval)',
+    sections: [
+      { h: 'Fixed', items: [
+        'v4.1.0 only autosaved every 30 seconds, so quick edits before quit were lost — no recovery prompt on relaunch. Now saves on every meaningful change (debounced to ~350ms after the last edit), every 10 seconds as a backup, AND on window close (beforeunload + pagehide). First save in a session shows a one-time toast "Auto-save on — your edits will be recoverable" so you know it\'s active.',
+        'Snapshots that are all-default (caption empty, no slider tweaks, no filters) now clear the recovery key instead of saving an empty snapshot — won\'t prompt to "restore" a session that had nothing in it.',
+      ]},
+    ]
+  },
+  {
     version: '4.1.0',
     date: '2026-05-04',
     title: 'Foundation — Auto-save, GPS map picker (Undo/Redo + window state from v4.0.10)',
@@ -12325,14 +12340,27 @@ applyPrefsToFreshState();
 // a "session restore" feature, not just crash recovery. One DISMISS click
 // is the cost.
 const RECOVERY_KEY = 'snapcap_recovery';
-const RECOVERY_INTERVAL_MS = 30 * 1000;
+const RECOVERY_INTERVAL_MS = 10 * 1000;     // backup; primary save is on every change
 const RECOVERY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+let _autosaveAnnounced = false;
 function autosaveState() {
   if (typeof snapshotEditorState !== 'function') return;
   try {
-    const data = { state: snapshotEditorState(), ts: Date.now() };
+    const snap = snapshotEditorState();
+    if (!isRecoverySnapshotInteresting(snap)) {
+      // Nothing worth saving — clear any stale snapshot so we don't
+      // resurrect old work after the user reset everything.
+      try { localStorage.removeItem(RECOVERY_KEY); } catch (_) {}
+      return;
+    }
+    const data = { state: snap, ts: Date.now() };
     localStorage.setItem(RECOVERY_KEY, JSON.stringify(data));
+    // First save in this session: tell the user once so they know it's on.
+    if (!_autosaveAnnounced && typeof showToast === 'function') {
+      _autosaveAnnounced = true;
+      showToast('Auto-save on — your edits will be recoverable');
+    }
   } catch (_) {}
 }
 
@@ -12431,6 +12459,11 @@ function checkAndOfferRecovery() {
 }
 
 setInterval(autosaveState, RECOVERY_INTERVAL_MS);
+// Best-effort save on close — both pagehide and beforeunload, since
+// pagehide is the modern equivalent and Tauri windows fire either path
+// depending on platform/version.
+window.addEventListener('beforeunload', autosaveState);
+window.addEventListener('pagehide', autosaveState);
 checkAndOfferRecovery();
 
 // =====================================================================
