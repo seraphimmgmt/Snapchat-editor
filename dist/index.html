@@ -3830,6 +3830,11 @@ async function exportVideoFFmpeg() {
     return true;
   }
 
+  // ABR target (v4.2.6) — see exportVideoFFmpegNative for the rationale.
+  // 0.25 bpp / 6 Mbps floor matches WebCodecs/MediaRecorder paths.
+  const targetBitrate = Math.max((w * h * targetFps * 0.25) | 0, 6_000_000);
+  const maxBitrate = (targetBitrate * 1.2) | 0;
+  const bufSize = (targetBitrate * 2) | 0;
   const ffmpegArgs = [
     '-framerate', String(targetFps),
     '-i', `f%0${frameDigits}d.jpg`,
@@ -3839,7 +3844,9 @@ async function exportVideoFFmpeg() {
     '-c:v', 'libx264',
     '-preset', 'medium',    // veryfast was visibly smearing motion at 1080p; medium
                             // doubles encode time but preserves the source's motion fidelity
-    '-crf', '18',           // visually near-lossless (was 20 — bumped for less mush in fast scenes)
+    '-b:v', String(targetBitrate),
+    '-maxrate', String(maxBitrate),
+    '-bufsize', String(bufSize),
     '-pix_fmt', 'yuv420p',  // broad player compat (incl. QuickTime/iOS)
     '-movflags', '+faststart',
     // Match source color metadata so players don't compress the gamut.
@@ -4096,6 +4103,17 @@ async function exportVideoFFmpegNative() {
     return true;
   }
 
+  // Bitrate target — matches the WebCodecs/MediaRecorder paths (v4.2.4).
+  // 0.25 bpp at 1080p24 = 12.4 Mbps, aligning with iPhone/Kling source bitrates.
+  // We use ABR (-b:v) instead of CRF here because the JPEG intermediate cleans
+  // up high-frequency detail enough that libx264's CRF 18 was hitting target
+  // quality at only ~5.8 Mbps — visually softer than source. ABR forces the
+  // encoder to use the full bitrate budget regardless of how "easy" the input
+  // looks. -maxrate is 1.2× target with a 2× bufsize for breathing room on
+  // motion-heavy frames.
+  const targetBitrate = Math.max((w * h * targetFps * 0.25) | 0, 6_000_000);
+  const maxBitrate = (targetBitrate * 1.2) | 0;
+  const bufSize = (targetBitrate * 2) | 0;
   const ffArgs = [
     '-y',
     '-framerate', String(targetFps),
@@ -4105,7 +4123,9 @@ async function exportVideoFFmpegNative() {
   ffArgs.push(
     '-c:v', 'libx264',
     '-preset', 'medium',    // see other path — veryfast smeared motion
-    '-crf', '18',
+    '-b:v', String(targetBitrate),
+    '-maxrate', String(maxBitrate),
+    '-bufsize', String(bufSize),
     '-pix_fmt', 'yuv420p',
     '-movflags', '+faststart',
     '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
@@ -5965,7 +5985,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.5';
+const APP_VERSION = '4.2.6';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12720,6 +12740,19 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.6',
+    date: '2026-05-04',
+    title: 'Fix — Reliable (FFmpeg) export bitrate (the real culprit behind clunky/laggy exports)',
+    sections: [
+      { h: 'Fixed', items: [
+        'v4.2.4 fixed the bitrate target for the Fast (WebCodecs) and Legacy (MediaRecorder) paths but missed the Reliable (FFmpeg) path — which is what most users hit by default on Windows because WebCodecs there is unreliable. ffprobe on a Windows export confirmed: encoder Lavc62.28.101 libx264, bitrate 5,814 kb/s — same as before. Half the source\'s 11.5 Mbps.',
+        'Root cause: the FFmpeg path used `-crf 18` (a quality target). CRF is bitrate-blind — libx264 picks whatever bitrate hits the quality target, and the JPEG intermediate frames clean up high-frequency detail enough that CRF 18 was content with 5.8 Mbps. Output: artifacts smoothed away, but so was source detail.',
+        'Fix: switched the FFmpeg path from CRF mode to ABR mode using the same 0.25 bpp formula as the other two paths. `-b:v` + `-maxrate` + `-bufsize` force libx264 to use the full bitrate budget regardless of how "easy" the input looks. 1080p24 now lands at ~12 Mbps — matching iPhone/Kling source video.',
+        'Applies to both the Tauri-native FFmpeg path (Mac/Windows desktop) and the FFmpeg.wasm fallback (browser builds).',
+      ]},
+    ]
+  },
   {
     version: '4.2.5',
     date: '2026-05-04',
