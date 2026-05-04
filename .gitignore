@@ -30,3 +30,7 @@ dist-build/
 
 # Local test assets (not needed in repo)
 dist/test.mp4
+
+# Session-local memory (regenerated each /session-end). Don't commit — it
+# churns on every session and would pollute git history.
+.claude/session-memory.md
