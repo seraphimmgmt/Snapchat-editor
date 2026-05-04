@@ -1190,6 +1190,10 @@ Pick from Google Drive
 <input type="text" id="carouselGpsSearch" placeholder="Type city — e.g. Miami, Tokyo, Paris" autocomplete="off" style="width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;box-sizing:border-box;">
 <div id="carouselGpsAutocomplete" class="gps-autocomplete hidden"></div>
 </div>
+<button type="button" id="carouselGpsMapBtn" style="width:100%;margin-top:6px;background:var(--accent);color:var(--bg);border:none;padding:7px 12px;font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;border-radius:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"/></svg>
+PICK ON MAP
+</button>
 <div style="margin-top:6px;display:flex;gap:6px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);">
 <label style="flex:1;display:flex;align-items:center;gap:4px;cursor:pointer;">
 <input type="checkbox" id="carouselGpsRandomize" checked style="margin:0;"> randomize within 5 km
@@ -5490,7 +5494,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.0.10';
+const APP_VERSION = '4.1.0';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12061,6 +12065,24 @@ function ensureSettingsModal() {
 // ============================================================================
 const PATCH_NOTES = [
   {
+    version: '4.1.0',
+    date: '2026-05-04',
+    title: 'Foundation — Auto-save, GPS map picker (Undo/Redo + window state from v4.0.10)',
+    sections: [
+      { h: 'New', items: [
+        'Auto-save & crash recovery — every 30 seconds the editor state (caption, all adjustment sliders, font/color/outline, mirror, grain, vignette) is snapshotted to localStorage. On launch, if there\'s a meaningful saved session, you get a "Restore previous session?" prompt with a summary of what\'ll come back. Files (images/videos) aren\'t restored, only state — reopen the source to see the restored adjustments applied.',
+        'GPS map picker — new PICK ON MAP button under the GPS section opens a full Leaflet map. Click anywhere to drop a pin, drag the pin to fine-tune, or search by name (forward geocoding via OpenStreetMap\'s Nominatim). Right rail shows live SUGGESTIONS, RECENTLY USED (last 8), and SAVED PLACES (you can name and bookmark). USE LOCATION commits to the EXIF GPS tags as before. Tiles + geocoding both free, no API key.',
+      ]},
+      { h: 'Carryover from v4.0.10', items: [
+        'Undo / Redo for editor state — ⌘Z / ⌘⇧Z (skips when typing in an input).',
+        'Window state remembered (size, position, maximized).',
+      ]},
+      { h: 'Note', items: [
+        'GPS map picker needs internet for the OpenStreetMap tiles + Nominatim search. Offline use: the existing type-a-city flow + custom-coordinates flow still work.',
+      ]},
+    ]
+  },
+  {
     version: '4.0.10',
     date: '2026-05-04',
     title: 'Drive HEIC build fix + Undo/Redo + window state',
@@ -12287,6 +12309,398 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 // Apply persisted defaults to fresh state once init() has constructed it.
 applyPrefsToFreshState();
+
+// =====================================================================
+// AUTO-SAVE & CRASH RECOVERY
+// =====================================================================
+// Snapshots the editor state (NOT files — they don't survive serialization
+// from blob URLs / drag-drops) to localStorage every RECOVERY_INTERVAL_MS.
+// On launch, if the saved snapshot looks meaningful (non-empty caption OR
+// any non-default adjustment), prompt to restore. Dismissing clears it
+// permanently for that snapshot.
+//
+// We don't try to detect "clean quit" because beforeunload fires on every
+// close (clean or not) — so the prompt will appear even after a normal
+// shutdown if you had work in progress. That's intentional: it doubles as
+// a "session restore" feature, not just crash recovery. One DISMISS click
+// is the cost.
+const RECOVERY_KEY = 'snapcap_recovery';
+const RECOVERY_INTERVAL_MS = 30 * 1000;
+const RECOVERY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function autosaveState() {
+  if (typeof snapshotEditorState !== 'function') return;
+  try {
+    const data = { state: snapshotEditorState(), ts: Date.now() };
+    localStorage.setItem(RECOVERY_KEY, JSON.stringify(data));
+  } catch (_) {}
+}
+
+function clearRecovery() {
+  try { localStorage.removeItem(RECOVERY_KEY); } catch (_) {}
+}
+
+function isRecoverySnapshotInteresting(snap) {
+  if (!snap) return false;
+  if (snap.caption && snap.caption.trim().length > 0) return true;
+  if (snap.saturation !== 100 || snap.contrast !== 100 || snap.brightness !== 100) return true;
+  if (snap.warmth !== 0 || snap.grain > 0 || snap.vignette > 0) return true;
+  if (snap.outlineEnabled) return true;
+  if (snap.fontIndex !== 0 || snap.captionSize !== 36 || snap.bgOpacity !== 55) return true;
+  if (snap.mirror) return true;
+  return false;
+}
+
+function showRecoveryPrompt(snap, ts) {
+  // Build a small modal — themed to match the rest of the app.
+  const overlay = document.createElement('div');
+  overlay.className = 'picker-overlay';
+  const ago = humanAgo(ts);
+  const captionPreview = (snap.caption || '').slice(0, 64);
+  const captionEllip = (snap.caption || '').length > 64 ? '…' : '';
+  // Build a short list of what's restoring
+  const lines = [];
+  if (snap.caption && snap.caption.trim()) lines.push(`<div><span style="color:var(--text-faint);">caption</span> — "${escapeHtml(captionPreview)}${captionEllip}"</div>`);
+  if (snap.saturation !== 100 || snap.contrast !== 100 || snap.brightness !== 100 || snap.warmth !== 0) {
+    lines.push(`<div><span style="color:var(--text-faint);">adjustments</span> — sat ${snap.saturation}%, con ${snap.contrast}%, bri ${snap.brightness}%, warm ${snap.warmth}</div>`);
+  }
+  if (snap.grain > 0 || snap.vignette > 0) {
+    lines.push(`<div><span style="color:var(--text-faint);">effects</span> — grain ${snap.grain}, vignette ${snap.vignette}</div>`);
+  }
+  if (snap.outlineEnabled) {
+    lines.push(`<div><span style="color:var(--text-faint);">outline</span> — width ${snap.outlineWidth}, color ${snap.outlineColor}</div>`);
+  }
+  overlay.innerHTML = `
+    <div class="picker-modal" style="max-width:min(460px,calc(100vw - 32px));width:min(460px,calc(100vw - 32px));">
+      <div class="picker-head">
+        <span class="ttl">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--accent);"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+          <span>Restore previous session?</span>
+        </span>
+        <button class="x" id="recCloseBtn" aria-label="Close">×</button>
+      </div>
+      <div style="padding:18px 22px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);">
+        <p style="color:var(--text-dim);margin:0 0 14px;line-height:1.5;">It looks like you had editor changes from <b>${ago}</b>. We can restore them now.</p>
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:2px;padding:10px 12px;font-size:11px;line-height:1.7;">${lines.join('') || '<div style="color:var(--text-faint);font-style:italic;">(state changes only, no preview text)</div>'}</div>
+        <p style="font-size:10px;color:var(--text-faint);margin:14px 0 0;font-style:italic;">Note: source images/videos aren't restored — only editor state. Reopen the file you were working on to see the restored adjustments applied.</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;">
+          <button id="recDismissBtn" style="background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:8px 16px;font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.14em;text-transform:uppercase;border-radius:2px;cursor:pointer;">DISMISS</button>
+          <button id="recRestoreBtn" style="background:var(--accent);border:none;color:var(--bg);padding:8px 18px;font-family:'Antonio',sans-serif;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;border-radius:2px;cursor:pointer;">RESTORE</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = () => { overlay.remove(); };
+  const dismiss = () => { clearRecovery(); close(); };
+  document.getElementById('recCloseBtn').onclick = dismiss;
+  document.getElementById('recDismissBtn').onclick = dismiss;
+  document.getElementById('recRestoreBtn').onclick = () => {
+    if (typeof editorHistory !== 'undefined') editorHistory.paused = true;
+    try {
+      if (typeof applyEditorSnapshot === 'function') applyEditorSnapshot(snap);
+    } finally {
+      if (typeof editorHistory !== 'undefined') editorHistory.paused = false;
+    }
+    clearRecovery();
+    close();
+    if (typeof showToast === 'function') showToast('Editor state restored');
+  };
+}
+
+// "12 minutes ago" / "2 hours ago" — for the recovery prompt timestamp.
+function humanAgo(ts) {
+  const sec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (sec < 60) return `${sec}s ago`;
+  if (sec < 3600) return `${Math.floor(sec / 60)} min ago`;
+  if (sec < 86400) { const h = Math.floor(sec / 3600); return `${h}h ago`; }
+  const d = Math.floor(sec / 86400);
+  return `${d}d ago`;
+}
+
+function checkAndOfferRecovery() {
+  try {
+    const raw = localStorage.getItem(RECOVERY_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!data || !data.state || !data.ts) { clearRecovery(); return; }
+    if (Date.now() - data.ts > RECOVERY_MAX_AGE_MS) { clearRecovery(); return; }
+    if (!isRecoverySnapshotInteresting(data.state)) { clearRecovery(); return; }
+    // Wait one tick so the rest of init has finished + the modal CSS applied.
+    setTimeout(() => showRecoveryPrompt(data.state, data.ts), 600);
+  } catch (_) { clearRecovery(); }
+}
+
+setInterval(autosaveState, RECOVERY_INTERVAL_MS);
+checkAndOfferRecovery();
+
+// =====================================================================
+// GPS MAP PICKER — Leaflet + OpenStreetMap + Nominatim
+// =====================================================================
+// Free, no API key. Tiles from tile.openstreetmap.org, geocoding from
+// nominatim.openstreetmap.org. Polite User-Agent set per OSM policy.
+// Leaflet loaded lazily on first open so it doesn't slow startup.
+const GPS_RECENT_KEY = 'snapcap_gps_recent';
+const GPS_SAVED_KEY  = 'snapcap_gps_saved';
+const NOMINATIM_UA = 'SnapCaptionStudio/4.1 (https://github.com/seraphimmgmt/Snapchat-editor)';
+let _leafletLoaded = false;
+let _gpsMap = null;
+let _gpsMarker = null;
+let _gpsResolveCb = null;
+let _gpsReverseGeocodeTimer = null;
+
+function loadLeaflet() {
+  if (_leafletLoaded) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(css);
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.onload = () => { _leafletLoaded = true; resolve(); };
+    s.onerror = () => reject(new Error('Could not load Leaflet (no internet?)'));
+    document.head.appendChild(s);
+  });
+}
+
+function getRecentPlaces() { try { return JSON.parse(localStorage.getItem(GPS_RECENT_KEY) || '[]'); } catch { return []; } }
+function getSavedPlaces() { try { return JSON.parse(localStorage.getItem(GPS_SAVED_KEY)  || '[]'); } catch { return []; } }
+function addToRecent(name, lat, lng) {
+  const recent = getRecentPlaces().filter(r => Math.abs(r.lat - lat) > 0.0001 || Math.abs(r.lng - lng) > 0.0001);
+  recent.unshift({ name, lat, lng, ts: Date.now() });
+  try { localStorage.setItem(GPS_RECENT_KEY, JSON.stringify(recent.slice(0, 8))); } catch (_) {}
+}
+function addToSaved(name, lat, lng) {
+  const saved = getSavedPlaces();
+  saved.unshift({ name, lat, lng, ts: Date.now() });
+  try { localStorage.setItem(GPS_SAVED_KEY, JSON.stringify(saved.slice(0, 50))); } catch (_) {}
+}
+function removeSaved(idx) {
+  const saved = getSavedPlaces();
+  saved.splice(idx, 1);
+  try { localStorage.setItem(GPS_SAVED_KEY, JSON.stringify(saved)); } catch (_) {}
+}
+
+async function openGpsMapPicker(initialLat, initialLng, onPick) {
+  try { await loadLeaflet(); } catch (e) {
+    showToast('Could not load map (need internet for OpenStreetMap tiles)');
+    return;
+  }
+  _gpsResolveCb = onPick;
+  const overlay = document.createElement('div');
+  overlay.id = 'gpsMapOverlay';
+  overlay.className = 'picker-overlay';
+  overlay.innerHTML = `
+    <div class="picker-modal" style="max-width:min(900px,calc(100vw - 32px));width:min(900px,calc(100vw - 32px));max-height:calc(100vh - 48px);">
+      <div class="picker-head" style="gap:14px;">
+        <span class="ttl" style="white-space:nowrap;">📍 PICK LOCATION</span>
+        <input type="text" id="gpsMapSearch" placeholder="Search city, address, place…" style="flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;outline:none;">
+        <button class="x" id="gpsMapCloseBtn" aria-label="Close">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 240px;flex:1;min-height:0;">
+        <div style="position:relative;min-height:340px;">
+          <div id="gpsMap" style="position:absolute;inset:0;background:#1a2a2f;"></div>
+          <div id="gpsMapReadout" style="position:absolute;bottom:10px;left:10px;background:rgba(15,15,20,.85);border:1px solid var(--border);border-radius:3px;padding:8px 12px;display:flex;flex-direction:column;gap:3px;font-family:'JetBrains Mono',monospace;z-index:500;max-width:60%;">
+            <span style="font-size:9px;color:var(--text-faint);letter-spacing:.12em;">SELECTED</span>
+            <span id="gpsMapPlace" style="font-size:12px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">…</span>
+            <span id="gpsMapCoords" style="font-size:10px;color:var(--accent);">…</span>
+          </div>
+        </div>
+        <div style="background:var(--surface-2);border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
+            <h4 style="font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.16em;color:var(--text-faint);margin:0 0 8px;">SUGGESTIONS</h4>
+            <div id="gpsMapResultList" style="font-size:11px;color:var(--text-dim);">Type to search…</div>
+          </div>
+          <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
+            <h4 style="font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.16em;color:var(--text-faint);margin:0 0 8px;">RECENTLY USED</h4>
+            <div id="gpsMapRecentList" style="font-size:11px;color:var(--text-dim);"></div>
+          </div>
+          <div style="padding:14px 16px;">
+            <h4 style="font-family:'Antonio',sans-serif;font-size:10px;letter-spacing:.16em;color:var(--text-faint);margin:0 0 8px;">SAVED PLACES</h4>
+            <div id="gpsMapSavedList" style="font-size:11px;color:var(--text-dim);"></div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--border);background:var(--surface);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:9px;color:var(--text-faint);">tiles © OpenStreetMap contributors · free</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="text" id="gpsMapSaveName" placeholder="Save as… (optional)" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;width:160px;outline:none;">
+          <button id="gpsMapSaveBtn" style="background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:6px 12px;font-family:'Antonio',sans-serif;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;border-radius:2px;cursor:pointer;">SAVE</button>
+          <button id="gpsMapUseBtn" style="background:var(--accent);color:var(--bg);border:none;padding:6px 14px;font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;border-radius:2px;cursor:pointer;">USE LOCATION</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const startLat = (initialLat == null || isNaN(initialLat)) ? 30.0444 : initialLat;
+  const startLng = (initialLng == null || isNaN(initialLng)) ? 31.2357 : initialLng;
+  _gpsMap = L.map('gpsMap', { zoomControl: true, attributionControl: false }).setView([startLat, startLng], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, subdomains: 'abc' }).addTo(_gpsMap);
+  _gpsMarker = L.marker([startLat, startLng], { draggable: true }).addTo(_gpsMap);
+
+  const handleSelect = (lat, lng) => {
+    document.getElementById('gpsMapCoords').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    document.getElementById('gpsMapPlace').textContent = 'resolving…';
+    clearTimeout(_gpsReverseGeocodeTimer);
+    _gpsReverseGeocodeTimer = setTimeout(async () => {
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`, { headers: { 'User-Agent': NOMINATIM_UA } });
+        const d = await r.json();
+        const parts = (d.display_name || '').split(',').map(s => s.trim()).slice(0, 3);
+        document.getElementById('gpsMapPlace').textContent = parts.join(', ') || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      } catch (_) {
+        document.getElementById('gpsMapPlace').textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      }
+    }, 350);
+  };
+
+  _gpsMap.on('click', (e) => { _gpsMarker.setLatLng(e.latlng); handleSelect(e.latlng.lat, e.latlng.lng); });
+  _gpsMarker.on('dragend', () => { const ll = _gpsMarker.getLatLng(); handleSelect(ll.lat, ll.lng); });
+  handleSelect(startLat, startLng);
+
+  // Search input — debounced forward geocode
+  const searchInput = document.getElementById('gpsMapSearch');
+  let _searchTimer = null;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(() => searchNominatim(searchInput.value), 400);
+  });
+
+  // Render side rails
+  renderGpsRecentList();
+  renderGpsSavedList();
+
+  // Footer buttons
+  const close = () => {
+    overlay.remove();
+    if (_gpsMap) { _gpsMap.remove(); _gpsMap = null; }
+    _gpsMarker = null; _gpsResolveCb = null;
+  };
+  document.getElementById('gpsMapCloseBtn').onclick = close;
+  document.getElementById('gpsMapUseBtn').onclick = () => {
+    const ll = _gpsMarker.getLatLng();
+    const place = document.getElementById('gpsMapPlace').textContent || `${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)}`;
+    addToRecent(place, ll.lat, ll.lng);
+    if (_gpsResolveCb) _gpsResolveCb({ lat: ll.lat, lng: ll.lng, label: place });
+    close();
+  };
+  document.getElementById('gpsMapSaveBtn').onclick = () => {
+    const customName = document.getElementById('gpsMapSaveName').value.trim();
+    const place = document.getElementById('gpsMapPlace').textContent || '';
+    const ll = _gpsMarker.getLatLng();
+    addToSaved(customName || place, ll.lat, ll.lng);
+    document.getElementById('gpsMapSaveName').value = '';
+    renderGpsSavedList();
+    if (typeof showToast === 'function') showToast(`Saved "${customName || place}"`);
+  };
+
+  // Force Leaflet to recompute size after the modal is in the DOM
+  setTimeout(() => _gpsMap && _gpsMap.invalidateSize(), 80);
+}
+
+async function searchNominatim(q) {
+  const list = document.getElementById('gpsMapResultList');
+  if (!list) return;
+  if (!q || q.trim().length < 2) { list.innerHTML = '<span style="color:var(--text-faint);">Type at least 2 characters…</span>'; return; }
+  list.innerHTML = '<span style="color:var(--text-faint);">Searching…</span>';
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8`, { headers: { 'User-Agent': NOMINATIM_UA } });
+    const results = await r.json();
+    if (!results || !results.length) { list.innerHTML = '<span style="color:var(--text-faint);">No results</span>'; return; }
+    list.innerHTML = results.map((rec, i) => `
+      <div class="gps-result" data-i="${i}" style="padding:7px 8px;cursor:pointer;border-radius:2px;">
+        <div style="color:var(--text);font-weight:500;font-size:11px;">${escapeHtml(rec.display_name.split(',')[0])}</div>
+        <div style="font-size:9px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(rec.display_name.split(',').slice(1, 3).join(',').trim())}</div>
+      </div>`).join('');
+    list.querySelectorAll('.gps-result').forEach(el => {
+      el.onclick = () => {
+        const rec = results[parseInt(el.dataset.i)];
+        const lat = parseFloat(rec.lat), lng = parseFloat(rec.lon);
+        _gpsMap.setView([lat, lng], 13);
+        _gpsMarker.setLatLng([lat, lng]);
+        document.getElementById('gpsMapCoords').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        document.getElementById('gpsMapPlace').textContent = rec.display_name.split(',').slice(0, 3).join(', ');
+      };
+      el.onmouseenter = () => el.style.background = 'var(--surface-3)';
+      el.onmouseleave = () => el.style.background = 'transparent';
+    });
+  } catch (e) {
+    list.innerHTML = '<span style="color:var(--red);">Search failed</span>';
+  }
+}
+
+function renderGpsRecentList() {
+  const list = document.getElementById('gpsMapRecentList');
+  if (!list) return;
+  const items = getRecentPlaces();
+  if (!items.length) { list.innerHTML = '<span style="color:var(--text-faint);">No history yet</span>'; return; }
+  list.innerHTML = items.map((r, i) => `
+    <div class="gps-recent" data-i="${i}" style="padding:6px 8px;cursor:pointer;border-radius:2px;">
+      <div style="color:var(--text);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.name || '?')}</div>
+      <div style="font-size:9px;color:var(--text-faint);">${humanAgo(r.ts)} · ${r.lat.toFixed(4)}, ${r.lng.toFixed(4)}</div>
+    </div>`).join('');
+  list.querySelectorAll('.gps-recent').forEach(el => {
+    el.onclick = () => {
+      const r = items[parseInt(el.dataset.i)];
+      _gpsMap.setView([r.lat, r.lng], 13);
+      _gpsMarker.setLatLng([r.lat, r.lng]);
+      document.getElementById('gpsMapCoords').textContent = `${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}`;
+      document.getElementById('gpsMapPlace').textContent = r.name;
+    };
+    el.onmouseenter = () => el.style.background = 'var(--surface-3)';
+    el.onmouseleave = () => el.style.background = 'transparent';
+  });
+}
+
+function renderGpsSavedList() {
+  const list = document.getElementById('gpsMapSavedList');
+  if (!list) return;
+  const items = getSavedPlaces();
+  if (!items.length) { list.innerHTML = '<span style="color:var(--text-faint);">No saved places</span>'; return; }
+  list.innerHTML = items.map((r, i) => `
+    <div class="gps-saved" data-i="${i}" style="padding:6px 8px;cursor:pointer;border-radius:2px;display:flex;justify-content:space-between;align-items:center;gap:6px;">
+      <div style="flex:1;min-width:0;">
+        <div style="color:var(--text);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📌 ${escapeHtml(r.name || '?')}</div>
+        <div style="font-size:9px;color:var(--text-faint);">${r.lat.toFixed(4)}, ${r.lng.toFixed(4)}</div>
+      </div>
+      <button class="gps-saved-del" data-i="${i}" title="Remove" style="background:transparent;border:none;color:var(--text-faint);cursor:pointer;font-size:14px;padding:0 4px;line-height:1;">×</button>
+    </div>`).join('');
+  list.querySelectorAll('.gps-saved').forEach(el => {
+    el.onclick = (e) => {
+      if (e.target.classList.contains('gps-saved-del')) return;
+      const r = items[parseInt(el.dataset.i)];
+      _gpsMap.setView([r.lat, r.lng], 13);
+      _gpsMarker.setLatLng([r.lat, r.lng]);
+      document.getElementById('gpsMapCoords').textContent = `${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}`;
+      document.getElementById('gpsMapPlace').textContent = r.name;
+    };
+    el.onmouseenter = () => el.style.background = 'var(--surface-3)';
+    el.onmouseleave = () => el.style.background = 'transparent';
+  });
+  list.querySelectorAll('.gps-saved-del').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      removeSaved(parseInt(btn.dataset.i));
+      renderGpsSavedList();
+    };
+  });
+}
+
+// Wire the PICK ON MAP button — runs on init.
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('carouselGpsMapBtn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const lat = (typeof iphoneGpsState !== 'undefined' && iphoneGpsState.lat) || null;
+    const lng = (typeof iphoneGpsState !== 'undefined' && iphoneGpsState.lng) || null;
+    openGpsMapPicker(lat, lng, ({ lat, lng, label }) => {
+      // Update the existing GPS state through its setter so the status pill etc reflect it.
+      if (typeof setGpsLocation === 'function') setGpsLocation(lat, lng, label);
+      const search = document.getElementById('carouselGpsSearch');
+      if (search) search.value = label;
+    });
+  });
+});
 
 // ============================================================================
 // IN-APP UPDATE MODAL — replaces the native OS dialog. Rust emits these:
