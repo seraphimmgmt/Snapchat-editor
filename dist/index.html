@@ -416,13 +416,27 @@
   .pk-action-btn.pk-action-clear:hover{color:var(--text);border-color:var(--text-dim);background:transparent;}
   .pk-action-note{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;color:var(--text-faint);text-transform:uppercase;padding:5px 0;}
   /* GRID VIEW for picker list — folders & files as tiles */
-  .picker-list.grid-view{display:grid;grid-template-columns:repeat(auto-fill, minmax(108px, 1fr));gap:10px;padding:10px 14px 12px;align-items:start;align-content:start;}
-  .picker-list.grid-view .picker-row,.picker-list.grid-view .picker-file-row{display:flex;flex-direction:column;align-items:stretch;padding:8px;gap:4px;aspect-ratio:1/1.15;position:relative;overflow:hidden;margin:0;border:1px solid var(--border);border-radius:3px;background:var(--surface-2);}
-  .picker-list.grid-view .picker-row:hover,.picker-list.grid-view .picker-file-row:hover{border-color:var(--border-strong);}
-  .picker-list.grid-view .picker-file-row.sel{border-color:var(--accent);background:rgba(217,199,122,.06);}
-  .picker-list.grid-view .picker-row > svg:first-child{width:36px;height:36px;align-self:center;margin:auto 0 4px;flex-shrink:0;}
-  .picker-list.grid-view .picker-row .nm,.picker-list.grid-view .picker-file-row .meta .fn{font-size:10px;text-align:center;letter-spacing:0;line-height:1.3;text-transform:none;font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;}
-  .picker-list.grid-view .picker-row .nm{margin-top:auto;}
+  .picker-list.grid-view{display:grid;grid-template-columns:repeat(auto-fill, minmax(132px, 1fr));gap:8px;padding:10px 14px 12px;align-items:start;align-content:start;}
+  /* Wider-than-tall tiles — feels more like macOS Finder / Files.app icon view
+     than the previous awkwardly-tall rectangles. Bigger folder icon, less dead
+     space, name has room to breathe. */
+  .picker-list.grid-view .picker-row,.picker-list.grid-view .picker-file-row{display:flex;flex-direction:column;align-items:stretch;padding:14px 10px 10px;gap:6px;position:relative;overflow:hidden;margin:0;border:1px solid var(--border);border-radius:4px;background:var(--surface-2);transition:border-color .12s,background .12s,transform .08s;}
+  /* Folders: short, wider-than-tall — most of the tile is the icon + label.
+     Files: square-ish so portrait/landscape thumbs both fit reasonably. */
+  .picker-list.grid-view .picker-row{aspect-ratio:1/0.82;}
+  .picker-list.grid-view .picker-file-row{aspect-ratio:1/1;padding:6px 6px 8px;}
+  .picker-list.grid-view .picker-row:hover,.picker-list.grid-view .picker-file-row:hover{border-color:var(--accent);background:var(--surface-3);}
+  .picker-list.grid-view .picker-row:active{transform:scale(.98);}
+  .picker-list.grid-view .picker-file-row.sel{border-color:var(--accent);background:rgba(217,199,122,.08);}
+  /* Today's folder (date pattern matches today): accent border + soft tint so
+     the user sees where to click without scanning. JS adds .today class. */
+  .picker-list.grid-view .picker-row.today{border-color:var(--accent);background:rgba(217,199,122,.10);box-shadow:0 0 0 1px rgba(217,199,122,.35) inset;}
+  .picker-list.grid-view .picker-row.today .nm{color:var(--accent);font-weight:600;}
+  .picker-list.grid-view .picker-row > svg:first-child{width:44px;height:44px;align-self:center;margin:auto 0 4px;flex-shrink:0;color:var(--accent);opacity:.92;}
+  .picker-list.grid-view .picker-row:hover > svg:first-child{opacity:1;}
+  .picker-list.grid-view .picker-row.today > svg:first-child{opacity:1;}
+  .picker-list.grid-view .picker-row .nm,.picker-list.grid-view .picker-file-row .meta .fn{font-size:11px;text-align:center;letter-spacing:.02em;line-height:1.25;text-transform:none;font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;color:var(--text);}
+  .picker-list.grid-view .picker-row .nm{margin-top:auto;padding:0 2px;}
   .picker-list.grid-view .picker-row .arr{display:none;}
   .picker-list.grid-view .picker-file-row .pk-thumb{width:100%;flex:1;min-height:0;border-radius:2px;object-fit:cover;}
   .picker-list.grid-view .picker-file-row .meta{flex-shrink:0;text-align:center;min-width:0;}
@@ -5951,7 +5965,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.4';
+const APP_VERSION = '4.2.5';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -8696,6 +8710,7 @@ async function drivePickerLoad(folderId) {
   if (!list) return;
   list.innerHTML = '<div class="loading">Loading...</div>';
   driveState.pickerLoading = true;
+  driveState.pickerFilterText = '';  // reset filter on every navigation
   // Persist current path so reopening restores it
   driveSaveLastPath('folder', driveState.pickerCrumbs);
   try {
@@ -8708,16 +8723,64 @@ async function drivePickerLoad(folderId) {
   }
 }
 
+// Detect whether a folder name represents "today" — typical content-folder
+// patterns: "5-04", "5-4", "05-04", "5/4", "2026-05-04". JS uses the user's
+// local clock; if you're past midnight in the wrong timezone the highlight
+// might lag a few hours. Acceptable.
+function drivePickerIsFolderToday(name) {
+  const t = new Date();
+  const m = t.getMonth() + 1, d = t.getDate();
+  const mm = String(m).padStart(2, '0'), dd = String(d).padStart(2, '0');
+  const variants = [
+    `${m}-${d}`, `${m}-${dd}`, `${mm}-${d}`, `${mm}-${dd}`,
+    `${m}/${d}`, `${m}/${dd}`, `${mm}/${d}`, `${mm}/${dd}`,
+  ];
+  return variants.some(v => {
+    if (name === v) return true;
+    // Boundary-bounded match — avoid matching "5-04" inside "15-04" or "5-049"
+    const esc = v.replace(/[/\-]/g, m2 => '\\' + m2);
+    const re = new RegExp(`(?:^|[^0-9])${esc}(?:[^0-9]|$)`);
+    return re.test(name);
+  });
+}
+
+// Filter threshold — below this we don't bother showing the filter input
+// (visual noise for a 3-folder list). May/Apr-sized folders (28-31 items)
+// reliably trigger it.
+const DRIVE_FILTER_THRESHOLD = 12;
+
 function drivePickerRenderList(folders) {
   const list = document.getElementById('drivePickerList');
   if (!list) return;
+  driveState.pickerFolderCache = folders;  // cached for filter input
+  drivePickerRenderListFiltered(folders, driveState.pickerFilterText || '');
+}
+
+function drivePickerRenderListFiltered(folders, query) {
+  const list = document.getElementById('drivePickerList');
+  if (!list) return;
+  const showFilter = folders.length >= DRIVE_FILTER_THRESHOLD;
+  const q = (query || '').trim().toLowerCase();
+  const matched = q ? folders.filter(f => f.name.toLowerCase().includes(q)) : folders;
+
   let html = '';
-  if (folders.length === 0) {
-    html += '<div class="empty">No subfolders here. Use "+ New folder" or "Use this folder".</div>';
+  if (showFilter) {
+    html += `<div class="picker-filterbar" style="grid-column:1 / -1;display:flex;align-items:center;gap:8px;padding:0 2px 4px;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-faint);flex-shrink:0;"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+      <input type="text" id="drivePickerFilter" placeholder="Filter ${folders.length} folders…" value="${escHtml(query || '')}" autocomplete="off" spellcheck="false" style="flex:1;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding:6px 0;font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;">
+      ${q ? `<button id="drivePickerFilterClear" style="background:none;border:none;color:var(--text-faint);cursor:pointer;padding:2px 6px;font-size:14px;line-height:1;">×</button>` : ''}
+    </div>`;
+  }
+
+  if (matched.length === 0 && folders.length > 0 && q) {
+    html += `<div class="empty" style="grid-column:1 / -1;">No folders match "${escHtml(query)}"</div>`;
+  } else if (folders.length === 0) {
+    html += '<div class="empty" style="grid-column:1 / -1;">No subfolders here. Use "+ New folder" or "Use this folder".</div>';
   } else {
-    for (const f of folders) {
-      html += `<div class="picker-row" data-id="${f.id}" data-name="${escHtml(f.name)}">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--text-dim)"><path d="M2 4a1 1 0 011-1h4l1.5 1.5H13a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1V4z"/></svg>
+    for (const f of matched) {
+      const isToday = drivePickerIsFolderToday(f.name);
+      html += `<div class="picker-row${isToday ? ' today' : ''}" data-id="${f.id}" data-name="${escHtml(f.name)}"${isToday ? ' title="Today"' : ''}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/></svg>
         <span class="nm">${escHtml(f.name)}</span>
         <span class="arr">›</span>
       </div>`;
@@ -8728,6 +8791,37 @@ function drivePickerRenderList(folders) {
   html += `<button class="picker-newrow picker-newrow-dated" id="drivePickerDatedBatchBtn"><span style="margin-right:6px;">▦</span> + Batch create month</button>`;
   list.innerHTML = html;
 
+  // Wire filter input
+  const filterEl = document.getElementById('drivePickerFilter');
+  if (filterEl) {
+    filterEl.oninput = (e) => {
+      driveState.pickerFilterText = e.target.value;
+      const cur = list.scrollTop;
+      drivePickerRenderListFiltered(driveState.pickerFolderCache || [], driveState.pickerFilterText);
+      list.scrollTop = cur;
+      // Re-focus + place caret at end so typing flows
+      const f2 = document.getElementById('drivePickerFilter');
+      if (f2) { f2.focus(); f2.setSelectionRange(f2.value.length, f2.value.length); }
+    };
+    filterEl.onkeydown = (e) => {
+      if (e.key === 'Escape') {
+        e.target.value = '';
+        e.target.dispatchEvent(new Event('input'));
+      } else if (e.key === 'Enter') {
+        // Drill into the first match if any
+        const first = list.querySelector('.picker-row');
+        if (first) first.click();
+      }
+    };
+    const clearBtn = document.getElementById('drivePickerFilterClear');
+    if (clearBtn) clearBtn.onclick = () => {
+      driveState.pickerFilterText = '';
+      drivePickerRenderListFiltered(driveState.pickerFolderCache || [], '');
+      const f2 = document.getElementById('drivePickerFilter');
+      if (f2) f2.focus();
+    };
+  }
+
   list.querySelectorAll('.picker-row').forEach(row => {
     const id = row.getAttribute('data-id');
     const name = row.getAttribute('data-name');
@@ -8737,6 +8831,7 @@ function drivePickerRenderList(folders) {
       driveState.pickerCrumbs.push({id, name});
       driveState.pickerCurrent = id;
       driveState.pickerSel = null;
+      driveState.pickerFilterText = '';  // reset filter on navigation
       drivePickerRender();
       drivePickerLoad(id);
     };
@@ -12625,6 +12720,18 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.5',
+    date: '2026-05-04',
+    title: 'Drive picker grid view — bigger tiles, today highlight, filter input',
+    sections: [
+      { h: 'Improved', items: [
+        '🟦 Tiles redesigned. Wider-than-tall (was awkwardly tall with a tiny icon centered in a sea of empty space). Bigger 44px folder icon tinted in the brand gold, snappier hover state, subtle press-down animation. Density bumped from 108px columns to 132px so the icon has room without each tile feeling cavernous.',
+        '⭐ Today\'s folder auto-highlights. Detects common date patterns in folder names (5-04, 5-4, 05-04, 5/04, etc.) and lights up today\'s folder with the accent color so you don\'t have to scan. JS uses the local clock — if you\'re past midnight in a non-local timezone the highlight may lag.',
+        '🔍 Filter input appears above the grid when there are 12+ folders. Type "15" to narrow to folders containing "15", press Enter to drill into the first match, Escape to clear. Resets automatically when you navigate to a different folder.',
+      ]},
+    ]
+  },
   {
     version: '4.2.4',
     date: '2026-05-04',
