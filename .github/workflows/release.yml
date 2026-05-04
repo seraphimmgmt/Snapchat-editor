@@ -135,7 +135,15 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Snap Caption Studio ${{ github.ref_name }}'
           releaseBody: 'See assets below.'
-          releaseDraft: false
+          # KEEP THE RELEASE AS A DRAFT until publish-latest-json finishes.
+          # GitHub promotes any non-draft release to "latest" the moment it's
+          # created — and tauri-action creates it at the START of the matrix.
+          # That left a ~14-minute window where /releases/latest/download/
+          # latest.json returned 404 because v<new>'s latest.json hadn't been
+          # uploaded yet. Drafts are excluded from "latest" by GitHub, so the
+          # updater stays on the previous good release until we explicitly
+          # un-draft this one in publish-latest-json.
+          releaseDraft: true
           prerelease: false
           # We write latest.json ourselves in the publish-latest-json job
           # below — tauri-action's "Signature not found" bug silently skipped
@@ -227,3 +235,13 @@ jobs:
 
           gh release upload "$TAG" "$DIR/latest.json" -R "$REPO" --clobber
           echo "✓ latest.json uploaded for v${VER}"
+
+          # Now that latest.json + all binaries are in place, flip the release
+          # from draft to public. GitHub will then promote it to "latest" and
+          # the auto-updater can fetch /releases/latest/download/latest.json
+          # without race-conditioning a 404. If this script fails before this
+          # line — partial uploads, signature missing, etc. — the release
+          # stays a draft and the updater keeps pointing at the previous good
+          # release. That's the desired failure mode.
+          gh release edit "$TAG" -R "$REPO" --draft=false
+          echo "✓ release v${VER} promoted from draft to public"
