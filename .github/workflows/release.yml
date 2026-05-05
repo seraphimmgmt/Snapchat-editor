@@ -127,6 +127,33 @@ jobs:
           echo "Bundled $(ls -1 src-tauri/binaries/*.dll 2>/dev/null | wc -l) DLL(s) for heif-enc:"
           ls -1 src-tauri/binaries/*.dll 2>/dev/null | head -50 || echo "(none — DLL bundling failed)"
 
+      # Write team-default cloud render config from a secret. Source file is
+      # gitignored so the public repo never sees the auth token, but the .app
+      # /.exe ships with it baked in as a bundled resource (see tauri.conf.json
+      # bundle.resources). Tauri's get_cloud_config command reads it at runtime
+      # to seed Settings → Cloud on first run. To rotate: gh secret set
+      # CLOUD_RENDER_CONFIG --repo ... < new-config.json + push a new tag.
+      - name: Write cloud-config.json (per-platform — runs on both Mac + Windows)
+        shell: bash
+        env:
+          CLOUD_RENDER_CONFIG: ${{ secrets.CLOUD_RENDER_CONFIG }}
+        run: |
+          if [ -z "$CLOUD_RENDER_CONFIG" ]; then
+            echo "::error::CLOUD_RENDER_CONFIG secret is empty. Set it via 'gh secret set CLOUD_RENDER_CONFIG' before building. tauri.conf.json's bundle.resources expects this file."
+            exit 1
+          fi
+          printf '%s' "$CLOUD_RENDER_CONFIG" > src-tauri/cloud-config.json
+          # Sanity check — must be valid JSON with non-empty url/token, otherwise
+          # bake-in is pointless. Use python rather than jq to avoid an extra
+          # apt-get on Windows runners.
+          python3 -c "
+          import json, sys
+          d = json.load(open('src-tauri/cloud-config.json'))
+          assert d.get('url'), 'url is empty in CLOUD_RENDER_CONFIG'
+          assert d.get('token'), 'token is empty in CLOUD_RENDER_CONFIG'
+          print(f'cloud-config.json bundled: url={d[\"url\"]} token={\"*\" * 8}...{d[\"token\"][-4:]}')
+          " || { echo "::error::CLOUD_RENDER_CONFIG is malformed JSON or missing fields"; exit 1; }
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

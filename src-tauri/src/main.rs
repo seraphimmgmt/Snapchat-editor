@@ -40,6 +40,7 @@ fn main() {
             save_export_to_path,
             reveal_in_folder,
             heic_to_jpeg,
+            get_cloud_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -775,4 +776,41 @@ fn reveal_in_folder(path: String) -> Result<(), String> {
             .map(|_| ())
             .map_err(|e| e.to_string())
     }
+}
+
+// ---------- Cloud render server config ----------
+//
+// Reads `cloud-config.json` bundled into the app as a resource. Source file
+// is gitignored (NEVER committed to the public repo) and written by GitHub
+// Actions from the secret `CLOUD_RENDER_CONFIG` before each build. This way
+// the .app/.exe ships with team-default URL+token but the public source tree
+// stays clean of credentials.
+//
+// Returns null fields when the file is missing (dev builds without the
+// secret, or someone forgot to seed it). JS treats null as "user must
+// configure manually in Settings → Cloud" and falls back to the localStorage
+// flow. Never errors loudly — Cloud mode is opt-in, missing config is fine.
+#[tauri::command]
+fn get_cloud_config(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    use tauri::Manager;
+    let path = match app
+        .path()
+        .resolve("cloud-config.json", tauri::path::BaseDirectory::Resource)
+    {
+        Ok(p) => p,
+        Err(_) => return Ok(serde_json::json!({"url": null, "token": null})),
+    };
+    let raw = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => return Ok(serde_json::json!({"url": null, "token": null})),
+    };
+    let parsed: serde_json::Value =
+        serde_json::from_str(&raw).map_err(|e| format!("cloud-config.json parse error: {}", e))?;
+    // Only return url + token; ignore any other keys to avoid leaking metadata.
+    let url = parsed.get("url").cloned().unwrap_or(serde_json::Value::Null);
+    let token = parsed
+        .get("token")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    Ok(serde_json::json!({"url": url, "token": token}))
 }

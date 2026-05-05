@@ -4390,6 +4390,36 @@ function setCloudPrefs(p) {
   } catch (_) {}
 }
 
+// Seed Cloud prefs from the bundled cloud-config.json (Tauri-only) on first
+// run. The file is bundled into the .app/.exe at build time via the
+// CLOUD_RENDER_CONFIG GitHub Actions secret — never committed to the public
+// repo. localStorage takes precedence so users can override via Settings (e.g.
+// to point at a different droplet, rotate token, etc).
+//
+// Idempotent: if localStorage already has both values, no-op. If only one is
+// missing, fill that one from the bundle. If the bundle isn't there (dev
+// builds without the resource file), no-op silently.
+async function bootstrapCloudPrefs() {
+  if (!window.__TAURI__ || !window.__TAURI__.core) return;
+  let bundled;
+  try {
+    bundled = await window.__TAURI__.core.invoke('get_cloud_config');
+  } catch (e) {
+    console.warn('[cloud] no bundled config (probably dev build):', e);
+    return;
+  }
+  if (!bundled || (!bundled.url && !bundled.token)) return;
+  const cur = getCloudPrefs();
+  const merged = {
+    url: cur.url || bundled.url || '',
+    token: cur.token || bundled.token || '',
+  };
+  if (merged.url !== cur.url || merged.token !== cur.token) {
+    setCloudPrefs(merged);
+    console.log('[cloud] seeded prefs from bundled config');
+  }
+}
+
 // Render the caption layer onto a fresh transparent canvas at output resolution.
 // Returns a Blob (PNG) or null if there's no caption to render.
 async function renderCaptionOverlayToPng(w, h) {
@@ -6256,7 +6286,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.11';
+const APP_VERSION = '4.2.12';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12669,6 +12699,9 @@ async function init() {
   updateDestUI();
   updateHeaderMeta();
   initRangeFills();
+  // Seed Cloud prefs from the bundled cloud-config.json on first run. Fire and
+  // forget — Cloud mode is opt-in, missing config is fine.
+  bootstrapCloudPrefs().catch(() => {});
   if (document.fonts?.ready) {
     try { await document.fonts.ready; } catch (e) {}
   }
@@ -13085,6 +13118,24 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.12',
+    date: '2026-05-05',
+    title: '☁️ Cloud Render — zero-config setup (URL + token bundled into the app)',
+    sections: [
+      { h: 'New', items: [
+        'Cloud render server URL + auth token now baked into the .app/.exe at build time. First-run experience: open the app on a fresh machine, select ☁️ Cloud as the export engine, hit Export — it just works. No more pasting URL/token from a chat into Settings.',
+        'Settings → Cloud panel still works as override (rotate the team token without rebuilding, or point at a different droplet). localStorage takes precedence over the bundled defaults.',
+        'Security: cloud-config.json is gitignored — never committed to the public repo. CI writes it from the GitHub Actions secret CLOUD_RENDER_CONFIG before each build, so the public source tree stays clean of credentials but the binaries we distribute carry the team default.',
+        'New Tauri command get_cloud_config reads the bundled resource at runtime. Returns nulls if missing (dev builds without the secret), so the JS gracefully falls back to the manual-paste flow.',
+      ]},
+      { h: 'How to rotate the team token', items: [
+        '(1) ssh root@<droplet> "openssl rand -hex 32 | tee /opt/render-server/auth_token && systemctl restart render-server"',
+        '(2) Update the secret: gh secret set CLOUD_RENDER_CONFIG --repo seraphimmgmt/Snapchat-editor < new-config.json',
+        '(3) Push a new tag — next build bundles the new token. Old binaries still work until users update.',
+      ]},
+    ]
+  },
   {
     version: '4.2.11',
     date: '2026-05-05',

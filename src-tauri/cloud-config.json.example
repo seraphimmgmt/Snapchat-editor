@@ -1,0 +1,5 @@
+{
+  "_comment": "Team-default cloud render server credentials. Bundled into the .app/.exe at build time so users get zero-config setup. The actual file (src-tauri/cloud-config.json, gitignored) is created by CI from GitHub secret CLOUD_RENDER_CONFIG. Local dev: copy this to cloud-config.json and fill in real values.",
+  "url": "http://your-droplet-ip:8000",
+  "token": "your-64-char-hex-token-from-/opt/render-server/auth_token"
+}

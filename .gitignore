@@ -34,3 +34,8 @@ dist/test.mp4
 # Session-local memory (regenerated each /session-end). Don't commit — it
 # churns on every session and would pollute git history.
 .claude/session-memory.md
+
+# Cloud render server credentials. Bundled into the .app/.exe at build time
+# via GitHub Actions secret CLOUD_RENDER_CONFIG, never committed to the
+# public repo. Local dev testing: copy cloud-config.json.example, fill in.
+src-tauri/cloud-config.json
