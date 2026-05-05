@@ -41,6 +41,8 @@ fn main() {
             reveal_in_folder,
             heic_to_jpeg,
             get_cloud_config,
+            cloud_test,
+            cloud_render,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -813,4 +815,158 @@ fn get_cloud_config(app: tauri::AppHandle) -> Result<serde_json::Value, String> 
         .cloned()
         .unwrap_or(serde_json::Value::Null);
     Ok(serde_json::json!({"url": url, "token": token}))
+}
+
+// ---------- Cloud render server HTTP plumbing ----------
+//
+// Why this exists in Rust instead of JS fetch(): macOS App Transport Security
+// (ATS) blocks plain http:// requests from WKWebView by default. The webview's
+// fetch() returns "Load failed" with no detail. Rust's reqwest doesn't go
+// through WKWebView's networking stack so it bypasses ATS entirely. Same
+// reason the Drive uploader, ffmpeg, etc. live on the Rust side.
+//
+// Two commands:
+//   cloud_test(url, token) -> { ok, ffmpeg }  — probes /health + auth
+//   cloud_render(url, token, source_path, overlay_path?, args_json) -> output_path
+//                — uploads multipart, streams response to a temp file, returns
+//                  the path. JS reads the file via existing read_temp_file.
+
+#[tauri::command]
+async fn cloud_test(url: String, token: String) -> Result<serde_json::Value, String> {
+    let base = url.trim_end_matches('/').to_string();
+    if base.is_empty() {
+        return Err("URL is empty".into());
+    }
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| format!("client init: {}", e))?;
+
+    // GET /health (unauthed) — verifies the server is reachable + ffmpeg works
+    let health_url = format!("{}/health", base);
+    let resp = client
+        .get(&health_url)
+        .send()
+        .await
+        .map_err(|e| format!("network error: {}", e))?;
+    let status = resp.status().as_u16();
+    if !resp.status().is_success() {
+        return Err(format!("server returned HTTP {} on /health", status));
+    }
+    let health: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("/health response wasn't JSON: {}", e))?;
+
+    // Auth probe — POST /render with no body, expect 422 (FastAPI validation
+    // error after auth check passes). 401/403 => bad token. Anything else =>
+    // auth is good even if request shape was rejected.
+    if !token.is_empty() {
+        let render_url = format!("{}/render", base);
+        let auth_resp = client
+            .post(&render_url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .map_err(|e| format!("auth probe network error: {}", e))?;
+        let auth_status = auth_resp.status().as_u16();
+        if auth_status == 401 || auth_status == 403 {
+            return Err(format!("token rejected (HTTP {})", auth_status));
+        }
+    }
+
+    Ok(serde_json::json!({
+        "ok": true,
+        "ffmpeg": health.get("ffmpeg").cloned().unwrap_or(serde_json::Value::Null),
+    }))
+}
+
+#[tauri::command]
+async fn cloud_render(
+    url: String,
+    token: String,
+    source_path: String,
+    overlay_path: Option<String>,
+    args_json: String,
+) -> Result<String, String> {
+    let base = url.trim_end_matches('/').to_string();
+    if base.is_empty() {
+        return Err("Cloud URL is empty — configure Settings → Cloud".into());
+    }
+    if token.is_empty() {
+        return Err("Cloud auth token is empty — configure Settings → Cloud".into());
+    }
+
+    // Build multipart form. Read files into memory rather than streaming because
+    // reqwest 0.12's stream feature requires a Send-able body and File doesn't
+    // play nicely without extra wrappers — for short clips (<200 MB) this is
+    // fine. Watch out if we ever bump MAX_UPLOAD on the server above ~500 MB.
+    let source_bytes = tokio::fs::read(&source_path)
+        .await
+        .map_err(|e| format!("read source ({}): {}", source_path, e))?;
+    let source_part = reqwest::multipart::Part::bytes(source_bytes)
+        .file_name("source.mp4")
+        .mime_str("video/mp4")
+        .map_err(|e| e.to_string())?;
+
+    let mut form = reqwest::multipart::Form::new()
+        .part("video", source_part)
+        .text("args", args_json);
+
+    if let Some(overlay) = overlay_path {
+        if !overlay.is_empty() {
+            let overlay_bytes = tokio::fs::read(&overlay)
+                .await
+                .map_err(|e| format!("read overlay: {}", e))?;
+            let overlay_part = reqwest::multipart::Part::bytes(overlay_bytes)
+                .file_name("caption.png")
+                .mime_str("image/png")
+                .map_err(|e| e.to_string())?;
+            form = form.part("caption_overlay", overlay_part);
+        }
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15 * 60))
+        .build()
+        .map_err(|e| format!("client init: {}", e))?;
+
+    let render_url = format!("{}/render", base);
+    let resp = client
+        .post(&render_url)
+        .bearer_auth(&token)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| format!("upload error: {}", e))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        let snippet: String = body.chars().take(500).collect();
+        return Err(format!(
+            "cloud render returned HTTP {}: {}",
+            status.as_u16(),
+            snippet
+        ));
+    }
+
+    // Stream response to a temp file. Reusing the same temp-dir pattern as
+    // make_temp_dir / write_temp_bytes for consistency. Caller (JS) reads it
+    // via read_temp_file, then deletes via delete_temp_file.
+    let out_dir = std::env::temp_dir().join(format!("scs-cloud-{}", uuid::Uuid::new_v4()));
+    tokio::fs::create_dir_all(&out_dir)
+        .await
+        .map_err(|e| format!("temp dir: {}", e))?;
+    let out_path = out_dir.join("output.mp4");
+
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| format!("download: {}", e))?;
+    tokio::fs::write(&out_path, &bytes)
+        .await
+        .map_err(|e| format!("write output: {}", e))?;
+
+    Ok(out_path.to_string_lossy().to_string())
 }

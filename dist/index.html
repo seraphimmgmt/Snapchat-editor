@@ -4456,7 +4456,15 @@ async function exportVideoCloud() {
     return;
   }
 
-  // Source video — must have a real File for upload
+  if (!window.__TAURI__ || !window.__TAURI__.core) {
+    setExportStep('demux', 'failed');
+    setExportStatus('Cloud render only works in the desktop app', 'error');
+    return;
+  }
+  const invoke = window.__TAURI__.core.invoke;
+
+  // Source video — must have real bytes. Spool to a temp file so the Rust
+  // command can stream it without a JS↔Rust copy of the whole video.
   setExportStatus('PREPARING SOURCE...', 'info', null, { indeterminate: true, showCancel: true });
   let sourceBlob = __lastVideoFile;
   if (!sourceBlob) {
@@ -4470,20 +4478,33 @@ async function exportVideoCloud() {
     }
   }
 
-  // Caption overlay — single PNG at output resolution. renderCaption() reused
-  // verbatim, so multi-line / emoji / outline / background-bar all match preview.
+  const tmpDir = await invoke('make_temp_dir', { prefix: 'cloud' });
+  const sourceBytes = new Uint8Array(await sourceBlob.arrayBuffer());
+  await invoke('write_temp_bytes', { dir: tmpDir, name: 'source.mp4', bytes: Array.from(sourceBytes) });
+  const sourcePath = tmpDir + '/source.mp4';
+
+  // Caption overlay PNG (transparent, full output resolution). renderCaption()
+  // reused verbatim → multi-line / emoji / outline / background-bar look identical
+  // to preview. Captions don't animate per-frame in this app, so a single PNG
+  // overlay suffices and the server applies it to every frame via ffmpeg overlay.
   setExportStep('demux', 'done');
   setExportStep('video', 'active');
   setExportStatus('RENDERING CAPTION OVERLAY...', 'info', 0.05, { showCancel: true });
-  let captionBlob = null;
+  let overlayPath = null;
   try {
-    captionBlob = await renderCaptionOverlayToPng(w, h);
+    const captionBlob = await renderCaptionOverlayToPng(w, h);
+    if (captionBlob) {
+      const captionBytes = new Uint8Array(await captionBlob.arrayBuffer());
+      await invoke('write_temp_bytes', { dir: tmpDir, name: 'caption.png', bytes: Array.from(captionBytes) });
+      overlayPath = tmpDir + '/caption.png';
+    }
   } catch (e) {
     console.warn('[cloud] caption overlay render failed:', e);
     // Non-fatal — proceed without overlay. User won't see captions in output.
   }
 
-  // Adjustments to send. Map editor state to the server's adj keys.
+  // Adjustments map to the server's adj keys (which translate to ffmpeg eq /
+  // colorbalance / vignette / noise filters).
   const adjustments = {
     sat: state.saturation | 0,
     con: state.contrast | 0,
@@ -4492,7 +4513,6 @@ async function exportVideoCloud() {
     gra: state.grain | 0,
     vig: state.vignette | 0,
   };
-
   const args = {
     width: w, height: h, fps: targetFps,
     target_bitrate: Math.max((w * h * targetFps * 0.30) | 0, 8_000_000),
@@ -4500,64 +4520,44 @@ async function exportVideoCloud() {
     adjustments,
   };
 
-  // Build multipart form
-  const fd = new FormData();
-  fd.append('video', sourceBlob, sourceBlob.name || 'source.mp4');
-  fd.append('args', JSON.stringify(args));
-  if (captionBlob) fd.append('caption_overlay', captionBlob, 'caption.png');
-
   setExportStep('audio', 'skipped');
   setExportStep('mux', 'active');
-  setExportStatus('UPLOADING TO CLOUD...', 'info', 0.10, { showCancel: true });
+  setExportStatus('UPLOADING TO CLOUD + ENCODING (libx264 @ ~15 Mbps)...', 'info', null, { indeterminate: true, showCancel: true });
 
-  // Use XMLHttpRequest for upload progress (fetch lacks progress API).
-  const url = prefs.url.replace(/\/+$/, '') + '/render';
-  const responseBlob = await new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url, true);
-    xhr.setRequestHeader('Authorization', 'Bearer ' + prefs.token);
-    xhr.responseType = 'blob';
+  // The Rust cloud_render command does the multipart upload, encode wait, and
+  // download in one shot. Rust HTTP bypasses macOS App Transport Security which
+  // blocks plain http:// from WKWebView. Returns the path to the downloaded
+  // output.mp4 in a temp dir. We read it back via read_temp_file.
+  let outputPath;
+  try {
+    outputPath = await invoke('cloud_render', {
+      url: prefs.url,
+      token: prefs.token,
+      sourcePath,
+      overlayPath: overlayPath || null,
+      argsJson: JSON.stringify(args),
+    });
+  } catch (e) {
+    setExportStep('mux', 'failed');
+    // Cleanup source temp before returning error
+    try { await invoke('delete_temp_file', { path: tmpDir }); } catch {}
+    throw new Error(typeof e === 'string' ? e : (e.message || 'cloud render failed'));
+  }
 
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        const pct = e.loaded / e.total;
-        const friendly = (e.loaded / 1024 / 1024).toFixed(1);
-        const total = (e.total / 1024 / 1024).toFixed(1);
-        setExportStatus(`UPLOADING TO CLOUD ${friendly} / ${total} MB...`, 'info', 0.10 + pct * 0.40, { showCancel: true });
-      }
-    };
-    xhr.upload.onload = () => {
-      setExportStatus('CLOUD ENCODING (libx264 @ ~15 Mbps)...', 'info', 0.55, { indeterminate: true, showCancel: true });
-    };
-    xhr.onprogress = (e) => {
-      if (e.lengthComputable) {
-        const pct = e.loaded / e.total;
-        const friendly = (e.loaded / 1024 / 1024).toFixed(1);
-        setExportStatus(`DOWNLOADING ${friendly} MB FROM CLOUD...`, 'info', 0.85 + pct * 0.10, { showCancel: true });
-      }
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(xhr.response);
-      } else {
-        // Try to read text error from the response blob
-        const reader = new FileReader();
-        reader.onload = () => reject(new Error(`HTTP ${xhr.status}: ${String(reader.result || '').slice(0, 400)}`));
-        reader.onerror = () => reject(new Error(`HTTP ${xhr.status}`));
-        try { reader.readAsText(xhr.response); } catch { reject(new Error(`HTTP ${xhr.status}`)); }
-      }
-    };
-    xhr.onerror = () => reject(new Error('Network error contacting cloud server'));
-    xhr.ontimeout = () => reject(new Error('Cloud render timed out'));
-    xhr.timeout = 15 * 60 * 1000;  // 15-minute hard cap
-    xhr.send(fd);
-  });
-
+  // Read the rendered MP4 back into a blob
   setExportStep('mux', 'done');
   setExportStep('save', 'active');
   setExportStatus('FINALIZING...', 'info', 0.95);
+  const outBytes = await invoke('read_temp_file', { path: outputPath });
+  let finalBlob = new Blob([new Uint8Array(outBytes)], { type: 'video/mp4' });
 
-  let finalBlob = responseBlob;
+  // Cleanup both temp dirs (source + output)
+  try { await invoke('delete_temp_file', { path: tmpDir }); } catch {}
+  try {
+    // outputPath is e.g. /tmp/scs-cloud-<uuid>/output.mp4 — delete the parent
+    const outDir = outputPath.replace(/\/[^/]+$/, '');
+    if (outDir && outDir !== outputPath) await invoke('delete_temp_file', { path: outDir });
+  } catch {}
 
   // iPhone metadata injection — same as Reliable path
   let filename;
@@ -6286,7 +6286,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.12';
+const APP_VERSION = '4.2.13';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13069,31 +13069,24 @@ function ensureSettingsModal() {
       const prefs = getCloudPrefs();
       if (!prefs.url) { cloudStatusEl.textContent = '✗ URL is empty'; cloudStatusEl.style.color = 'var(--red)'; return; }
       cloudStatusEl.textContent = '↻ testing...'; cloudStatusEl.style.color = 'var(--text-faint)';
+      // Route through Rust (reqwest) instead of webview fetch — macOS App
+      // Transport Security blocks plain http:// from WKWebView, so the
+      // browser-side fetch returns "Load failed" with no detail. Rust HTTP
+      // bypasses ATS entirely. Same reason every other network call in this
+      // app (Drive, ffmpeg, etc.) lives on the Rust side.
+      if (!window.__TAURI__ || !window.__TAURI__.core) {
+        cloudStatusEl.textContent = '✗ Cloud test only works in the desktop app (Tauri)';
+        cloudStatusEl.style.color = 'var(--red)';
+        return;
+      }
       try {
-        // /health is unauthed but we test that AND a small auth-required call
-        // by hitting /render with no body — server should reject with 422 (missing
-        // file) AFTER passing auth. So 401/403 = bad token; 422 = good token, no file.
-        const healthRes = await fetch(prefs.url.replace(/\/+$/, '') + '/health', { method: 'GET' });
-        if (!healthRes.ok) throw new Error('Server unhealthy: HTTP ' + healthRes.status);
-        const health = await healthRes.json();
-
-        if (prefs.token) {
-          const authProbe = await fetch(prefs.url.replace(/\/+$/, '') + '/render', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + prefs.token },
-          });
-          if (authProbe.status === 401 || authProbe.status === 403) {
-            cloudStatusEl.textContent = '✗ Token rejected (HTTP ' + authProbe.status + ')';
-            cloudStatusEl.style.color = 'var(--red)';
-            return;
-          }
-          // Anything else (422 missing file, 400 bad form, etc) means auth passed
-        }
-
-        cloudStatusEl.textContent = '✓ Connected · ' + (health.ffmpeg || 'ffmpeg ready');
+        const result = await window.__TAURI__.core.invoke('cloud_test', {
+          url: prefs.url, token: prefs.token,
+        });
+        cloudStatusEl.textContent = '✓ Connected · ' + (result.ffmpeg || 'ffmpeg ready');
         cloudStatusEl.style.color = 'var(--green)';
       } catch (e) {
-        cloudStatusEl.textContent = '✗ ' + (e.message || 'connection failed');
+        cloudStatusEl.textContent = '✗ ' + (typeof e === 'string' ? e : (e.message || 'connection failed'));
         cloudStatusEl.style.color = 'var(--red)';
       }
     });
@@ -13118,6 +13111,19 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.13',
+    date: '2026-05-05',
+    title: 'Fix — Cloud render TEST CONNECTION + uploads now actually work on macOS (ATS workaround)',
+    sections: [
+      { h: 'Fixed', items: [
+        'v4.2.12 shipped a working TEST CONNECTION button — that immediately threw "Load failed" with no useful detail. Root cause: macOS App Transport Security blocks plain http:// requests from WKWebView by default, regardless of CSP or other allow-lists. The browser-side fetch() and XMLHttpRequest both fail silently against http://137.184.47.65:8000.',
+        'Fix: routed all cloud server HTTP through Rust (reqwest) instead of webview fetch. Rust\'s networking stack doesn\'t go through WKWebView so it bypasses ATS entirely. Same architecture pattern as the Drive uploader, ffmpeg sidecars, and every other network call in this app.',
+        'New Rust commands: cloud_test (probes /health + auth) and cloud_render (multipart upload, encode wait, response download). Both work from JS via invoke().',
+        'JS-side TEST CONNECTION button now calls cloud_test. Cloud Export now spools source video + caption overlay PNG to temp files, calls cloud_render with paths, reads the rendered MP4 back. No webview fetch involved.',
+      ]},
+    ]
+  },
   {
     version: '4.2.12',
     date: '2026-05-05',
