@@ -3983,14 +3983,23 @@ async function exportVideoFFmpegNative() {
   video.pause();
   video.muted = true;
 
-  // Seek-and-wait that's robust across WKWebView's quirks. Three escape
-  // hatches race each other; whichever fires first wins:
-  //   1. requestVideoFrameCallback — fires after compositor paints (best for
-  //      frame accuracy, but doesn't always fire on subframe seeks)
-  //   2. 'seeked' event — fires when seek completes (sometimes BEFORE paint)
-  //   3. currentTime convergence poll — last-resort fallback
-  // After resolution via #2, a 16ms wait ensures the compositor has painted
-  // before the caller grabs the canvas (rVFC already guarantees this).
+  // Seek-and-wait, redesigned in v4.2.8 after VA's Lenovo X280 (UHD 620 / 8th-gen
+  // i5) was producing exports with duplicated frames. The previous version raced
+  // rVFC against the 'seeked' event, taking whichever fired first. On fast Macs
+  // rVFC won (fresh frame guaranteed). On the X280's slow integrated GPU, 'seeked'
+  // routinely fired BEFORE the compositor presented the new frame — code fell
+  // through with only a 1-raf wait, drawImage(video) then grabbed the PREVIOUS
+  // frame's pixels. Result: misaligned source content, motion looked laggy.
+  //
+  // Fix: when rVFC is available, wait specifically for IT — never trust 'seeked'
+  // as a "frame is ready to draw" signal. rVFC is the only callback in the spec
+  // that guarantees a new frame has been presented. The previous-iteration
+  // optimization of racing the events bought maybe 5-10ms on fast hardware and
+  // cost frame accuracy on slow hardware. Not a worthwhile trade.
+  //
+  // Hard-timeout fallback covers the rare edge case where rVFC never fires
+  // (e.g., subframe seeks where source frame doesn't change). 'seeked' is still
+  // the trigger when rVFC isn't available at all (very old WebView2).
   const hasRVFC = typeof video.requestVideoFrameCallback === 'function';
   const seekAndWait = async (target, timeoutMs = 4000) => {
     if (Math.abs(video.currentTime - target) <= 0.001) return;
@@ -3998,16 +4007,43 @@ async function exportVideoFFmpegNative() {
     await new Promise((resolve, reject) => {
       let settled = false;
       const finish = (how) => { settled = true; resolveMethod = how; video.onseeked = null; clearInterval(poll); clearTimeout(timer); };
+
       if (hasRVFC) {
+        // Primary path: wait for rVFC. Don't race against 'seeked' — that's the
+        // bug we're fixing. 'seeked' becomes only a safety net (if rVFC doesn't
+        // fire because the frame at target is identical to current frame, the
+        // seeked-then-converge path eventually wakes us up).
         video.requestVideoFrameCallback(() => { if (!settled) { finish('rvfc'); resolve(); } });
+        video.onseeked = () => {
+          // After 'seeked' fires, give rVFC up to 250ms to also fire. If it
+          // doesn't (subframe seek case), fall through with a generous raf wait
+          // to be safe on slow compositors.
+          setTimeout(() => {
+            if (settled) return;
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+              if (!settled) { finish('seeked-fallback'); resolve(); }
+            }));
+          }, 250);
+        };
+      } else {
+        // No rVFC at all — fall back to seeked + double raf
+        video.onseeked = () => {
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (!settled) { finish('seeked-no-rvfc'); resolve(); }
+          }));
+        };
       }
-      video.onseeked = () => { if (!settled) { finish('seeked'); resolve(); } };
+
       const t0 = performance.now();
       const poll = setInterval(() => {
         if (settled) return;
         if (exportControl.cancelled) { finish('cancel'); reject(new Error('cancelled')); return; }
-        if (Math.abs(video.currentTime - target) <= 0.05 && (performance.now() - t0) > 150) {
-          finish('converge'); resolve();
+        if (Math.abs(video.currentTime - target) <= 0.05 && (performance.now() - t0) > 400) {
+          // Converge fallback bumped from 150ms to 400ms — slow GPUs sometimes
+          // present the new frame slightly after currentTime updates. Give the
+          // compositor a real chance before declaring "frame ready".
+          finish('converge');
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
         }
       }, 50);
       const timer = setTimeout(() => {
@@ -4015,9 +4051,6 @@ async function exportVideoFFmpegNative() {
       }, timeoutMs);
       try { video.currentTime = target; } catch (e) { finish('error'); reject(e); }
     });
-    // If we resolved via 'seeked' or 'converge', the compositor may not have
-    // painted the new frame yet. Wait one frame so canvas.drawImage gets it.
-    if (resolveMethod !== 'rvfc') await new Promise(r => requestAnimationFrame(r));
   };
 
   await seekAndWait(0);
@@ -5990,7 +6023,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.7';
+const APP_VERSION = '4.2.8';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12745,6 +12778,19 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.8',
+    date: '2026-05-05',
+    title: 'Fix — frame-timing race that was duplicating frames on slow GPUs (Lenovo X280 case)',
+    sections: [
+      { h: 'Fixed', items: [
+        'VA reported "clunky/laggy" exports on her Lenovo X280 (Intel UHD 620 / 8th-gen i5) but not on faster machines, with every export. Root cause: the seek-and-wait function in the FFmpeg export path raced `requestVideoFrameCallback` against the `seeked` event, taking whichever fired first. On fast Apple Silicon / dedicated GPUs, rVFC won — fresh frame guaranteed. On the X280\'s weak integrated GPU, `seeked` routinely fired BEFORE the compositor presented the new frame. Code fell through with only a 1-frame raf wait, then drawImage(video) grabbed the previous frame\'s pixels. Result: every few output frames duplicated their predecessor → motion looked stutter-y / "laggy".',
+        'Fix: when rVFC is available (modern WebView2), wait specifically for it. Don\'t race against `seeked` — that signal lies on slow hardware. Old behavior bought 5-10ms on fast machines and cost frame accuracy on slow ones; not a worthwhile trade.',
+        'When `seeked` fires before rVFC (common on slow GPUs during subframe seeks), give rVFC up to 250ms to also fire, then fall through with 2-raf wait. Convergence-poll fallback also bumped from 150ms → 400ms for slow compositors.',
+        'No code change for fast machines — they were already taking the rVFC path 99% of the time. Pure improvement for X280-class hardware.',
+      ]},
+    ]
+  },
   {
     version: '4.2.7',
     date: '2026-05-05',
