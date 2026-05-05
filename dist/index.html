@@ -1010,9 +1010,10 @@
 <option value="fast">⚡ Fast (WebCodecs · hardware H.264)</option>
 <option value="reliable">🛡️ Reliable (FFmpeg · software H.264)</option>
 <option value="legacy">🐢 Legacy (MediaRecorder · real-time)</option>
+<option value="cloud">☁️ Cloud (DigitalOcean · server H.264)</option>
 </select>
 </div>
-<p class="output-note"><b>Fast</b>: frame-perfect, fastest. Hardware-accelerated. May hang on some Windows laptops.<br><b>Reliable</b>: frame-perfect, slower (~2–3× real-time). Loads ~30MB FFmpeg on first use, then cached. Use this if Fast hangs.<br><b>Legacy</b>: real-time capture. May drop frames on slow hardware. Use only if Fast and Reliable both fail.</p>
+<p class="output-note"><b>Fast</b>: frame-perfect, fastest. Hardware-accelerated. May hang on some Windows laptops.<br><b>Reliable</b>: frame-perfect, slower (~2–3× real-time). Loads ~30MB FFmpeg on first use, then cached. Use this if Fast hangs.<br><b>Legacy</b>: real-time capture. May drop frames on slow hardware. Use only if Fast and Reliable both fail.<br><b>Cloud</b>: bakes captions + adjustments into the video on a remote server (DigitalOcean droplet). Bypasses local hardware entirely — guaranteed quality on slow/quirky machines, no JPEG/PNG intermediates, no canvas roundtrip. Configure URL + token in Settings → Cloud.</p>
 <button class="export-btn" id="exportBtn" disabled style="margin-top:18px;display:flex;justify-content:space-between;align-items:center;text-align:left;"><span>DOWNLOAD</span> <span class="action-suffix" id="exportResLabel" style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.05em;opacity:.7;">1080P</span></button>
 <button class="export-drive-btn" id="exportDriveBtn" disabled style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;text-align:left;">
 <span style="display:flex;align-items:center;gap:10px;">
@@ -4336,6 +4337,227 @@ function isFrameProcessorAvailable() {
     && typeof video.captureStream === 'function';
 }
 
+// ============================================================================
+// CLOUD EXPORT (v4.2.11+) — outsource encoding to a remote DigitalOcean droplet
+// ============================================================================
+// Why this exists: VAs / users on slow Windows hardware were getting bad local
+// exports (frame-timing races on weak GPUs, JPEG-intermediate quality loss,
+// libx264 encoding undershoot). The local pipeline was iterated 5+ times
+// without a definitive fix because each user's hardware behaves differently.
+// Cloud render moves the entire encode step to a controlled Linux box, making
+// quality deterministic regardless of which laptop is calling.
+//
+// Architecture:
+//   1. Client renders the caption layer to a transparent PNG at output res.
+//      We reuse the existing renderCaption() canvas code untouched, so the
+//      caption looks pixel-identical to the preview. Captions don't animate
+//      per-frame in this app, so a single overlay PNG is sufficient.
+//   2. Client uploads source.mp4 + caption_overlay.png + adjustments JSON.
+//   3. Server runs ffmpeg with eq/colorbalance/vignette/noise filters for
+//      adjustments + overlay filter for caption + libx264 encode at target
+//      bitrate (0.30 bpp = ~14.9 Mbps for 1080p24).
+//   4. Server returns finished MP4. Client delivers as if it were local.
+//
+// Limitations (v1):
+//   - Filter presets (Clarendon, Noir, etc.) are NOT applied server-side.
+//     Use Fast/Reliable mode if you need them. Could be added later via
+//     ffmpeg curves/lut3d but not in scope for first ship.
+//   - Mirror flip is NOT applied server-side. Same caveat.
+//   - Audio is preserved via -c:a aac (re-encoded), not stream-copied. That's
+//     fine for short clips; a future optimization could detect AAC source
+//     and copy through.
+//   - iPhone metadata injection happens client-side AFTER cloud download,
+//     using the same code path as Reliable. So that toggle still works.
+
+const CLOUD_PREFS_KEY = 'snapcap_cloud_prefs';
+
+function getCloudPrefs() {
+  try {
+    const raw = localStorage.getItem(CLOUD_PREFS_KEY);
+    if (!raw) return { url: '', token: '' };
+    return JSON.parse(raw);
+  } catch (_) {
+    return { url: '', token: '' };
+  }
+}
+
+function setCloudPrefs(p) {
+  try {
+    localStorage.setItem(CLOUD_PREFS_KEY, JSON.stringify({
+      url: (p.url || '').trim().replace(/\/+$/, ''),  // strip trailing slashes
+      token: (p.token || '').trim(),
+    }));
+  } catch (_) {}
+}
+
+// Render the caption layer onto a fresh transparent canvas at output resolution.
+// Returns a Blob (PNG) or null if there's no caption to render.
+async function renderCaptionOverlayToPng(w, h) {
+  if (!state.caption || !state.caption.trim()) return null;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const cx = c.getContext('2d');
+  // Transparent background — only the caption + its bar should be drawn
+  cx.clearRect(0, 0, w, h);
+  // renderCaption writes the bar fill (rgba(0,0,0,opacity)) and the text on top.
+  // For an overlay PNG we want the bar visible (so the user gets the same look)
+  // but everything OUTSIDE the bar to be transparent. The clearRect above
+  // already gives us that — renderCaption only paints inside the bar region.
+  await renderCaption(cx, w, h);
+  return await new Promise(r => c.toBlob(r, 'image/png'));
+}
+
+async function exportVideoCloud() {
+  const { w, h } = getExportDimensions();
+  if (!w || !h) {
+    setExportStatus('NO EXPORT DIMENSIONS', 'error');
+    return;
+  }
+  const targetFps = getEffectiveExportFps();
+
+  resetExportSteps();
+  setExportStep('demux', 'active');
+  const startWall = performance.now();
+
+  const prefs = getCloudPrefs();
+  if (!prefs.url || !prefs.token) {
+    setExportStep('demux', 'failed');
+    setExportStatus('CLOUD URL OR TOKEN MISSING — Settings → Cloud', 'error');
+    return;
+  }
+
+  // Source video — must have a real File for upload
+  setExportStatus('PREPARING SOURCE...', 'info', null, { indeterminate: true, showCancel: true });
+  let sourceBlob = __lastVideoFile;
+  if (!sourceBlob) {
+    try {
+      const r = await fetch(video.src);
+      sourceBlob = await r.blob();
+    } catch (e) {
+      setExportStep('demux', 'failed');
+      setExportStatus('Could not load source video: ' + e.message, 'error');
+      return;
+    }
+  }
+
+  // Caption overlay — single PNG at output resolution. renderCaption() reused
+  // verbatim, so multi-line / emoji / outline / background-bar all match preview.
+  setExportStep('demux', 'done');
+  setExportStep('video', 'active');
+  setExportStatus('RENDERING CAPTION OVERLAY...', 'info', 0.05, { showCancel: true });
+  let captionBlob = null;
+  try {
+    captionBlob = await renderCaptionOverlayToPng(w, h);
+  } catch (e) {
+    console.warn('[cloud] caption overlay render failed:', e);
+    // Non-fatal — proceed without overlay. User won't see captions in output.
+  }
+
+  // Adjustments to send. Map editor state to the server's adj keys.
+  const adjustments = {
+    sat: state.saturation | 0,
+    con: state.contrast | 0,
+    bri: state.brightness | 0,
+    war: state.warmth | 0,
+    gra: state.grain | 0,
+    vig: state.vignette | 0,
+  };
+
+  const args = {
+    width: w, height: h, fps: targetFps,
+    target_bitrate: Math.max((w * h * targetFps * 0.30) | 0, 8_000_000),
+    preset: 'medium',
+    adjustments,
+  };
+
+  // Build multipart form
+  const fd = new FormData();
+  fd.append('video', sourceBlob, sourceBlob.name || 'source.mp4');
+  fd.append('args', JSON.stringify(args));
+  if (captionBlob) fd.append('caption_overlay', captionBlob, 'caption.png');
+
+  setExportStep('audio', 'skipped');
+  setExportStep('mux', 'active');
+  setExportStatus('UPLOADING TO CLOUD...', 'info', 0.10, { showCancel: true });
+
+  // Use XMLHttpRequest for upload progress (fetch lacks progress API).
+  const url = prefs.url.replace(/\/+$/, '') + '/render';
+  const responseBlob = await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + prefs.token);
+    xhr.responseType = 'blob';
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = e.loaded / e.total;
+        const friendly = (e.loaded / 1024 / 1024).toFixed(1);
+        const total = (e.total / 1024 / 1024).toFixed(1);
+        setExportStatus(`UPLOADING TO CLOUD ${friendly} / ${total} MB...`, 'info', 0.10 + pct * 0.40, { showCancel: true });
+      }
+    };
+    xhr.upload.onload = () => {
+      setExportStatus('CLOUD ENCODING (libx264 @ ~15 Mbps)...', 'info', 0.55, { indeterminate: true, showCancel: true });
+    };
+    xhr.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = e.loaded / e.total;
+        const friendly = (e.loaded / 1024 / 1024).toFixed(1);
+        setExportStatus(`DOWNLOADING ${friendly} MB FROM CLOUD...`, 'info', 0.85 + pct * 0.10, { showCancel: true });
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(xhr.response);
+      } else {
+        // Try to read text error from the response blob
+        const reader = new FileReader();
+        reader.onload = () => reject(new Error(`HTTP ${xhr.status}: ${String(reader.result || '').slice(0, 400)}`));
+        reader.onerror = () => reject(new Error(`HTTP ${xhr.status}`));
+        try { reader.readAsText(xhr.response); } catch { reject(new Error(`HTTP ${xhr.status}`)); }
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error contacting cloud server'));
+    xhr.ontimeout = () => reject(new Error('Cloud render timed out'));
+    xhr.timeout = 15 * 60 * 1000;  // 15-minute hard cap
+    xhr.send(fd);
+  });
+
+  setExportStep('mux', 'done');
+  setExportStep('save', 'active');
+  setExportStatus('FINALIZING...', 'info', 0.95);
+
+  let finalBlob = responseBlob;
+
+  // iPhone metadata injection — same as Reliable path
+  let filename;
+  let metaTag = '';
+  if (!state.metaClean && state.iphoneMeta) {
+    setExportStatus('INJECTING IPHONE METADATA...', 'info', null, { indeterminate: true });
+    const injected = await injectIphoneMp4Metadata(finalBlob);
+    if (injected) {
+      finalBlob = injected;
+      metaTag = ' · 📱 iPhone QuickTime metadata';
+    }
+    filename = generateIphoneFilename('MOV');
+  } else {
+    filename = applyFilenameTemplate(getCurrentTemplate(), 'mp4');
+  }
+
+  const wasDriveIntent = _editorExportIntent === 'drive';
+  deliverBlob(finalBlob, filename);
+  setExportStep('save', 'done');
+
+  if (!wasDriveIntent) {
+    const totalElapsed = ((performance.now() - startWall) / 1000).toFixed(1);
+    setExportStatus(
+      `DOWNLOADED · ${filename} · cloud render · ${totalElapsed}s${metaTag}`,
+      'success', null, { showSteps: true }
+    );
+    setTimeout(clearExportStatus, 8000);
+  }
+}
+
 async function exportVideoFast() {
   if (!isWebCodecsAvailable()) return false;
   if (typeof MP4Box === 'undefined') {
@@ -5442,6 +5664,7 @@ async function handleExport() {
       fast: 'Exporting Video · Fast (WebCodecs)',
       reliable: 'Exporting Video · Reliable (FFmpeg)',
       legacy: 'Exporting Video · Legacy (MediaRecorder)',
+      cloud: 'Exporting Video · Cloud (DigitalOcean)',
     };
     editorDownloadShowModal(titleByMode[mode] || 'Exporting Video');
   }
@@ -5488,6 +5711,16 @@ async function handleExport() {
           exportError = (e && e.message) ? e.message : 'unknown error';
           setExportStatus('FFMPEG EXPORT FAILED: ' + exportError + ' — try Fast or Legacy', 'error');
           handled = true; // don't fall through; user chose this mode explicitly
+        }
+      } else if (mode === 'cloud') {
+        try {
+          await exportVideoCloud();
+          handled = true;
+        } catch (e) {
+          console.error('Cloud export threw:', e);
+          exportError = (e && e.message) ? e.message : 'unknown error';
+          setExportStatus('CLOUD EXPORT FAILED: ' + exportError + ' — check Settings → Cloud, or try Fast/Reliable', 'error');
+          handled = true;
         }
       } else {
         // legacy
@@ -6023,7 +6256,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.10';
+const APP_VERSION = '4.2.11';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12532,6 +12765,7 @@ function ensureSettingsModal() {
           <button class="settings-nav-btn"        data-cat="metadata"   data-no-sfx>📷 METADATA</button>
           <button class="settings-nav-btn"        data-cat="sounds"     data-no-sfx>🔔 SOUNDS</button>
           <button class="settings-nav-btn"        data-cat="updates"    data-no-sfx>↻ UPDATES</button>
+          <button class="settings-nav-btn"        data-cat="cloud"      data-no-sfx>☁️ CLOUD</button>
           <button class="settings-nav-btn"        data-cat="diagnostics" data-no-sfx>🔧 DIAGNOSTICS</button>
         </nav>
         <!-- Content panel — only the active category is visible -->
@@ -12621,6 +12855,22 @@ function ensureSettingsModal() {
               <button class="none-toggle" id="prefManualCheckUpdate">CHECK</button>
             </div>
           </div>
+        </div>
+        <div class="settings-group" data-cat="cloud">
+          <div class="settings-label">CLOUD RENDER SERVER</div>
+          <p class="settings-note" style="margin:0 0 14px;">Run video encoding on a remote DigitalOcean droplet instead of locally. Bypasses local hardware quirks (slow GPUs, broken WebView2, etc.). Select <b>☁️ Cloud</b> as the export engine in the OUTPUT panel to use it. Configure once here.</p>
+          <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+            <label style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;">Server URL</label>
+            <input type="text" id="prefCloudUrl" placeholder="http://137.184.47.65:8000" autocomplete="off" spellcheck="false" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;outline:none;">
+          </div>
+          <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+            <label style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;">Auth Token</label>
+            <input type="password" id="prefCloudToken" placeholder="64-char hex token from your droplet" autocomplete="off" spellcheck="false" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;outline:none;">
+          </div>
+          <div class="settings-row" style="margin-top:12px;justify-content:flex-end;">
+            <button class="none-toggle" id="prefCloudTest">TEST CONNECTION</button>
+          </div>
+          <div id="prefCloudStatus" style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-faint);min-height:16px;"></div>
         </div>
         <div class="settings-group" data-cat="diagnostics">
           <div class="settings-label">DIAGNOSTICS</div>
@@ -12758,6 +13008,63 @@ function ensureSettingsModal() {
     try { localStorage.removeItem(PREFS_KEY); } catch (_) {}
     location.reload();
   });
+
+  // Cloud render settings — URL + auth token. Auto-saved on blur / change.
+  // Test button hits /health on the configured URL with the token in the
+  // Authorization header so we can validate both the URL is reachable AND
+  // the token's accepted before the user tries a real export.
+  const cloudUrlEl = document.getElementById('prefCloudUrl');
+  const cloudTokenEl = document.getElementById('prefCloudToken');
+  const cloudStatusEl = document.getElementById('prefCloudStatus');
+  const cloudTestBtn = document.getElementById('prefCloudTest');
+  const saveCloudPrefs = () => {
+    if (!cloudUrlEl || !cloudTokenEl) return;
+    setCloudPrefs({ url: cloudUrlEl.value, token: cloudTokenEl.value });
+  };
+  if (cloudUrlEl && cloudTokenEl) {
+    const _cp = getCloudPrefs();
+    cloudUrlEl.value = _cp.url || '';
+    cloudTokenEl.value = _cp.token || '';
+    cloudUrlEl.addEventListener('change', saveCloudPrefs);
+    cloudUrlEl.addEventListener('blur', saveCloudPrefs);
+    cloudTokenEl.addEventListener('change', saveCloudPrefs);
+    cloudTokenEl.addEventListener('blur', saveCloudPrefs);
+  }
+  if (cloudTestBtn) {
+    cloudTestBtn.addEventListener('click', async () => {
+      saveCloudPrefs();
+      const prefs = getCloudPrefs();
+      if (!prefs.url) { cloudStatusEl.textContent = '✗ URL is empty'; cloudStatusEl.style.color = 'var(--red)'; return; }
+      cloudStatusEl.textContent = '↻ testing...'; cloudStatusEl.style.color = 'var(--text-faint)';
+      try {
+        // /health is unauthed but we test that AND a small auth-required call
+        // by hitting /render with no body — server should reject with 422 (missing
+        // file) AFTER passing auth. So 401/403 = bad token; 422 = good token, no file.
+        const healthRes = await fetch(prefs.url.replace(/\/+$/, '') + '/health', { method: 'GET' });
+        if (!healthRes.ok) throw new Error('Server unhealthy: HTTP ' + healthRes.status);
+        const health = await healthRes.json();
+
+        if (prefs.token) {
+          const authProbe = await fetch(prefs.url.replace(/\/+$/, '') + '/render', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + prefs.token },
+          });
+          if (authProbe.status === 401 || authProbe.status === 403) {
+            cloudStatusEl.textContent = '✗ Token rejected (HTTP ' + authProbe.status + ')';
+            cloudStatusEl.style.color = 'var(--red)';
+            return;
+          }
+          // Anything else (422 missing file, 400 bad form, etc) means auth passed
+        }
+
+        cloudStatusEl.textContent = '✓ Connected · ' + (health.ffmpeg || 'ffmpeg ready');
+        cloudStatusEl.style.color = 'var(--green)';
+      } catch (e) {
+        cloudStatusEl.textContent = '✗ ' + (e.message || 'connection failed');
+        cloudStatusEl.style.color = 'var(--red)';
+      }
+    });
+  }
   document.getElementById('prefCancelBtn').addEventListener('click', () => {
     overlay.classList.add('hidden');
   });
@@ -12778,6 +13085,26 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.11',
+    date: '2026-05-05',
+    title: '☁️ Cloud Render — outsource encoding to a remote server',
+    sections: [
+      { h: 'New', items: [
+        'Cloud Render export engine. Bypasses local hardware entirely — sends source video + caption + adjustments to a remote DigitalOcean droplet, server runs ffmpeg with libx264 at 15 Mbps target, returns the finished MP4. Perfect for old laptops, integrated GPUs, weird WebView2 versions, and any other "works on my machine but not theirs" hardware quirks.',
+        'Caption rendering: client renders the caption layer to a transparent PNG using the existing canvas pipeline (so multi-line / emoji / outline / fonts / background bar all match preview pixel-identically), uploads it as an overlay, server composites with ffmpeg overlay filter onto every frame.',
+        'Adjustments: saturation / contrast / brightness / warmth / grain / vignette translated to ffmpeg eq + colorbalance + noise + vignette filters server-side. Applied during the encode pass.',
+        'Settings → Cloud — paste your droplet URL + auth token, hit TEST CONNECTION to verify both. Then select "☁️ Cloud" as the export engine in OUTPUT.',
+        'iPhone metadata injection still works — happens client-side after cloud download, same code path as Reliable mode.',
+      ]},
+      { h: 'Limitations', items: [
+        'Filter presets (Clarendon, Noir, Vivid, etc.) are NOT applied server-side yet. Use Fast or Reliable mode if you need them.',
+        'Mirror flip is NOT applied server-side yet.',
+        'Audio is re-encoded to AAC 192k (not stream-copied). Fine quality but a tiny re-encode hit. Optimization: detect AAC source and copy through.',
+        'Uses HTTP (not HTTPS). For internal use across trusted networks only — auth token travels in plaintext. HTTPS via Caddy + DuckDNS is the next hardening pass.',
+      ]},
+    ]
+  },
   {
     version: '4.2.10',
     date: '2026-05-05',
