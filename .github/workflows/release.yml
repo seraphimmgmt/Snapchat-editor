@@ -61,7 +61,38 @@ jobs:
           # exiftool standalone Windows (.exe). Newer zips ship as
           # exiftool-<ver>_64/exiftool(-k).exe with an exiftool_files/ sibling
           # the exe needs at runtime — copy both.
-          curl -L -o exiftool.zip https://exiftool.org/exiftool-13.57_64.zip
+          #
+          # exiftool.org sometimes silently 200s with a few-byte error page
+          # instead of the actual zip (we hit this on v4.2.8 — got 231 bytes,
+          # 7z choked, Windows build failed, latest.json shipped Mac-only,
+          # auto-update broke for every Windows user). Mitigations:
+          #   1. Walk a list of versions (newest → oldest). If 13.57 is gone
+          #      because they cut a newer release, we find it without manual
+          #      workflow updates.
+          #   2. Verify the file is actually >= 1 MB before declaring success.
+          #      A real exiftool zip is ~10 MB; an HTML error page is < 50 KB.
+          EXIFTOOL_VERSIONS="13.99 13.95 13.90 13.85 13.80 13.75 13.70 13.65 13.60 13.57"
+          EXIFTOOL_OK=""
+          for ver in $EXIFTOOL_VERSIONS; do
+            url="https://exiftool.org/exiftool-${ver}_64.zip"
+            echo "Trying exiftool $ver: $url"
+            if curl -fL --max-time 60 -o exiftool.zip "$url" 2>/dev/null; then
+              SIZE=$(stat -c%s exiftool.zip 2>/dev/null || stat -f%z exiftool.zip 2>/dev/null || echo 0)
+              if [ "$SIZE" -gt 1000000 ]; then
+                echo "✓ exiftool $ver downloaded ($SIZE bytes)"
+                EXIFTOOL_OK="$ver"
+                break
+              else
+                echo "  → only $SIZE bytes, probably an error page; trying next"
+              fi
+            else
+              echo "  → curl failed; trying next"
+            fi
+          done
+          if [ -z "$EXIFTOOL_OK" ]; then
+            echo "All exiftool versions failed. exiftool.org may be down or all listed versions removed."
+            exit 1
+          fi
           7z x exiftool.zip -oexiftool-extract
           EXIFTOOL_EXE=$(find exiftool-extract -name "exiftool(-k).exe" -type f | head -1)
           if [ -z "$EXIFTOOL_EXE" ]; then
@@ -236,12 +267,25 @@ jobs:
           gh release upload "$TAG" "$DIR/latest.json" -R "$REPO" --clobber
           echo "✓ latest.json uploaded for v${VER}"
 
-          # Now that latest.json + all binaries are in place, flip the release
-          # from draft to public. GitHub will then promote it to "latest" and
-          # the auto-updater can fetch /releases/latest/download/latest.json
-          # without race-conditioning a 404. If this script fails before this
-          # line — partial uploads, signature missing, etc. — the release
-          # stays a draft and the updater keeps pointing at the previous good
-          # release. That's the desired failure mode.
+          # Verify ALL expected platforms have signatures before promoting the
+          # release to public. If any platform's build failed (e.g. v4.2.8's
+          # Windows build choked on a flaky exiftool.org download), the release
+          # stays a draft so GitHub falls back to the previous good "latest"
+          # and Windows users don't get a Mac-only latest.json that breaks
+          # their auto-updater. Manual recovery: fix the build, re-tag, push.
+          MISSING=""
+          [ -f "$MAC_SIG" ] || MISSING="$MISSING mac"
+          [ -f "$WIN_MSI_SIG" ] && [ -f "$WIN_NSIS_SIG" ] || MISSING="$MISSING windows"
+          if [ -n "$MISSING" ]; then
+            echo "::warning::v${VER} has missing platforms:$MISSING — leaving release as draft"
+            echo "::warning::Auto-updater will continue serving the previous good release."
+            echo "::warning::To recover: fix the failed build and re-tag/re-push v${VER}, OR manually un-draft if a partial release is acceptable."
+            exit 0
+          fi
+
+          # All platforms present — flip the release from draft to public.
+          # GitHub then promotes it to "latest" and the auto-updater can
+          # fetch /releases/latest/download/latest.json without race-conditioning
+          # a 404 or a partial-platform manifest.
           gh release edit "$TAG" -R "$REPO" --draft=false
-          echo "✓ release v${VER} promoted from draft to public"
+          echo "✓ release v${VER} promoted from draft to public (all platforms present)"

@@ -6023,7 +6023,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.8';
+const APP_VERSION = '4.2.9';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12778,6 +12778,21 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.9',
+    date: '2026-05-05',
+    title: 'Workflow hardening — exiftool.org flake-proofing + don\'t ship partial releases',
+    sections: [
+      { h: 'Fixed', items: [
+        'v4.2.8 Windows build failed because exiftool.org returned a 231-byte error page instead of the expected zip. The Mac build succeeded, the publish-latest-json job uploaded a Mac-only latest.json, and the workflow promoted the release to public anyway — every Windows user opening "Check for updates" got "None of the fallback platforms were found" instead of an actual update.',
+        'Fix #1 (download flake): the exiftool download now walks a list of versions newest→oldest (13.99 → 13.57) and verifies each is at least 1 MB before declaring success. If 13.57 is removed because they cut a newer release, we find it automatically without a manual workflow update. If exiftool.org is genuinely down, all versions fail and the build halts cleanly instead of producing a useless zip.',
+        'Fix #2 (partial releases): publish-latest-json now verifies BOTH platforms (Mac + Windows) have signature files before flipping the release from draft to public. If anything\'s missing, the release stays a draft so GitHub serves the previous good release as "latest" and the auto-updater keeps working. Manual recovery via fixing the build and re-tagging.',
+      ]},
+      { h: 'Carried over from v4.2.8 (which never shipped Windows binaries)', items: [
+        'Frame-timing race fix for slow GPUs (Lenovo X280-class hardware). The seek-and-wait function now waits specifically for requestVideoFrameCallback instead of racing it against `seeked`. Eliminates duplicated source frames in exports on weak integrated graphics.',
+      ]},
+    ]
+  },
   {
     version: '4.2.8',
     date: '2026-05-05',
