@@ -6023,7 +6023,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.9';
+const APP_VERSION = '4.2.10';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12778,6 +12778,23 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.10',
+    date: '2026-05-05',
+    title: 'Pre-commit Windows exiftool — exiftool.org is no longer a build dependency',
+    sections: [
+      { h: 'Fixed', items: [
+        'exiftool.org broke Windows builds three times in a row (v4.2.8 served a 231-byte error page; v4.2.9 404\'d every URL in the fallback list). The retry logic in v4.2.9 worked correctly — but Phil Harvey moved the Windows distribution to SourceForge and changed the URL pattern, so no version we tried still existed at the old paths.',
+        'Pre-committed exiftool 13.58 (Windows standalone) to the repo at src-tauri/exiftool/exiftool.exe + exiftool_files/. Same convention as the Mac exiftool that\'s already there. Removes exiftool.org as a runtime build dependency — the Windows build can no longer be derailed by exiftool.org\'s availability or URL changes.',
+        'Repo grew by ~34 MB (mostly Perl modules in exiftool_files/). One-time cost. Updates via deliberate re-commit when bumping versions.',
+      ]},
+      { h: 'Carries forward (still trying to ship to Windows)', items: [
+        'v4.2.8\'s seek-and-wait race fix for slow GPUs (the actual fix for the VA\'s Lenovo X280 stutter).',
+        'v4.2.7\'s PNG intermediate frames + 0.30 bpp ABR target.',
+        'v4.2.6\'s FFmpeg path CRF→ABR bitrate fix.',
+      ]},
+    ]
+  },
   {
     version: '4.2.9',
     date: '2026-05-05',

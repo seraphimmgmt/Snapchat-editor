@@ -58,51 +58,21 @@ jobs:
           curl -L -o ffmpeg.zip https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
           7z x ffmpeg.zip -offmpeg-extract
           cp ffmpeg-extract/ffmpeg-*/bin/ffmpeg.exe src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
-          # exiftool standalone Windows (.exe). Newer zips ship as
-          # exiftool-<ver>_64/exiftool(-k).exe with an exiftool_files/ sibling
-          # the exe needs at runtime — copy both.
+          # exiftool: pre-committed to repo as of v4.2.10. Previously downloaded
+          # from exiftool.org each build, which broke Windows releases three
+          # times in a row (v4.2.8: served 231-byte error page; v4.2.9: 404 on
+          # all 10 fallback version URLs; v4.2.7 worked because exiftool.org
+          # happened to still host 13.57 at the time). Phil moved the Windows
+          # standalone distribution to SourceForge and renamed the URL pattern,
+          # making the script-based download brittle.
           #
-          # exiftool.org sometimes silently 200s with a few-byte error page
-          # instead of the actual zip (we hit this on v4.2.8 — got 231 bytes,
-          # 7z choked, Windows build failed, latest.json shipped Mac-only,
-          # auto-update broke for every Windows user). Mitigations:
-          #   1. Walk a list of versions (newest → oldest). If 13.57 is gone
-          #      because they cut a newer release, we find it without manual
-          #      workflow updates.
-          #   2. Verify the file is actually >= 1 MB before declaring success.
-          #      A real exiftool zip is ~10 MB; an HTML error page is < 50 KB.
-          EXIFTOOL_VERSIONS="13.99 13.95 13.90 13.85 13.80 13.75 13.70 13.65 13.60 13.57"
-          EXIFTOOL_OK=""
-          for ver in $EXIFTOOL_VERSIONS; do
-            url="https://exiftool.org/exiftool-${ver}_64.zip"
-            echo "Trying exiftool $ver: $url"
-            if curl -fL --max-time 60 -o exiftool.zip "$url" 2>/dev/null; then
-              SIZE=$(stat -c%s exiftool.zip 2>/dev/null || stat -f%z exiftool.zip 2>/dev/null || echo 0)
-              if [ "$SIZE" -gt 1000000 ]; then
-                echo "✓ exiftool $ver downloaded ($SIZE bytes)"
-                EXIFTOOL_OK="$ver"
-                break
-              else
-                echo "  → only $SIZE bytes, probably an error page; trying next"
-              fi
-            else
-              echo "  → curl failed; trying next"
-            fi
-          done
-          if [ -z "$EXIFTOOL_OK" ]; then
-            echo "All exiftool versions failed. exiftool.org may be down or all listed versions removed."
-            exit 1
-          fi
-          7z x exiftool.zip -oexiftool-extract
-          EXIFTOOL_EXE=$(find exiftool-extract -name "exiftool(-k).exe" -type f | head -1)
-          if [ -z "$EXIFTOOL_EXE" ]; then
-            echo "Could not locate exiftool(-k).exe in extracted zip"; ls -R exiftool-extract; exit 1
-          fi
-          EXIFTOOL_DIR=$(dirname "$EXIFTOOL_EXE")
-          if [ -d "$EXIFTOOL_DIR/exiftool_files" ]; then
-            cp -r "$EXIFTOOL_DIR/exiftool_files" src-tauri/exiftool/
-          fi
-          cp "$EXIFTOOL_EXE" src-tauri/exiftool/exiftool.exe
+          # exiftool 13.58 (~34 MB extracted, mostly Perl modules) is now in
+          # src-tauri/exiftool/exiftool.exe + exiftool_files/. Same convention
+          # as the pre-committed Mac exiftool. Update via re-download only when
+          # bumping versions deliberately.
+          test -f src-tauri/exiftool/exiftool.exe || { echo "exiftool.exe missing from repo — re-commit it"; exit 1; }
+          test -d src-tauri/exiftool/exiftool_files || { echo "exiftool_files missing from repo — re-commit it"; exit 1; }
+          echo "✓ Using pre-committed exiftool.exe from src-tauri/exiftool/"
           # libheif heif-enc.exe for Windows HEIC encoding (Mac uses sips).
           # strukturag doesn't ship Windows binaries; use MSYS2 (preinstalled
           # on windows-latest) to pull a prebuilt mingw libheif. heif-enc.exe
