@@ -932,6 +932,11 @@
 <div class="section-content">
 <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button id="resetTextStyle" class="none-toggle" style="font-size:10px;padding:4px 10px;letter-spacing:.12em;">CLEAR</button></div>
 <div class="caption-options">
+<div class="seg-control" id="captionStyleSeg" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px;">
+<button class="seg-btn active" data-cap-style="bar" type="button" data-no-sfx title="Snapchat — full-width bar (default)">BAR</button>
+<button class="seg-btn" data-cap-style="box" type="button" data-no-sfx title="Reels — rounded pill around text">BOX</button>
+<button class="seg-btn" data-cap-style="plain" type="button" data-no-sfx title="No background, just text + outline">PLAIN</button>
+</div>
 <label><span>FONT</span><select id="fontSelect"></select></label>
 <label><span>SIZE</span><input type="range" id="captionSize" min="20" max="80" value="36"></label>
 </div>
@@ -1608,6 +1613,10 @@ const EMOJI_CATEGORIES = [
 const state = {
   mediaType: null, mediaElement: null, mediaWidth: 0, mediaHeight: 0,
   caption: '', fontIndex: 0, captionSize: 36, bgOpacity: 55,
+  // captionStyle: 'bar' = full-width Snapchat bar (default, classic look),
+  //               'box' = rounded pill just around the text (Reels-style),
+  //               'plain' = no bar at all, just text (use outline for legibility).
+  captionStyle: 'bar',
   textColor: '#ffffff', outlineColor: '#000000', outlineWidth: 0, outlineEnabled: false,
   captionY: 0.5,
   saturation: 100, contrast: 100, brightness: 100, warmth: 0, grain: 0, vignette: 0,
@@ -1767,11 +1776,41 @@ async function renderCaption(targetCtx, w, h) {
   const yCenter = clampedY * h;
   const yTop = yCenter - totalHeight / 2;
 
-  // Draw bar
+  // Draw bar — three styles:
+  //   'bar'   (Snapchat classic) = full-width fill across the canvas
+  //   'box'   (Reels-style)      = rounded pill around each text line, with padding
+  //   'plain' (no background)    = text only, no fill drawn
+  // Plain users typically need outline for legibility — the UI handler auto-
+  // enables outline when switching to 'plain' for the first time.
   const barAlpha = state.bgOpacity / 100;
-  if (barAlpha > 0) {
+  const captionStyle = state.captionStyle || 'bar';
+  if (barAlpha > 0 && captionStyle !== 'plain') {
     targetCtx.fillStyle = `rgba(0,0,0,${barAlpha})`;
-    targetCtx.fillRect(0, yTop, w, totalHeight);
+    if (captionStyle === 'box') {
+      // Pill around each line (per-line so multi-line captions get separate pills)
+      const pillPad = padding * 0.55;
+      let lineY = yTop + padding * 0.6;
+      const lineCornerR = lineHeight * 0.32;
+      for (const line of lines) {
+        const startX = (w - line.width) / 2;
+        const pillX = startX - pillPad;
+        const pillY = lineY;
+        const pillW = line.width + pillPad * 2;
+        const pillH = lineHeight;
+        if (typeof targetCtx.roundRect === 'function') {
+          targetCtx.beginPath();
+          targetCtx.roundRect(pillX, pillY, pillW, pillH, lineCornerR);
+          targetCtx.fill();
+        } else {
+          // Fallback for very old WebKit without roundRect — flat rect
+          targetCtx.fillRect(pillX, pillY, pillW, pillH);
+        }
+        lineY += lineHeight;
+      }
+    } else {
+      // 'bar' — full-width Snapchat-style
+      targetCtx.fillRect(0, yTop, w, totalHeight);
+    }
   }
 
   // Draw text + emojis
@@ -1939,6 +1978,7 @@ function snapshotEditorState() {
     fontIndex: state.fontIndex,
     captionSize: state.captionSize,
     bgOpacity: state.bgOpacity,
+    captionStyle: state.captionStyle,
     textColor: state.textColor,
     outlineColor: state.outlineColor,
     outlineWidth: state.outlineWidth,
@@ -6314,6 +6354,17 @@ function trialReel() {
 
   state.bgOpacity = randInt(30, 80);
 
+  // v4.2.22: Trial Reel can pick a non-bar caption style. Weighted toward
+  // 'bar' (Snapchat) since that's the primary aesthetic, with occasional
+  // 'box' (Reels) and 'plain' for variety. Keeps trial reels surprising
+  // without making them all look like Reels overnight.
+  const styleRoll = Math.random();
+  state.captionStyle = styleRoll < 0.65 ? 'bar' : (styleRoll < 0.88 ? 'box' : 'plain');
+  if (state.captionStyle === 'plain' && !state.outlineEnabled) {
+    state.outlineEnabled = true;
+    state.outlineWidth = state.outlineWidth > 0 ? state.outlineWidth : 2;
+  }
+
   // Filter ranges (tasteful, not extreme)
   state.saturation = randInt(85, 130);
   state.contrast = randInt(92, 115);
@@ -6350,6 +6401,11 @@ function syncUIToState() {
   const oTog = document.getElementById('outlineToggle');
   oTog.classList.toggle('active', state.outlineEnabled);
   oTog.textContent = state.outlineEnabled ? 'ON' : 'NONE';
+  // Sync caption-style segmented control
+  const capStyleVal = state.captionStyle || 'bar';
+  document.querySelectorAll('#captionStyleSeg .seg-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.capStyle === capStyleVal);
+  });
 
   document.getElementById('saturation').value = state.saturation;
   document.getElementById('contrast').value = state.contrast;
@@ -6470,7 +6526,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.21';
+const APP_VERSION = '4.2.22';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12444,6 +12500,7 @@ function snapshotCaptionState() {
     fontIndex:      state.fontIndex,
     captionSize:    state.captionSize,
     bgOpacity:      state.bgOpacity,
+    captionStyle:   state.captionStyle,
     textColor:      state.textColor,
     outlineColor:   state.outlineColor,
     outlineWidth:   state.outlineWidth,
@@ -12455,6 +12512,7 @@ function applyCaptionTemplate(tpl) {
   if (tpl.fontIndex !== undefined)      state.fontIndex = tpl.fontIndex;
   if (tpl.captionSize !== undefined)    state.captionSize = tpl.captionSize;
   if (tpl.bgOpacity !== undefined)      state.bgOpacity = tpl.bgOpacity;
+  if (tpl.captionStyle !== undefined)   state.captionStyle = tpl.captionStyle;
   if (tpl.textColor !== undefined)      state.textColor = tpl.textColor;
   if (tpl.outlineColor !== undefined)   state.outlineColor = tpl.outlineColor;
   if (tpl.outlineWidth !== undefined)   state.outlineWidth = tpl.outlineWidth;
@@ -12606,6 +12664,32 @@ function bindEvents() {
     // side effect was that quick consecutive slider inputs got coalesced wrong.
     if (typeof renderScheduled !== 'undefined') renderScheduled = false;
     schedulePreviewRender();
+  });
+
+  // Caption style segmented control: bar (Snapchat) / box (Reels) / plain
+  document.querySelectorAll('#captionStyleSeg .seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const newStyle = btn.dataset.capStyle;
+      state.captionStyle = newStyle;
+      document.querySelectorAll('#captionStyleSeg .seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+      // When switching to 'plain' (no background), text needs an outline to
+      // stay readable on bright video. Auto-enable outline if it's currently
+      // off and width is zero — gives users a usable result by default. They
+      // can still toggle it off manually if they want pure plain text.
+      if (newStyle === 'plain' && !state.outlineEnabled) {
+        state.outlineEnabled = true;
+        const outlineToggle = document.getElementById('outlineToggle');
+        if (outlineToggle) outlineToggle.textContent = 'ON';
+        if (state.outlineWidth === 0) {
+          state.outlineWidth = 2;
+          const owSlider = document.getElementById('outlineWidth');
+          if (owSlider) owSlider.value = 2;
+        }
+      }
+      if (typeof renderScheduled !== 'undefined') renderScheduled = false;
+      schedulePreviewRender();
+      if (typeof updateBadges === 'function') updateBadges();
+    });
   });
 
   document.getElementById('textColor').addEventListener('input', (e) => {
@@ -12803,6 +12887,7 @@ function bindEvents() {
     state.outlineWidth = 0;
     state.outlineEnabled = false;
     state.bgOpacity = 55;
+    state.captionStyle = 'bar';
     syncUIToState();
     schedulePreviewRender();
   });
@@ -13303,6 +13388,26 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.22',
+    date: '2026-05-06',
+    title: 'Caption style modes — Bar (Snapchat) / Box (Reels) / Plain',
+    sections: [
+      { h: 'New', items: [
+        '🎨 Three-way caption style toggle at the top of TEXT STYLE: BAR (Snapchat-style full-width dark bar — default, unchanged), BOX (Reels-style rounded pill that wraps just the text), PLAIN (no background, just text — needs outline for legibility).',
+        '📐 BOX style draws a rounded pill per line — multi-line captions get separate pills stacked. Uses canvas roundRect API (with flat-rect fallback for very old WebKit). Same BG OPACITY slider controls the pill\'s transparency.',
+        '✏️ Switching to PLAIN auto-enables the outline (width 2 minimum) since plain text on bright video is unreadable without one. You can override after — the auto-enable is a one-time helpful default, not a lock.',
+        '🎲 Trial Reel now picks a random style too (weighted: 65% bar, 23% box, 12% plain) so trial reels feel less repetitive.',
+      ]},
+      { h: 'Carries forward', items: [
+        'Style is included in caption templates (saves with the template, restores on apply). Undo/redo includes it. Survives across sessions via auto-save snapshot.',
+        'Cloud render handles all three styles automatically since the caption PNG is rendered client-side via the existing renderCaption() — no server changes needed.',
+      ]},
+      { h: 'Coming next', items: [
+        'Multi-text overlays + free positioning (unanchored placement anywhere on the canvas) is queued for v4.3.0+. This release\'s 3-style toggle covers the immediate "I need Reels-style text for trial reels" use case.',
+      ]},
+    ]
+  },
   {
     version: '4.2.21',
     date: '2026-05-06',
