@@ -948,6 +948,17 @@
 </div>
 </div>
 </div>
+<div class="control-section collapsed" data-section-id="filters">
+<button class="section-header"><h3>FILTERS <span class="section-badge hidden">0</span></h3><span class="section-chevron">›</span></button>
+<div class="section-content">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;">
+<p style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);margin:0;line-height:1.4;flex:1;">Stack iPhone + Instagram filters. Click a chip to add, drag the strength slider in the stack to dial it in.</p>
+<button id="resetEditorFilters" class="none-toggle" style="font-size:10px;padding:4px 10px;letter-spacing:.12em;flex-shrink:0;">CLEAR</button>
+</div>
+<div id="editorFilterChips" class="filter-cards"></div>
+<div id="editorFilterStack" class="filter-stack"></div>
+</div>
+</div>
 <div class="control-section" data-section-id="adjustments">
 <button class="section-header"><h3>ADJUSTMENTS <span class="section-badge hidden">0</span></h3><span class="section-chevron">›</span></button>
 <div class="section-content">
@@ -1620,6 +1631,12 @@ const state = {
   textColor: '#ffffff', outlineColor: '#000000', outlineWidth: 0, outlineEnabled: false,
   captionY: 0.5,
   saturation: 100, contrast: 100, brightness: 100, warmth: 0, grain: 0, vignette: 0,
+  // v4.2.23: filter chips ported from carousel. `filters` is an ordered list of
+  // FILTER_LIBRARY ids that are stacked on top of the image. Each filter has a
+  // strength in `filterStrengths` (0..100 — interpolates between identity and
+  // full effect). `filterThumbCache` is built lazily once media is loaded so the
+  // chip grid can show before/after thumbs.
+  filters: [], filterStrengths: {}, filterThumbCache: null,
   mirror: false, metaClean: false, iphoneMeta: false, iphoneCaptureDate: null, muteAudio: false,
   // v3.16.14: export engine selector replaces binary legacy toggle.
   // 'fast'     = WebCodecs (hardware H.264, fastest, may hang on broken hardware)
@@ -1714,7 +1731,20 @@ function buildFontString(size) {
 // ============================================================================
 function buildFilterString() {
   const w = state.warmth !== 0 ? ` sepia(${Math.abs(state.warmth) / 100})` : '';
-  return `saturate(${state.saturation}%) contrast(${state.contrast}%) brightness(${state.brightness}%)${w}`;
+  const adjustments = `saturate(${state.saturation}%) contrast(${state.contrast}%) brightness(${state.brightness}%)${w}`;
+  // v4.2.23: append CSS-method filter chip strings, interpolated by their
+  // per-filter strength. lut-method filters (Vivid, Mono, Noir, etc.) don't
+  // contribute here — they run as a pixel pass inside renderFrame.
+  if (!state.filters || state.filters.length === 0) return adjustments;
+  if (typeof FILTER_BY_ID === 'undefined') return adjustments;
+  const chipStrs = [];
+  for (const id of state.filters) {
+    const f = FILTER_BY_ID[id];
+    if (!f || f.method !== 'css' || !f.filter) continue;
+    const strength = state.filterStrengths[id] != null ? state.filterStrengths[id] : 50;
+    chipStrs.push(interpolateFilterString(f.filter, strength));
+  }
+  return chipStrs.length ? `${adjustments} ${chipStrs.join(' ')}` : adjustments;
 }
 
 let grainPattern = null, grainPatternSize = 0;
@@ -1920,6 +1950,35 @@ async function renderFrame(sourceElem, targetCtx, w, h) {
   }
   targetCtx.restore();
 
+  // v4.2.23: filter chip pixel passes. LUT-method filters (iPhone presets) need
+  // raw pixel access — applyLutToCanvas reads/writes through getImageData. Tints
+  // are CSS-method-filter overlays that paint a colored rect with a blend mode.
+  // Both run on the un-mirrored coord space because drawImage already mirrored.
+  // For preview the canvas is at dpr transform, so pass dpr; export canvases are
+  // identity (dpr=1). canvas.style.filter (set by renderPreview) sits on top of
+  // these baked pixels so adjustments still composite correctly.
+  if (state.filters && state.filters.length > 0 && typeof FILTER_BY_ID !== 'undefined') {
+    const lutDpr = isPreview ? dpr : 1;
+    for (const fid of state.filters) {
+      const f = FILTER_BY_ID[fid];
+      if (!f || f.method !== 'lut') continue;
+      const lutFn = (typeof FILTER_LUTS !== 'undefined') ? FILTER_LUTS[fid] : null;
+      if (!lutFn) continue;
+      const strength = (state.filterStrengths[fid] != null ? state.filterStrengths[fid] : 50) / 100;
+      applyLutToCanvas(targetCtx, 0, 0, w, h, lutFn, strength, lutDpr);
+    }
+    for (const fid of state.filters) {
+      const f = FILTER_BY_ID[fid];
+      if (!f || f.method !== 'css' || !f.tint) continue;
+      const strength = state.filterStrengths[fid] != null ? state.filterStrengths[fid] : 50;
+      targetCtx.save();
+      targetCtx.globalCompositeOperation = f.blend || 'overlay';
+      targetCtx.fillStyle = interpolateTintAlpha(f.tint, strength);
+      targetCtx.fillRect(0, 0, w, h);
+      targetCtx.restore();
+    }
+  }
+
   if (state.vignette > 0) {
     const grad = targetCtx.createRadialGradient(w/2, h/2, Math.min(w,h)*0.3, w/2, h/2, Math.max(w,h)*0.7);
     grad.addColorStop(0, 'rgba(0,0,0,0)');
@@ -1990,12 +2049,20 @@ function snapshotEditorState() {
     grain: state.grain,
     vignette: state.vignette,
     mirror: state.mirror,
+    // v4.2.23: filter chips. Deep-copy so undo doesn't replay a mutated array.
+    filters: Array.isArray(state.filters) ? [...state.filters] : [],
+    filterStrengths: state.filterStrengths ? { ...state.filterStrengths } : {},
   };
 }
 
 function applyEditorSnapshot(snap) {
   Object.assign(state, snap);
+  // Re-deserialize filter arrays/objects so subsequent edits don't mutate the
+  // history copy — Object.assign aliases the stored references.
+  if (snap.filters) state.filters = [...snap.filters];
+  if (snap.filterStrengths) state.filterStrengths = { ...snap.filterStrengths };
   if (typeof syncUIToState === 'function') syncUIToState();
+  if (typeof renderEditorFilterChips === 'function') renderEditorFilterChips();
   schedulePreviewRender();
 }
 
@@ -2613,6 +2680,11 @@ function updateMediaInfo() {
   }
   if (typeof updateHeaderMeta === 'function') updateHeaderMeta();
   if (typeof updateFilenamePreview === 'function') updateFilenamePreview();
+  // v4.2.23: rebuild filter chip thumbnails for the newly loaded media. Old
+  // thumbs from a previous source would mislead the user about what each filter
+  // looks like. Cache is invalidated here, then rebuilt lazily on next render.
+  if (typeof invalidateEditorFilterThumbs === 'function') invalidateEditorFilterThumbs();
+  if (typeof renderEditorFilterChips === 'function') renderEditorFilterChips();
 }
 
 function switchToEditor() {
@@ -4597,6 +4669,13 @@ async function exportVideoCloud() {
   }
   const targetFps = getEffectiveExportFps();
 
+  // v4.2.23: cloud server doesn't yet bake filter chips into its ffmpeg pipeline
+  // (server-side support is v4.2.24). Warn the user once per export so they
+  // don't silently lose filters. They can switch to Fast/Reliable to get them.
+  if (state.filters && state.filters.length > 0 && typeof showToast === 'function') {
+    showToast('⚠ Filters skipped — cloud export bakes adjustments only. Use Fast/Reliable for filter chips.', 'notify');
+  }
+
   resetExportSteps();
   setExportStep('demux', 'active');
   const startWall = performance.now();
@@ -5238,6 +5317,29 @@ async function exportVideoFast() {
     cx.drawImage(sourceFrame, 0, 0, w, h);
     cx.filter = 'none';
     cx.restore();
+
+    // v4.2.23: filter chip LUT + tint passes (mirrors renderFrame). This is the
+    // WebCodecs Fast path, identity transform, dpr=1.
+    if (state.filters && state.filters.length > 0 && typeof FILTER_BY_ID !== 'undefined') {
+      for (const fid of state.filters) {
+        const f = FILTER_BY_ID[fid];
+        if (!f || f.method !== 'lut') continue;
+        const lutFn = (typeof FILTER_LUTS !== 'undefined') ? FILTER_LUTS[fid] : null;
+        if (!lutFn) continue;
+        const strength = (state.filterStrengths[fid] != null ? state.filterStrengths[fid] : 50) / 100;
+        applyLutToCanvas(cx, 0, 0, w, h, lutFn, strength, 1);
+      }
+      for (const fid of state.filters) {
+        const f = FILTER_BY_ID[fid];
+        if (!f || f.method !== 'css' || !f.tint) continue;
+        const strength = state.filterStrengths[fid] != null ? state.filterStrengths[fid] : 50;
+        cx.save();
+        cx.globalCompositeOperation = f.blend || 'overlay';
+        cx.fillStyle = interpolateTintAlpha(f.tint, strength);
+        cx.fillRect(0, 0, w, h);
+        cx.restore();
+      }
+    }
 
     if (state.vignette > 0) {
       const grad = cx.createRadialGradient(w/2, h/2, Math.min(w,h)*0.3, w/2, h/2, Math.max(w,h)*0.7);
@@ -6304,6 +6406,8 @@ function updateBadges() {
 
   setBadge('caption', captionCount);
   setBadge('text-style', styleCount);
+  // v4.2.23: filter count badge
+  setBadge('filters', (state.filters && state.filters.length) || 0);
   setBadge('adjustments', adjustCount);
   setBadge('output', outputCount);
 }
@@ -6377,7 +6481,24 @@ function trialReel() {
   // Random caption Y position too — keep it around middle/lower
   state.captionY = rand(0.45, 0.85);
 
+  // v4.2.23: 55% chance to add a random Instagram-style filter at modest
+  // strength. iPhone LUT filters are skipped here — they're heavier-handed and
+  // would clash with the random adjustment values above. Always single filter
+  // (don't stack — multi-filter trial reels look like accidents). Existing
+  // filters are cleared first so trial reel is reproducible.
+  state.filters = [];
+  state.filterStrengths = {};
+  if (typeof FILTER_LIBRARY !== 'undefined' && Math.random() < 0.55) {
+    const cssFilters = FILTER_LIBRARY.filter(f => f.method === 'css');
+    if (cssFilters.length > 0) {
+      const pick = cssFilters[randInt(0, cssFilters.length - 1)];
+      state.filters.push(pick.id);
+      state.filterStrengths[pick.id] = randInt(35, 70);
+    }
+  }
+
   syncUIToState();
+  if (typeof renderEditorFilterChips === 'function') renderEditorFilterChips();
   schedulePreviewRender();
 
   // Spin the dice icon
@@ -6526,7 +6647,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.22';
+const APP_VERSION = '4.2.23';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -10887,6 +11008,195 @@ function applyItemFiltersToAll() {
   drawCarouselCanvas();
 }
 
+// ============================================================================
+// v4.2.23: EDITOR FILTER CHIPS — same UI as carousel, single-image mode.
+// Reuses FILTER_LIBRARY / FILTER_BY_ID / FILTER_LUTS / applyLutToCanvas /
+// interpolateFilterString / interpolateTintAlpha. State lives on the editor's
+// `state.filters` (id list) + `state.filterStrengths` (id → 0..100), and the
+// thumbnail cache is keyed off `state.filterThumbCache` (rebuilt when media
+// changes).
+// ============================================================================
+const EDITOR_FILTER_THUMB_SIZE = 120;
+
+function _editorFilterSourceForThumb() {
+  // Need a static image source. For images, use state.mediaElement directly.
+  // For videos, use the current frame painted onto a temp canvas.
+  if (!state.mediaElement) return null;
+  if (state.mediaType === 'image') return state.mediaElement;
+  if (state.mediaType === 'video' && state.mediaElement instanceof HTMLVideoElement) {
+    // Best-effort frame grab. If video isn't ready (readyState < 2) the chips
+    // will still build skeleton-only and re-render once media is ready.
+    const v = state.mediaElement;
+    if (!v.videoWidth || !v.videoHeight || v.readyState < 2) return null;
+    const c = document.createElement('canvas');
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    const cx = c.getContext('2d');
+    try { cx.drawImage(v, 0, 0); return c; } catch (_) { return null; }
+  }
+  return null;
+}
+
+async function buildEditorFilterThumbnails() {
+  if (state.filterThumbCache) return state.filterThumbCache;
+  if (typeof FILTER_LIBRARY === 'undefined') return null;
+  const src = _editorFilterSourceForThumb();
+  if (!src) return null;
+
+  const srcW = src.naturalWidth || src.videoWidth || src.width || 0;
+  const srcH = src.naturalHeight || src.videoHeight || src.height || 0;
+  if (!srcW || !srcH) return null;
+  const srcMin = Math.min(srcW, srcH);
+  const srcX = (srcW - srcMin) / 2;
+  const srcY = (srcH - srcMin) / 2;
+
+  const perFilter = {};
+  const SIZE = EDITOR_FILTER_THUMB_SIZE;
+  for (let i = 0; i < FILTER_LIBRARY.length; i++) {
+    const f = FILTER_LIBRARY[i];
+    const c = document.createElement('canvas');
+    c.width = SIZE; c.height = SIZE;
+    const cx = c.getContext('2d');
+    cx.imageSmoothingEnabled = true;
+    cx.imageSmoothingQuality = 'medium';
+    if (f.method === 'css' && f.filter) cx.filter = f.filter;
+    try { cx.drawImage(src, srcX, srcY, srcMin, srcMin, 0, 0, SIZE, SIZE); } catch (_) { continue; }
+    cx.filter = 'none';
+    if (f.method === 'lut') {
+      const lutFn = (typeof FILTER_LUTS !== 'undefined') ? FILTER_LUTS[f.id] : null;
+      if (lutFn) applyLutToCanvas(cx, 0, 0, SIZE, SIZE, lutFn, 1, 1);
+    } else if (f.method === 'css' && f.tint) {
+      cx.save();
+      cx.globalCompositeOperation = f.blend || 'overlay';
+      cx.fillStyle = f.tint;
+      cx.fillRect(0, 0, SIZE, SIZE);
+      cx.restore();
+    }
+    perFilter[f.id] = c.toDataURL('image/jpeg', 0.7);
+    if (i % 4 === 3) await new Promise(r => setTimeout(r, 0));
+  }
+  state.filterThumbCache = { perFilter };
+  return state.filterThumbCache;
+}
+
+function invalidateEditorFilterThumbs() {
+  state.filterThumbCache = null;
+}
+
+function renderEditorFilterChips() {
+  const container = document.getElementById('editorFilterChips');
+  if (!container) return;
+  if (typeof FILTER_LIBRARY === 'undefined' || !state.mediaElement) {
+    container.innerHTML = '<p style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--text-faint);grid-column:1/-1;text-align:center;padding:12px 0;">Load media to enable filters</p>';
+    renderEditorFilterStack();
+    return;
+  }
+  const activeIds = new Set(state.filters);
+  const groups = {};
+  for (const f of FILTER_LIBRARY) {
+    if (!groups[f.group]) groups[f.group] = [];
+    groups[f.group].push(f);
+  }
+
+  let html = '';
+  for (const groupName of Object.keys(groups)) {
+    html += `<div class="filter-group-label">${groupName}</div>`;
+    for (const f of groups[groupName]) {
+      const isActive = activeIds.has(f.id);
+      const stackPosition = isActive ? state.filters.indexOf(f.id) + 1 : 0;
+      const cachedThumb = state.filterThumbCache ? state.filterThumbCache.perFilter[f.id] : null;
+      const thumbHtml = cachedThumb
+        ? `<img class="fc-thumb" src="${cachedThumb}" alt="">`
+        : `<div class="fc-thumb-skeleton"></div>`;
+      html += `<div class="filter-card${isActive ? ' active' : ''}" data-fid="${f.id}">
+        ${thumbHtml}
+        <span class="fc-label">${f.label}</span>
+        ${stackPosition > 0 ? `<span class="fc-stack-num">${stackPosition}</span>` : ''}
+      </div>`;
+    }
+  }
+  container.innerHTML = html;
+  container.querySelectorAll('.filter-card').forEach(card => {
+    card.addEventListener('click', () => toggleEditorFilter(card.dataset.fid));
+  });
+
+  renderEditorFilterStack();
+
+  // Build thumbs lazily, then re-render once done. Won't re-trigger after
+  // they're cached; cache is invalidated on media load.
+  if (!state.filterThumbCache) {
+    buildEditorFilterThumbnails().then(cache => {
+      if (cache) renderEditorFilterChips();
+    });
+  }
+}
+
+function renderEditorFilterStack() {
+  const container = document.getElementById('editorFilterStack');
+  if (!container) return;
+  if (!state.filters || state.filters.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  let html = '';
+  state.filters.forEach((id, idx) => {
+    const f = FILTER_BY_ID[id];
+    if (!f) return;
+    const strength = state.filterStrengths[id] != null ? state.filterStrengths[id] : 50;
+    html += `<div class="filter-stack-item" data-fid="${id}">
+      <div class="fsi-row">
+        <span class="fsi-num">${idx + 1}</span>
+        <span class="fsi-name">${f.label}</span>
+        <span class="fsi-val" data-fsi-val>${strength}</span>
+        <button class="fsi-rm" type="button" title="Remove">×</button>
+      </div>
+      <input type="range" class="fsi-strength" min="0" max="100" value="${strength}" data-fsi-strength>
+    </div>`;
+  });
+  container.innerHTML = html;
+
+  container.querySelectorAll('.filter-stack-item').forEach(node => {
+    const fid = node.dataset.fid;
+    const slider = node.querySelector('[data-fsi-strength]');
+    const valEl = node.querySelector('[data-fsi-val]');
+    slider.addEventListener('input', (e) => {
+      const v = parseInt(e.target.value);
+      valEl.textContent = v;
+      state.filterStrengths[fid] = v;
+      schedulePreviewRender();
+    });
+    node.querySelector('.fsi-rm').addEventListener('click', () => {
+      const i = state.filters.indexOf(fid);
+      if (i >= 0) state.filters.splice(i, 1);
+      delete state.filterStrengths[fid];
+      renderEditorFilterChips();
+      schedulePreviewRender();
+      if (typeof updateBadges === 'function') updateBadges();
+    });
+  });
+}
+
+function toggleEditorFilter(filterId) {
+  const idx = state.filters.indexOf(filterId);
+  if (idx >= 0) {
+    state.filters.splice(idx, 1);
+    delete state.filterStrengths[filterId];
+  } else {
+    state.filters.push(filterId);
+    state.filterStrengths[filterId] = 50;
+  }
+  renderEditorFilterChips();
+  schedulePreviewRender();
+  if (typeof updateBadges === 'function') updateBadges();
+}
+
+function clearEditorFilters() {
+  state.filters = [];
+  state.filterStrengths = {};
+  renderEditorFilterChips();
+  schedulePreviewRender();
+  if (typeof updateBadges === 'function') updateBadges();
+}
+
 // ----------------------- Templates (localStorage) -----------------------
 const TEMPLATE_STORAGE_KEY = 'snap-caption-studio.carousel.templates';
 
@@ -12755,6 +13065,14 @@ function bindEvents() {
     schedulePreviewRender();
   });
 
+  // v4.2.23: editor filter chips CLEAR button
+  const resetEditorFiltersBtn = document.getElementById('resetEditorFilters');
+  if (resetEditorFiltersBtn) {
+    resetEditorFiltersBtn.addEventListener('click', () => {
+      clearEditorFilters();
+    });
+  }
+
   document.querySelectorAll('.res-btn[data-res]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.res-btn[data-res]').forEach(b => b.classList.remove('active'));
@@ -13389,6 +13707,30 @@ function ensureSettingsModal() {
 // ============================================================================
 const PATCH_NOTES = [
   {
+    version: '4.2.23',
+    date: '2026-05-06',
+    title: 'Filter chips in the video editor (27 presets — iPhone + Instagram)',
+    sections: [
+      { h: 'New', items: [
+        '🎛️ FILTERS section in the editor sidebar — same 27-filter library that\'s been in the carousel since v3.x is now in the editor too. iPhone group: Vivid, Vivid Warm/Cool, Dramatic, Dramatic Warm/Cool, Mono, Silvertone, Noir (LUT-method, math-derived from Apple\'s CIPhotoEffect filters). Instagram group: Clarendon, Gingham, Moon, Lark, Reyes, Juno, Slumber, Crema, Ludwig, Aden, Perpetua, Amaro, Mayfair, Rise, Hudson, Valencia, X-Pro II, Sierra, Willow, Lo-Fi, Inkwell, Nashville, 1977, Kelvin, Toaster (CSS+tint method via CSSgram).',
+        '🎚️ Multi-stack: click chips to add filters, each gets a strength slider in the stack below (0–100). Stack order matters — earlier filters apply first. Click the × on a stack item to remove it. CLEAR wipes the whole stack.',
+        '🖼️ Per-filter thumbnails preview the look on YOUR media (a center crop of the loaded image, or the first decoded frame for video). Built lazily when you open the section, cached until you load new media.',
+        '🎲 Trial Reel now occasionally picks a random Instagram filter at modest strength (~55% chance, 35–70 strength). LUT iPhone filters skipped here — they\'re heavier and would clash with random adjustments. Single filter only — no surprise stacks.',
+      ]},
+      { h: 'How it bakes into export', items: [
+        'Local exports (Fast / Reliable / Legacy / Image): filters are baked into pixels via the same render pipeline the carousel already uses. CSS-method filters use ctx.filter; LUT-method filters run a getImageData/putImageData pixel pass; tints overlay with their blend mode. All three local engines + image export get full filter support.',
+        'Cloud export: filters are NOT yet baked server-side — the cloud server\'s ffmpeg pipeline only knows about adjustments + caption + vignette + mirror right now. v4.2.24 will port the CSS filter expressions into Python ffmpeg expressions on the droplet. For now, if you have filters active and pick Cloud, you\'ll see a one-time toast warning that filters will be skipped — switch to Fast/Reliable to keep them.',
+      ]},
+      { h: 'State + history', items: [
+        'Filters and per-filter strengths are part of the editor snapshot, so undo/redo replays them. Auto-save persists them across sessions via the same crash-recovery hook that handles caption + adjustments.',
+        'Filter section badge shows the count of active filters, so you can collapse it without losing track.',
+      ]},
+      { h: 'Coming next', items: [
+        'v4.2.24: server-side ffmpeg filter expressions so Cloud renders the same CSS-method filters as local. LUT-method (Vivid/Mono/Noir) needs .cube LUT files baked from the JS LUT functions — bigger scope, slated for after that.',
+      ]},
+    ]
+  },
+  {
     version: '4.2.22',
     date: '2026-05-06',
     title: 'Caption style modes — Bar (Snapchat) / Box (Reels) / Plain',
@@ -14006,6 +14348,11 @@ function ensurePatchNotesModal() {
 
 // Bind cogwheel + patch notes — both build their modal lazily on first click.
 document.addEventListener('DOMContentLoaded', () => {
+  // v4.2.23: paint the editor filter section's empty-state placeholder on
+  // initial load so the panel doesn't look broken until media is added.
+  if (typeof renderEditorFilterChips === 'function') {
+    try { renderEditorFilterChips(); } catch (_) {}
+  }
   const cog = document.getElementById('settingsBtn');
   if (cog) cog.addEventListener('click', () => {
     ensureSettingsModal();
@@ -14087,6 +14434,8 @@ function isRecoverySnapshotInteresting(snap) {
   if (snap.outlineEnabled) return true;
   if (snap.fontIndex !== 0 || snap.captionSize !== 36 || snap.bgOpacity !== 55) return true;
   if (snap.mirror) return true;
+  // v4.2.23: filter chips count as interesting state worth restoring
+  if (Array.isArray(snap.filters) && snap.filters.length > 0) return true;
   return false;
 }
 
@@ -14108,6 +14457,11 @@ function showRecoveryPrompt(snap, ts) {
   }
   if (snap.outlineEnabled) {
     lines.push(`<div><span style="color:var(--text-faint);">outline</span> — width ${snap.outlineWidth}, color ${snap.outlineColor}</div>`);
+  }
+  // v4.2.23: surface restored filter chips so users know they're coming back
+  if (Array.isArray(snap.filters) && snap.filters.length > 0) {
+    const labels = snap.filters.map(id => (typeof FILTER_BY_ID !== 'undefined' && FILTER_BY_ID[id] ? FILTER_BY_ID[id].label : id)).join(', ');
+    lines.push(`<div><span style="color:var(--text-faint);">filters</span> — ${escapeHtml(labels)}</div>`);
   }
   overlay.innerHTML = `
     <div class="picker-modal" style="max-width:min(460px,calc(100vw - 32px));width:min(460px,calc(100vw - 32px));">
