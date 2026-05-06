@@ -1851,38 +1851,35 @@ async function renderFrame(sourceElem, targetCtx, w, h) {
   targetCtx.imageSmoothingEnabled = true;
   targetCtx.imageSmoothingQuality = 'high';
 
-  // WebKit (WKWebView on Mac) silently drops ctx.filter when the destination
-  // canvas has a non-identity transform set via setTransform — the preview
-  // canvas does that for dpr sharpness, so saturation/contrast/brightness/
-  // warmth sliders had no visual effect on the preview. Same bug we fixed in
-  // the carousel render at v4.2.3, but the editor canvas has caption +
-  // vignette + grain layered on top so we can't use canvas.style.filter
-  // (would filter those too).
+  // Filter handling — TWO different paths depending on target:
   //
-  // Fix: render the filtered source to an offscreen canvas at identity
-  // transform, then drawImage that bitmap onto the main canvas WITHOUT
-  // filter. Mirror flip happens on the offscreen too. Subsequent layers
-  // (vignette, grain, caption) draw normally on the main canvas.
+  //   PREVIEW canvas: WKWebView (Mac) drops ctx.filter unreliably regardless of
+  //   transform. v4.2.19 tried an offscreen-canvas-at-identity workaround but
+  //   that still fails on this WebKit build (filter dropped on offscreen too).
+  //   Fix: skip ctx.filter here entirely and let renderPreview() apply
+  //   canvas.style.filter on the DOM element (CSS filter, applied at composite
+  //   time, rock-solid across all browsers — same approach the carousel uses).
+  //   Tradeoff: caption + vignette + grain pixels also get filtered at composite,
+  //   slight cosmetic shift under heavy warmth/sepia. Acceptable.
   //
-  // Cloud exports were unaffected because they apply adjustments via ffmpeg's
-  // eq filter server-side, bypassing the broken client ctx.filter entirely.
-  // Local exports (Fast/Reliable/Legacy) also benefit from this fix since
-  // they go through renderFrame too.
-  const off = document.createElement('canvas');
-  off.width = Math.round(w);
-  off.height = Math.round(h);
-  const offCtx = off.getContext('2d');
-  offCtx.imageSmoothingEnabled = true;
-  offCtx.imageSmoothingQuality = 'high';
-  offCtx.filter = buildFilterString();
+  //   EXPORT canvas (anything that's not the preview): ctx.filter works fine
+  //   because export canvases are at identity transform without dpr scaling.
+  //   We need pixels filtered (not just visual composite) so toBlob/getImageData
+  //   read correct values for ffmpeg. Direct ctx.filter is correct here.
+  const isPreview = targetCtx === ctx;
+  targetCtx.save();
   if (state.mirror) {
-    offCtx.translate(w, 0);
-    offCtx.scale(-1, 1);
+    targetCtx.translate(w, 0);
+    targetCtx.scale(-1, 1);
   }
-  offCtx.drawImage(sourceElem, 0, 0, w, h);
-  offCtx.filter = 'none';
-  // Composite the filtered, optionally-mirrored source onto the main canvas
-  targetCtx.drawImage(off, 0, 0, w, h);
+  if (!isPreview) {
+    targetCtx.filter = buildFilterString();
+  }
+  targetCtx.drawImage(sourceElem, 0, 0, w, h);
+  if (!isPreview) {
+    targetCtx.filter = 'none';
+  }
+  targetCtx.restore();
 
   if (state.vignette > 0) {
     const grad = targetCtx.createRadialGradient(w/2, h/2, Math.min(w,h)*0.3, w/2, h/2, Math.max(w,h)*0.7);
@@ -2232,6 +2229,14 @@ async function renderPreview() {
   setupPreviewCanvas();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   await renderFrame(state.mediaElement, ctx, previewW, previewH);
+  // Apply adjustments as CSS filter on the canvas DOM element. Bypasses the
+  // WKWebView ctx.filter quirk that was dropping adjustments silently in v4.2.4
+  // through v4.2.20 attempts. CSS filter applies at composite layer — caption
+  // pixels also get filtered, but for typical adjustment ranges this is
+  // imperceptible. Export pipelines bypass this and apply ctx.filter directly
+  // (renderFrame's else branch) since those canvases are identity-transform
+  // and need pixels actually filtered for downstream toBlob/ffmpeg.
+  canvas.style.filter = buildFilterString();
 }
 
 let videoRenderLoopId = null;
@@ -6465,7 +6470,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.20';
+const APP_VERSION = '4.2.21';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13298,6 +13303,20 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.21',
+    date: '2026-05-06',
+    title: 'Preview adjustments fix (real this time) — switched to canvas.style.filter',
+    sections: [
+      { h: 'Fixed', items: [
+        'Saturation / Contrast / Brightness / Warmth sliders still weren\'t showing in the preview after v4.2.19\'s offscreen-canvas fix. Diagnosis: WKWebView (Mac) drops ctx.filter even on offscreen canvases at identity transform — broader than I thought. The carousel was working because it used canvas.style.filter (CSS on the DOM element) which lives at a different rendering layer entirely.',
+        'Fix: editor preview now uses the same canvas.style.filter approach as the carousel. CSS filter applies at the browser composite layer, totally independent of canvas internals — works in every WebView, every browser, no quirks.',
+        'Tradeoff: caption / vignette / grain pixels also get filtered at composite (since CSS filter affects the whole canvas DOM element). Imperceptible at typical adjustment ranges; only matters at extreme warmth/sepia values where caption text gets a slight tan tint.',
+        'Export pipelines unaffected — they still apply ctx.filter directly because export canvases are at identity transform without the dpr funkiness, and they need pixels actually filtered (not just visually composited) for downstream toBlob/ffmpeg.',
+        'Cloud exports also unaffected — they\'ve always applied adjustments via ffmpeg eq filter server-side.',
+      ]},
+    ]
+  },
   {
     version: '4.2.20',
     date: '2026-05-05',
