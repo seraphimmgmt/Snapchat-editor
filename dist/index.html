@@ -1389,13 +1389,22 @@ EXPORT TO DRIVE
       // Materialize each dropped path into a real File. Pair files with paths
       // so we can later record paths in Recents (file picker uploads have no
       // path, but Tauri drops do).
+      //
+      // We also stash the disk path on the File object as `__diskPath`. This
+      // lets the cloud export skip the slow JS→Rust byte-spool step: instead
+      // of `Array.from(uint8array)` (which serializes via JSON and crawls on
+      // big files), we just pass the disk path to Rust which reads the file
+      // directly. Saves 5–15s on a typical 7MB upload. File-picker uploads
+      // don't have a path so they fall back to the slow path.
       const files = [];
       const filePaths = [];
       for (const p of paths) {
         try {
           const bytes = await invoke('read_user_file', { path: p });
           const name = p.split(/[\\/]/).pop() || 'dropped';
-          files.push(new File([new Uint8Array(bytes)], name, { type: guessMime(name) }));
+          const f = new File([new Uint8Array(bytes)], name, { type: guessMime(name) });
+          try { f.__diskPath = p; } catch (_) {}
+          files.push(f);
           filePaths.push(p);
         } catch (err) {
           console.error('[drop] could not read', p, err);
@@ -4593,18 +4602,30 @@ async function exportVideoCloud() {
     throw new Error('temp dir: ' + describeError(e));
   }
 
-  setExportStatus(`SPOOLING SOURCE TO TEMP (${sourceMB} MB)...`, 'info', 0.05, { showCancel: true });
-  try {
-    const sourceBytes = new Uint8Array(await sourceBlob.arrayBuffer());
-    await invoke('write_temp_bytes', { dir: tmpDir, name: 'source.mp4', bytes: Array.from(sourceBytes) });
-    debug('spooled source');
-  } catch (e) {
-    try { await invoke('delete_temp_file', { path: tmpDir }); } catch {}
-    setExportStep('demux', 'failed');
-    setExportStatus('TEMP WRITE FAILED: ' + describeError(e), 'error');
-    throw new Error('temp write source: ' + describeError(e));
+  // Fast path: if the source File came from drag-drop, we already have the
+  // original disk path stashed on it. Skip the slow JS→Rust byte-spool entirely
+  // and let Rust read the file directly. Saves 5–15s on a typical 7MB upload
+  // (the JSON-encoded Array.from(uint8array) IPC path is the bottleneck).
+  // Slow path: file came from a picker / Drive / fetch — no disk path, have to
+  // serialize bytes across the bridge.
+  let sourcePath;
+  if (sourceBlob && sourceBlob.__diskPath) {
+    sourcePath = sourceBlob.__diskPath;
+    debug('using direct disk path (fast path)', sourcePath);
+  } else {
+    setExportStatus(`SPOOLING SOURCE TO TEMP (${sourceMB} MB)...`, 'info', 0.05, { showCancel: true });
+    try {
+      const sourceBytes = new Uint8Array(await sourceBlob.arrayBuffer());
+      await invoke('write_temp_bytes', { dir: tmpDir, name: 'source.mp4', bytes: Array.from(sourceBytes) });
+      sourcePath = tmpDir + '/source.mp4';
+      debug('spooled source via IPC (slow path)');
+    } catch (e) {
+      try { await invoke('delete_temp_file', { path: tmpDir }); } catch {}
+      setExportStep('demux', 'failed');
+      setExportStatus('TEMP WRITE FAILED: ' + describeError(e), 'error');
+      throw new Error('temp write source: ' + describeError(e));
+    }
   }
-  const sourcePath = tmpDir + '/source.mp4';
   setExportStep('demux', 'done');
 
   // ---- Phase 2: caption overlay PNG ----
@@ -4642,6 +4663,9 @@ async function exportVideoCloud() {
     war: state.warmth | 0,
     gra: state.grain | 0,
     vig: state.vignette | 0,
+    // Mirror is a transform (hflip), not technically an adjustment, but lives
+    // in the same JSON blob to keep the server's args signature simple.
+    mirror: !!state.mirror,
   };
   const args = {
     width: w, height: h, fps: targetFps,
@@ -6441,7 +6465,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.19';
+const APP_VERSION = '4.2.20';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13274,6 +13298,22 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.20',
+    date: '2026-05-05',
+    title: 'Cloud render — mirror flip server-side + drag-drop fast path',
+    sections: [
+      { h: 'New', items: [
+        '↔️ MIRROR flip now works in Cloud export. Server adds ffmpeg hflip to the filter chain when state.mirror is on. Previously Cloud silently ignored the toggle.',
+        '🚀 Faster cloud uploads for drag-dropped files. When a video is loaded via Tauri drag-drop we already have the original disk path — now we pass it directly to the Rust render command and let it read the file from disk. Skips the slow JS→Rust byte-spool step (`Array.from(uint8array)` was JSON-serializing 7M+ numbers across the IPC bridge, ~5–15s overhead).',
+        'File-picker uploads (no disk path available) fall through to the existing slow path. No behavior change there.',
+      ]},
+      { h: 'Coming next', items: [
+        'Cloud filter presets (Clarendon, Gingham, Lark, etc.) — partial-strength sepia/grayscale via ffmpeg gets fiddly so split into its own release. Use Fast/Reliable mode if you need filters in the meantime.',
+        'Tauri Channel API for byte streams — eliminates the slow path even for non-drag-drop uploads. Bigger refactor, deferred.',
+      ]},
+    ]
+  },
   {
     version: '4.2.19',
     date: '2026-05-05',
