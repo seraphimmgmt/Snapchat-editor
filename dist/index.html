@@ -2791,9 +2791,62 @@ function buildStepHtml() {
   return html;
 }
 
+// Live elapsed-time ticker for indeterminate phases. Appended to the displayed
+// message every second so users can tell "still working" from "frozen". Auto-
+// applies to every setExportStatus call across the app — Fast/Reliable/Legacy/
+// Cloud video exports, image exports, Drive uploads, carousel renders. Don't
+// add per-callsite tickers; just let this global one handle it.
+let _statusTickerInterval = null;
+let _statusTickerStart = 0;
+let _statusTickerBase = '';
+let _statusTickerHadSpinner = false;
+
+function _stopStatusTicker() {
+  if (_statusTickerInterval) {
+    clearInterval(_statusTickerInterval);
+    _statusTickerInterval = null;
+  }
+  _statusTickerBase = '';
+}
+
+function _renderStatusTickerTick() {
+  if (!_statusTickerBase) return;
+  const elapsed = ((performance.now() - _statusTickerStart) / 1000).toFixed(0);
+  const augmented = `${_statusTickerBase} · ${elapsed}s`;
+  // Update the mini status bar (.status-msg span). innerHTML preserved so the
+  // spinner element stays intact across ticks.
+  const msgEl = document.querySelector('#exportStatus .status-msg');
+  if (msgEl) {
+    const spinner = _statusTickerHadSpinner ? '<span class="status-spinner"></span>' : '';
+    msgEl.innerHTML = spinner + augmented;
+  }
+  // Mirror into the full-screen download modal if it's open
+  const modalEl = document.getElementById('editorDownloadStatus');
+  if (modalEl) modalEl.textContent = augmented;
+}
+
 function setExportStatus(msg, type = 'info', progress = null, options = {}) {
   const { indeterminate = false, showCancel = false, showSteps = true } = options;
   const el = document.getElementById('exportStatus');
+
+  // Manage the elapsed-time ticker BEFORE rebuilding DOM. Conditions for a
+  // ticker to run: type === 'info', indeterminate === true (no specific %).
+  // Determinate progress (we know the %) doesn't need elapsed time — the bar
+  // tells you everything. Success/error end states stop the ticker.
+  const tickerEligible = type === 'info' && indeterminate && progress === null;
+  if (tickerEligible) {
+    if (msg !== _statusTickerBase) {
+      // New indeterminate phase — restart the counter from zero
+      _statusTickerBase = msg;
+      _statusTickerStart = performance.now();
+      _statusTickerHadSpinner = true;  // we always render a spinner for indeterminate
+      if (_statusTickerInterval) clearInterval(_statusTickerInterval);
+      _statusTickerInterval = setInterval(_renderStatusTickerTick, 1000);
+    }
+    // Same msg called repeatedly → leave ticker running with accumulated time
+  } else {
+    _stopStatusTicker();
+  }
   // Detect transitions to success / error so we ring the SFX once per
   // change (not every progress tick that's also flagged success).
   const wasSuccess = el.classList.contains('success');
@@ -2859,6 +2912,7 @@ function setExportStatus(msg, type = 'info', progress = null, options = {}) {
 function clearExportStatus() {
   document.getElementById('exportStatus').classList.add('hidden');
   resetExportSteps();
+  _stopStatusTicker();
 }
 
 // ============================================================================
@@ -4459,22 +4513,6 @@ function describeError(e) {
   return String(e) || 'unknown error';
 }
 
-// Periodic status updater for indeterminate phases. Shows a live elapsed-time
-// counter so users can tell the export is alive vs. genuinely hung. Returns
-// a stop function — call it when the phase ends.
-function startPhaseTicker(getLabel) {
-  const start = performance.now();
-  let stopped = false;
-  const tick = () => {
-    if (stopped) return;
-    const elapsed = ((performance.now() - start) / 1000).toFixed(0);
-    setExportStatus(`${getLabel(elapsed)} · ${elapsed}s elapsed`, 'info', null, { indeterminate: true, showCancel: true });
-  };
-  tick();
-  const id = setInterval(tick, 1000);
-  return () => { stopped = true; clearInterval(id); };
-}
-
 async function exportVideoCloud() {
   const { w, h } = getExportDimensions();
   if (!w || !h) {
@@ -4594,12 +4632,9 @@ async function exportVideoCloud() {
   setExportStep('mux', 'active');
   debug('phase 3: cloud_render', { url: prefs.url, sourceMB, overlayPath, args });
 
-  const stopTicker = startPhaseTicker((sec) => {
-    // Below 10s = upload likely; 10-60s = server encoding; 60+ = stuck or huge file
-    if (sec < 10) return `UPLOADING ${sourceMB} MB TO CLOUD`;
-    if (sec < 90) return `CLOUD ENCODING (libx264 @ ~15 Mbps)`;
-    return `STILL ENCODING — large clip or server backlog`;
-  });
+  // Indeterminate status — global setExportStatus ticker auto-appends "· Xs"
+  // every second so user sees it's alive. No local ticker needed.
+  setExportStatus(`UPLOADING ${sourceMB} MB TO CLOUD + ENCODING (libx264 @ ~15 Mbps)`, 'info', null, { indeterminate: true, showCancel: true });
 
   let outputPath;
   try {
@@ -4612,14 +4647,12 @@ async function exportVideoCloud() {
     });
     debug('cloud_render returned', outputPath);
   } catch (e) {
-    stopTicker();
     setExportStep('mux', 'failed');
     try { await invoke('delete_temp_file', { path: tmpDir }); } catch {}
     const msg = describeError(e);
     setExportStatus('CLOUD RENDER FAILED: ' + msg, 'error');
     throw new Error('cloud_render: ' + msg);
   }
-  stopTicker();
 
   // ---- Phase 4: read result + cleanup ----
   setExportStep('mux', 'done');
@@ -6379,7 +6412,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.14';
+const APP_VERSION = '4.2.15';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13204,6 +13237,23 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.15',
+    date: '2026-05-05',
+    title: 'Live elapsed-time counter on every export modal (not just cloud)',
+    sections: [
+      { h: 'New', items: [
+        'The "is it stuck?" question goes away. setExportStatus now appends "· Xs" to every indeterminate phase and updates every second. Applies automatically to Fast (WebCodecs), Reliable (FFmpeg), Legacy (MediaRecorder), Cloud, image exports, and carousel renders — every existing call site benefits with no per-callsite refactoring.',
+        'Determinate progress (with %) is unchanged — the bar already tells you everything. Only "indeterminate" / spinner phases get the elapsed counter.',
+        'Counter resets when the phase label changes (so each step starts at 0s) and stops on success/error.',
+        'Examples you\'ll now see: "LOADING FFMPEG · 4s", "DEMUXING SOURCE · 12s", "ENCODING VIDEO · 47s", "UPLOADING TO CLOUD · 8s", "INJECTING IPHONE METADATA · 1s".',
+      ]},
+      { h: 'Internals', items: [
+        'Single global ticker (vs. per-callsite) means no two pieces of code can fight over the displayed status. Removes the local startPhaseTicker from cloud export which would have conflicted.',
+        'Drive uploads keep their own per-file progress UI (already shows active/done/fail + byte counts). Not affected by this change.',
+      ]},
+    ]
+  },
   {
     version: '4.2.14',
     date: '2026-05-05',
