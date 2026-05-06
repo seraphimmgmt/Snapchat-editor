@@ -5906,13 +5906,19 @@ async function handleExport() {
       const isSuccess = statusEl && statusEl.classList.contains('success');
       if (isError) {
         const errText = exportError || (statusEl ? statusEl.textContent.replace(/^EXPORT FAILED:?\s*/i, '').trim() : 'Unknown error');
+        // Suggest a different engine to fall back to. Cloud is the most
+        // reliable option (server-side, deterministic) so always suggest it
+        // unless that's the one that just failed. If Cloud failed, the issue
+        // is probably network or auth — suggest a local engine as backup.
         let suggestion = '';
-        if (mode === 'reliable') {
-          suggestion = 'Try switching Export Engine to Fast or Legacy in the Output panel.';
+        if (mode === 'cloud') {
+          suggestion = 'Cloud server may be down or auth token rotated. Try Reliable (FFmpeg) for a local export, or check Settings → Cloud.';
+        } else if (mode === 'reliable') {
+          suggestion = 'Try ☁️ Cloud (server-side, bypasses local hardware quirks) or Fast (WebCodecs) in the Output panel.';
         } else if (mode === 'fast') {
-          suggestion = 'Try switching Export Engine to Reliable (FFmpeg) for guaranteed software encoding.';
+          suggestion = 'Try ☁️ Cloud (server-side) or Reliable (FFmpeg) for guaranteed software encoding.';
         } else {
-          suggestion = 'Try switching Export Engine to Reliable (FFmpeg) for frame-perfect output.';
+          suggestion = 'Try ☁️ Cloud (server-side) or Reliable (FFmpeg) for frame-perfect output.';
         }
         editorDownloadShowError(errText, suggestion);
       } else if (isSuccess) {
@@ -6412,7 +6418,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.16';
+const APP_VERSION = '4.2.17';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -12955,8 +12961,10 @@ function ensureSettingsModal() {
               <option value="fast">Fast (WebCodecs)</option>
               <option value="reliable">Reliable (FFmpeg)</option>
               <option value="legacy">Legacy (MediaRecorder)</option>
+              <option value="cloud">☁️ Cloud (DigitalOcean)</option>
             </select>
           </div>
+          <p class="settings-note" style="margin:-2px 0 8px;font-size:10px;color:var(--text-faint);">Sets the engine used when you click DOWNLOAD. Can also be changed per-export from the dropdown in the OUTPUT panel.</p>
           <div class="settings-row" style="align-items:flex-start;">
             <span style="display:flex;flex-direction:column;gap:3px;">
               <span>Default save folder</span>
@@ -13237,6 +13245,17 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.17',
+    date: '2026-05-05',
+    title: 'Cloud as default export option + suggested in failure modal',
+    sections: [
+      { h: 'New', items: [
+        'Settings → Export → "Default export engine" dropdown now includes ☁️ Cloud (DigitalOcean). Pick it once, it persists across sessions, and every export defaults to cloud render.',
+        'Export failure modal now suggests Cloud as a fallback option. Examples: Reliable failed → "Try ☁️ Cloud (server-side, bypasses local hardware quirks) or Fast (WebCodecs)". Cloud failed → "Server may be down or token rotated. Try Reliable for a local export, or check Settings → Cloud."',
+      ]},
+    ]
+  },
   {
     version: '4.2.16',
     date: '2026-05-05',
