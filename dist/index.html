@@ -6412,7 +6412,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.15';
+const APP_VERSION = '4.2.16';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13237,6 +13237,17 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.16',
+    date: '2026-05-05',
+    title: 'Fix — cloud export "refusing to read outside snapcap temp"',
+    sections: [
+      { h: 'Fixed', items: [
+        'Cloud export downloaded the rendered MP4 successfully but then errored on the read-back step with "refusing to read outside snapcap temp". Root cause: cloud_render wrote the output to /var/folders/.../scs-cloud-<uuid>/output.mp4 (using std::env::temp_dir()), but JS read_temp_file has a sandbox check that only allows paths under the snapcap subdirectory of temp. Output was outside the allowlist, read rejected.',
+        'Fix: cloud_render now writes to snapcap_temp_dir().join("cloud-<uuid>") so the output lands inside the sandbox. read_temp_file allowlist passes, JS gets the bytes, blob delivers normally.',
+      ]},
+    ]
+  },
   {
     version: '4.2.15',
     date: '2026-05-05',

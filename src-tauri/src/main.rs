@@ -951,10 +951,11 @@ async fn cloud_render(
         ));
     }
 
-    // Stream response to a temp file. Reusing the same temp-dir pattern as
-    // make_temp_dir / write_temp_bytes for consistency. Caller (JS) reads it
-    // via read_temp_file, then deletes via delete_temp_file.
-    let out_dir = std::env::temp_dir().join(format!("scs-cloud-{}", uuid::Uuid::new_v4()));
+    // Stream response to a temp file INSIDE the snapcap sandbox (so JS's
+    // read_temp_file allowlist check passes). The sandbox is
+    // std::env::temp_dir().join("snapcap"); reading from anywhere else gets
+    // rejected with "refusing to read outside snapcap temp".
+    let out_dir = snapcap_temp_dir().join(format!("cloud-{}", uuid::Uuid::new_v4().simple()));
     tokio::fs::create_dir_all(&out_dir)
         .await
         .map_err(|e| format!("temp dir: {}", e))?;
