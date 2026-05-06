@@ -4437,6 +4437,44 @@ async function renderCaptionOverlayToPng(w, h) {
   return await new Promise(r => c.toBlob(r, 'image/png'));
 }
 
+// Robust error → string. Tauri 2 errors come through invoke() catches in
+// multiple shapes: plain strings (when Rust returns Err(String)), Error
+// instances, plain objects with .message, etc. Falling through to "unknown
+// error" hides the real cause — extract whatever we can find.
+function describeError(e) {
+  if (e == null) return 'unknown error';
+  if (typeof e === 'string') return e || 'empty error';
+  if (typeof e === 'object') {
+    if (e.message) return String(e.message);
+    if (e.error) return String(e.error);
+    if (e.toString && e.toString !== Object.prototype.toString) {
+      const s = e.toString();
+      if (s && s !== '[object Object]') return s;
+    }
+    try {
+      const j = JSON.stringify(e);
+      if (j && j !== '{}' && j !== 'null') return j;
+    } catch (_) {}
+  }
+  return String(e) || 'unknown error';
+}
+
+// Periodic status updater for indeterminate phases. Shows a live elapsed-time
+// counter so users can tell the export is alive vs. genuinely hung. Returns
+// a stop function — call it when the phase ends.
+function startPhaseTicker(getLabel) {
+  const start = performance.now();
+  let stopped = false;
+  const tick = () => {
+    if (stopped) return;
+    const elapsed = ((performance.now() - start) / 1000).toFixed(0);
+    setExportStatus(`${getLabel(elapsed)} · ${elapsed}s elapsed`, 'info', null, { indeterminate: true, showCancel: true });
+  };
+  tick();
+  const id = setInterval(tick, 1000);
+  return () => { stopped = true; clearInterval(id); };
+}
+
 async function exportVideoCloud() {
   const { w, h } = getExportDimensions();
   if (!w || !h) {
@@ -4452,7 +4490,7 @@ async function exportVideoCloud() {
   const prefs = getCloudPrefs();
   if (!prefs.url || !prefs.token) {
     setExportStep('demux', 'failed');
-    setExportStatus('CLOUD URL OR TOKEN MISSING — Settings → Cloud', 'error');
+    setExportStatus('CLOUD URL OR TOKEN MISSING — open Settings → Cloud and paste the URL + token', 'error');
     return;
   }
 
@@ -4462,10 +4500,15 @@ async function exportVideoCloud() {
     return;
   }
   const invoke = window.__TAURI__.core.invoke;
+  const debug = (msg, extra) => {
+    console.log('[cloud]', msg, extra ?? '');
+  };
 
-  // Source video — must have real bytes. Spool to a temp file so the Rust
-  // command can stream it without a JS↔Rust copy of the whole video.
-  setExportStatus('PREPARING SOURCE...', 'info', null, { indeterminate: true, showCancel: true });
+  // ---- Phase 1: source video → temp file ----
+  // Spool source video bytes to disk so Rust can stream the upload without
+  // JS↔Rust copying the entire blob across the bridge.
+  setExportStatus('PREPARING SOURCE VIDEO...', 'info', 0.02, { indeterminate: false, showCancel: true });
+  debug('phase 1: preparing source');
   let sourceBlob = __lastVideoFile;
   if (!sourceBlob) {
     try {
@@ -4473,23 +4516,43 @@ async function exportVideoCloud() {
       sourceBlob = await r.blob();
     } catch (e) {
       setExportStep('demux', 'failed');
-      setExportStatus('Could not load source video: ' + e.message, 'error');
-      return;
+      setExportStatus('SOURCE VIDEO LOAD FAILED: ' + describeError(e), 'error');
+      throw new Error('source load: ' + describeError(e));
     }
   }
+  const sourceMB = (sourceBlob.size / 1024 / 1024).toFixed(1);
+  debug(`source size: ${sourceMB} MB`);
 
-  const tmpDir = await invoke('make_temp_dir', { prefix: 'cloud' });
-  const sourceBytes = new Uint8Array(await sourceBlob.arrayBuffer());
-  await invoke('write_temp_bytes', { dir: tmpDir, name: 'source.mp4', bytes: Array.from(sourceBytes) });
+  let tmpDir;
+  try {
+    tmpDir = await invoke('make_temp_dir', { prefix: 'cloud' });
+    debug('tmpDir', tmpDir);
+  } catch (e) {
+    setExportStep('demux', 'failed');
+    setExportStatus('TEMP DIR CREATE FAILED: ' + describeError(e), 'error');
+    throw new Error('temp dir: ' + describeError(e));
+  }
+
+  setExportStatus(`SPOOLING SOURCE TO TEMP (${sourceMB} MB)...`, 'info', 0.05, { showCancel: true });
+  try {
+    const sourceBytes = new Uint8Array(await sourceBlob.arrayBuffer());
+    await invoke('write_temp_bytes', { dir: tmpDir, name: 'source.mp4', bytes: Array.from(sourceBytes) });
+    debug('spooled source');
+  } catch (e) {
+    try { await invoke('delete_temp_file', { path: tmpDir }); } catch {}
+    setExportStep('demux', 'failed');
+    setExportStatus('TEMP WRITE FAILED: ' + describeError(e), 'error');
+    throw new Error('temp write source: ' + describeError(e));
+  }
   const sourcePath = tmpDir + '/source.mp4';
-
-  // Caption overlay PNG (transparent, full output resolution). renderCaption()
-  // reused verbatim → multi-line / emoji / outline / background-bar look identical
-  // to preview. Captions don't animate per-frame in this app, so a single PNG
-  // overlay suffices and the server applies it to every frame via ffmpeg overlay.
   setExportStep('demux', 'done');
+
+  // ---- Phase 2: caption overlay PNG ----
+  // renderCaption() reused verbatim onto a transparent canvas at output res.
+  // Single PNG covers all frames since captions don't animate in this app.
   setExportStep('video', 'active');
-  setExportStatus('RENDERING CAPTION OVERLAY...', 'info', 0.05, { showCancel: true });
+  setExportStatus('RENDERING CAPTION OVERLAY...', 'info', 0.10, { showCancel: true });
+  debug('phase 2: caption overlay');
   let overlayPath = null;
   try {
     const captionBlob = await renderCaptionOverlayToPng(w, h);
@@ -4497,14 +4560,21 @@ async function exportVideoCloud() {
       const captionBytes = new Uint8Array(await captionBlob.arrayBuffer());
       await invoke('write_temp_bytes', { dir: tmpDir, name: 'caption.png', bytes: Array.from(captionBytes) });
       overlayPath = tmpDir + '/caption.png';
+      debug('caption overlay written');
+    } else {
+      debug('no caption — overlay skipped');
     }
   } catch (e) {
-    console.warn('[cloud] caption overlay render failed:', e);
-    // Non-fatal — proceed without overlay. User won't see captions in output.
+    // Non-fatal: caption fails → render without it. Better than failing the export.
+    console.warn('[cloud] caption overlay failed (proceeding without):', e);
   }
+  setExportStep('video', 'done');
 
-  // Adjustments map to the server's adj keys (which translate to ffmpeg eq /
-  // colorbalance / vignette / noise filters).
+  // ---- Phase 3: cloud render (the big one) ----
+  // Rust cloud_render: multipart POST (upload), waits for ffmpeg encode on
+  // server, streams response back. We can't get incremental progress events
+  // from inside the single Rust call without more plumbing — for now show a
+  // live elapsed-time counter so it doesn't look frozen.
   const adjustments = {
     sat: state.saturation | 0,
     con: state.contrast | 0,
@@ -4522,12 +4592,15 @@ async function exportVideoCloud() {
 
   setExportStep('audio', 'skipped');
   setExportStep('mux', 'active');
-  setExportStatus('UPLOADING TO CLOUD + ENCODING (libx264 @ ~15 Mbps)...', 'info', null, { indeterminate: true, showCancel: true });
+  debug('phase 3: cloud_render', { url: prefs.url, sourceMB, overlayPath, args });
 
-  // The Rust cloud_render command does the multipart upload, encode wait, and
-  // download in one shot. Rust HTTP bypasses macOS App Transport Security which
-  // blocks plain http:// from WKWebView. Returns the path to the downloaded
-  // output.mp4 in a temp dir. We read it back via read_temp_file.
+  const stopTicker = startPhaseTicker((sec) => {
+    // Below 10s = upload likely; 10-60s = server encoding; 60+ = stuck or huge file
+    if (sec < 10) return `UPLOADING ${sourceMB} MB TO CLOUD`;
+    if (sec < 90) return `CLOUD ENCODING (libx264 @ ~15 Mbps)`;
+    return `STILL ENCODING — large clip or server backlog`;
+  });
+
   let outputPath;
   try {
     outputPath = await invoke('cloud_render', {
@@ -4537,24 +4610,38 @@ async function exportVideoCloud() {
       overlayPath: overlayPath || null,
       argsJson: JSON.stringify(args),
     });
+    debug('cloud_render returned', outputPath);
   } catch (e) {
+    stopTicker();
     setExportStep('mux', 'failed');
-    // Cleanup source temp before returning error
     try { await invoke('delete_temp_file', { path: tmpDir }); } catch {}
-    throw new Error(typeof e === 'string' ? e : (e.message || 'cloud render failed'));
+    const msg = describeError(e);
+    setExportStatus('CLOUD RENDER FAILED: ' + msg, 'error');
+    throw new Error('cloud_render: ' + msg);
   }
+  stopTicker();
 
-  // Read the rendered MP4 back into a blob
+  // ---- Phase 4: read result + cleanup ----
   setExportStep('mux', 'done');
   setExportStep('save', 'active');
-  setExportStatus('FINALIZING...', 'info', 0.95);
-  const outBytes = await invoke('read_temp_file', { path: outputPath });
+  setExportStatus('READING RESULT FROM TEMP...', 'info', 0.95, { showCancel: false });
+  debug('phase 4: reading result');
+
+  let outBytes;
+  try {
+    outBytes = await invoke('read_temp_file', { path: outputPath });
+  } catch (e) {
+    setExportStep('save', 'failed');
+    try { await invoke('delete_temp_file', { path: tmpDir }); } catch {}
+    setExportStatus('RESULT READ FAILED: ' + describeError(e), 'error');
+    throw new Error('result read: ' + describeError(e));
+  }
   let finalBlob = new Blob([new Uint8Array(outBytes)], { type: 'video/mp4' });
+  debug(`output size: ${(finalBlob.size / 1024 / 1024).toFixed(1)} MB`);
 
   // Cleanup both temp dirs (source + output)
   try { await invoke('delete_temp_file', { path: tmpDir }); } catch {}
   try {
-    // outputPath is e.g. /tmp/scs-cloud-<uuid>/output.mp4 — delete the parent
     const outDir = outputPath.replace(/\/[^/]+$/, '');
     if (outDir && outDir !== outputPath) await invoke('delete_temp_file', { path: outDir });
   } catch {}
@@ -5748,8 +5835,14 @@ async function handleExport() {
           handled = true;
         } catch (e) {
           console.error('Cloud export threw:', e);
-          exportError = (e && e.message) ? e.message : 'unknown error';
-          setExportStatus('CLOUD EXPORT FAILED: ' + exportError + ' — check Settings → Cloud, or try Fast/Reliable', 'error');
+          exportError = describeError(e);
+          // Don't overwrite status if exportVideoCloud already set a specific
+          // error message (its phase-specific errors are more informative than
+          // a generic "CLOUD EXPORT FAILED" wrapper)
+          const statusEl = document.getElementById('exportStatus');
+          if (!statusEl || !statusEl.classList.contains('error')) {
+            setExportStatus('CLOUD EXPORT FAILED: ' + exportError + ' — check Settings → Cloud, or try Fast/Reliable', 'error');
+          }
           handled = true;
         }
       } else {
@@ -5765,7 +5858,7 @@ async function handleExport() {
     }
   } catch (e) {
     console.error(e);
-    exportError = (e && e.message) ? e.message : 'unknown error';
+    exportError = describeError(e);
     setExportStatus('EXPORT FAILED: ' + exportError, 'error');
   } finally {
     state.isExporting = false;
@@ -6286,7 +6379,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.13';
+const APP_VERSION = '4.2.14';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13111,6 +13204,19 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.14',
+    date: '2026-05-05',
+    title: 'Cloud export: live elapsed-time counter + actual error messages (no more "unknown error")',
+    sections: [
+      { h: 'Fixed', items: [
+        '"unknown error" on cloud export failures hid the actual cause. Tauri 2 returns Err(String) from Rust commands as a plain JS string (no `.message` property), and the old catch handler fell through to the generic fallback. Replaced with a describeError() helper that handles strings, Error objects, plain objects with .message / .error keys, and JSON-serializable objects — extracts whatever info is available rather than throwing it away.',
+        'Cloud export status now shows live elapsed-time counter during the long indeterminate phases (upload + server encode). Updates every 1 second so you can see the export is alive vs. genuinely stuck. Heuristic phase labels: <10s = uploading, 10-90s = server encoding, 90+ = "still encoding — large clip or server backlog".',
+        'Each phase of the cloud export now has a specific status message: PREPARING SOURCE → SPOOLING SOURCE TO TEMP (X MB) → RENDERING CAPTION OVERLAY → UPLOADING X MB TO CLOUD → CLOUD ENCODING → READING RESULT FROM TEMP. If any step fails the status string includes the phase name + actual error.',
+        'console.log debug trail through the entire cloud export pipeline so we can copy-paste from devtools when something goes wrong (right-click → Inspect → Console).',
+      ]},
+    ]
+  },
   {
     version: '4.2.13',
     date: '2026-05-05',
