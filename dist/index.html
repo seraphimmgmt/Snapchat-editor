@@ -1842,16 +1842,38 @@ async function renderFrame(sourceElem, targetCtx, w, h) {
   targetCtx.imageSmoothingEnabled = true;
   targetCtx.imageSmoothingQuality = 'high';
 
-  // Mirror flip applies to the source media only, not to the caption overlay
-  targetCtx.save();
+  // WebKit (WKWebView on Mac) silently drops ctx.filter when the destination
+  // canvas has a non-identity transform set via setTransform — the preview
+  // canvas does that for dpr sharpness, so saturation/contrast/brightness/
+  // warmth sliders had no visual effect on the preview. Same bug we fixed in
+  // the carousel render at v4.2.3, but the editor canvas has caption +
+  // vignette + grain layered on top so we can't use canvas.style.filter
+  // (would filter those too).
+  //
+  // Fix: render the filtered source to an offscreen canvas at identity
+  // transform, then drawImage that bitmap onto the main canvas WITHOUT
+  // filter. Mirror flip happens on the offscreen too. Subsequent layers
+  // (vignette, grain, caption) draw normally on the main canvas.
+  //
+  // Cloud exports were unaffected because they apply adjustments via ffmpeg's
+  // eq filter server-side, bypassing the broken client ctx.filter entirely.
+  // Local exports (Fast/Reliable/Legacy) also benefit from this fix since
+  // they go through renderFrame too.
+  const off = document.createElement('canvas');
+  off.width = Math.round(w);
+  off.height = Math.round(h);
+  const offCtx = off.getContext('2d');
+  offCtx.imageSmoothingEnabled = true;
+  offCtx.imageSmoothingQuality = 'high';
+  offCtx.filter = buildFilterString();
   if (state.mirror) {
-    targetCtx.translate(w, 0);
-    targetCtx.scale(-1, 1);
+    offCtx.translate(w, 0);
+    offCtx.scale(-1, 1);
   }
-  targetCtx.filter = buildFilterString();
-  targetCtx.drawImage(sourceElem, 0, 0, w, h);
-  targetCtx.filter = 'none';
-  targetCtx.restore();
+  offCtx.drawImage(sourceElem, 0, 0, w, h);
+  offCtx.filter = 'none';
+  // Composite the filtered, optionally-mirrored source onto the main canvas
+  targetCtx.drawImage(off, 0, 0, w, h);
 
   if (state.vignette > 0) {
     const grad = targetCtx.createRadialGradient(w/2, h/2, Math.min(w,h)*0.3, w/2, h/2, Math.max(w,h)*0.7);
@@ -6419,7 +6441,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.18';
+const APP_VERSION = '4.2.19';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13252,6 +13274,19 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.19',
+    date: '2026-05-05',
+    title: 'Fix — editor preview saturation/contrast/brightness/warmth not showing (same bug as v4.2.3 carousel fix)',
+    sections: [
+      { h: 'Fixed', items: [
+        'Same WebKit ctx.filter quirk that hit the carousel in v4.2.3 was also affecting the editor view\'s preview canvas. WKWebView on Mac silently drops ctx.filter when the destination canvas has a non-identity transform — preview uses setTransform(dpr) for Retina sharpness, so the adjustment sliders rendered onto state but never affected what was on screen.',
+        'Cloud exports masked the bug because they apply adjustments via ffmpeg eq filter server-side, totally bypassing the client ctx.filter path. Local exports (Fast/Reliable/Legacy) had the same bug as preview but most testing was happening through Cloud lately.',
+        'Fix: renderFrame now draws the filtered source to an offscreen canvas at identity transform first, then composites that bitmap onto the main canvas without filter. Mirror flip happens on the offscreen too. Subsequent layers (vignette, grain, caption) keep drawing on the main canvas normally — they\'re unfiltered as intended.',
+        'Side benefit: ALL local exports (Fast/Reliable/Legacy) now bake in adjustments correctly too. Cloud was already correct via server-side ffmpeg.',
+      ]},
+    ]
+  },
   {
     version: '4.2.18',
     date: '2026-05-05',
