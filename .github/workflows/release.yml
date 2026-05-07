@@ -161,7 +161,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Snap Caption Studio ${{ github.ref_name }}'
+          releaseName: 'Seraphim Studio ${{ github.ref_name }}'
           releaseBody: 'See assets below.'
           # KEEP THE RELEASE AS A DRAFT until publish-latest-json finishes.
           # GitHub promotes any non-draft release to "latest" the moment it's
@@ -213,20 +213,20 @@ jobs:
 
           # Pull each platform's .sig from the release. Names match what
           # tauri-action uploads (mac is unversioned, Windows is versioned).
-          MAC_SIG="$DIR/Snap.Caption.Studio_aarch64.app.tar.gz.sig"
-          WIN_MSI_SIG="$DIR/Snap.Caption.Studio_${VER}_x64_en-US.msi.sig"
-          WIN_NSIS_SIG="$DIR/Snap.Caption.Studio_${VER}_x64-setup.exe.sig"
+          MAC_SIG="$DIR/Seraphim.Studio_aarch64.app.tar.gz.sig"
+          WIN_MSI_SIG="$DIR/Seraphim.Studio_${VER}_x64_en-US.msi.sig"
+          WIN_NSIS_SIG="$DIR/Seraphim.Studio_${VER}_x64-setup.exe.sig"
 
           # `gh release download` exits non-zero if a file is missing,
           # which is fine for individual platforms — we want to know.
           # Use || true so the absence of one platform doesn't kill the
           # script before we check the others.
           gh release download "$TAG" -R "$REPO" -D "$DIR" \
-            -p "Snap.Caption.Studio_aarch64.app.tar.gz.sig" --clobber 2>/dev/null || true
+            -p "Seraphim.Studio_aarch64.app.tar.gz.sig" --clobber 2>/dev/null || true
           gh release download "$TAG" -R "$REPO" -D "$DIR" \
-            -p "Snap.Caption.Studio_${VER}_x64_en-US.msi.sig" --clobber 2>/dev/null || true
+            -p "Seraphim.Studio_${VER}_x64_en-US.msi.sig" --clobber 2>/dev/null || true
           gh release download "$TAG" -R "$REPO" -D "$DIR" \
-            -p "Snap.Caption.Studio_${VER}_x64-setup.exe.sig" --clobber 2>/dev/null || true
+            -p "Seraphim.Studio_${VER}_x64-setup.exe.sig" --clobber 2>/dev/null || true
 
           python3 <<EOF > "$DIR/latest.json"
           import json, datetime, pathlib, os
@@ -234,17 +234,17 @@ jobs:
           mac = pathlib.Path(r"$MAC_SIG")
           if mac.exists():
               sig = mac.read_text().strip()
-              plats["darwin-aarch64"]     = {"signature": sig, "url": f"$BASE/Snap.Caption.Studio_aarch64.app.tar.gz"}
-              plats["darwin-aarch64-app"] = {"signature": sig, "url": f"$BASE/Snap.Caption.Studio_aarch64.app.tar.gz"}
+              plats["darwin-aarch64"]     = {"signature": sig, "url": f"$BASE/Seraphim.Studio_aarch64.app.tar.gz"}
+              plats["darwin-aarch64-app"] = {"signature": sig, "url": f"$BASE/Seraphim.Studio_aarch64.app.tar.gz"}
           wmsi = pathlib.Path(r"$WIN_MSI_SIG")
           if wmsi.exists():
               sig = wmsi.read_text().strip()
-              plats["windows-x86_64"]     = {"signature": sig, "url": f"$BASE/Snap.Caption.Studio_${VER}_x64_en-US.msi"}
-              plats["windows-x86_64-msi"] = {"signature": sig, "url": f"$BASE/Snap.Caption.Studio_${VER}_x64_en-US.msi"}
+              plats["windows-x86_64"]     = {"signature": sig, "url": f"$BASE/Seraphim.Studio_${VER}_x64_en-US.msi"}
+              plats["windows-x86_64-msi"] = {"signature": sig, "url": f"$BASE/Seraphim.Studio_${VER}_x64_en-US.msi"}
           wnsis = pathlib.Path(r"$WIN_NSIS_SIG")
           if wnsis.exists():
               sig = wnsis.read_text().strip()
-              plats["windows-x86_64-nsis"] = {"signature": sig, "url": f"$BASE/Snap.Caption.Studio_${VER}_x64-setup.exe"}
+              plats["windows-x86_64-nsis"] = {"signature": sig, "url": f"$BASE/Seraphim.Studio_${VER}_x64-setup.exe"}
           if not plats:
               print(json.dumps({"error": "no platforms had signatures — aborting"}))
               exit(1)

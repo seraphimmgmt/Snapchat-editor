@@ -6683,7 +6683,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.3.2';
+const APP_VERSION = '4.3.3';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13839,6 +13839,20 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.3.3',
+    date: '2026-05-07',
+    title: 'Auto-updater fix — v4.3.1 / v4.3.2 finally published',
+    sections: [
+      { h: 'Fixed', items: [
+        '📦 <b>Release publish workflow now uses the new Seraphim.Studio_* bundle filenames</b>. After the v4.3.1 rebrand, GitHub Actions was still looking for <code>Snap.Caption.Studio_*.sig</code> files when assembling latest.json — none of them existed, so v4.3.1 + v4.3.2 stayed as draft releases and the auto-updater kept serving v4.3.0. This release fixes the workflow + ships everything that was queued up.',
+        'You should now see v4.3.3 as the auto-update prompt — installing it gives you the SERAPHIM STUDIO rebrand, the Holographic Halo icon, the cyberpunk skin bug fixes (filter sounds, slider sync, restore z-index, background animations) all at once.',
+      ]},
+      { h: 'No app changes vs v4.3.2', items: [
+        'This is purely a publish-pipeline fix. The actual app contents are identical to what was sitting in the v4.3.2 draft.',
+      ]},
+    ]
+  },
   {
     version: '4.3.2',
     date: '2026-05-07',
