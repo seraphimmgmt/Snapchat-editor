@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seraphim Studio — Icon Options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{
+  margin:0;padding:40px 24px;background:#06060F;color:#F2F2FF;
+  font-family:'Inter',system-ui,sans-serif;
+  background-image:
+    radial-gradient(900px 700px at 80% -10%,rgba(0,240,255,.12),transparent 55%),
+    radial-gradient(900px 700px at 0% 110%,rgba(255,46,136,.18),transparent 55%);
+  min-height:100vh;
+}
+h1{font-family:'Audiowide',sans-serif;font-size:24px;letter-spacing:.18em;margin:0 0 6px;text-align:center;color:#F2F2FF}
+.sub{text-align:center;color:#82DDFF;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;margin:0 0 36px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:24px;max-width:1280px;margin:0 auto}
+.card{background:rgba(15,15,30,.55);border:1px solid rgba(0,240,255,.2);padding:24px;display:flex;flex-direction:column;align-items:center;gap:14px;position:relative;backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%)}
+.card::before{content:'';position:absolute;top:-1px;left:-1px;width:14px;height:14px;border-top:2px solid #FF2E88;border-left:2px solid #FF2E88}
+.card::after{content:'';position:absolute;bottom:-1px;right:-1px;width:14px;height:14px;border-bottom:2px solid #00F0FF;border-right:2px solid #00F0FF}
+.icon{width:128px;height:128px;border-radius:24px;display:grid;place-items:center;position:relative;overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 30px rgba(255,46,136,.18)}
+.label{font-family:'Audiowide',sans-serif;font-size:13px;letter-spacing:.18em;color:#F2F2FF;text-align:center}
+.desc{font-family:'JetBrains Mono',monospace;font-size:10px;color:#82DDFF;letter-spacing:.05em;line-height:1.5;text-align:center;max-width:230px}
+.row{display:flex;gap:8px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:9px;color:#5A4677;letter-spacing:.08em;text-transform:uppercase;border-top:1px dashed rgba(0,240,255,.12);padding-top:10px;width:100%;justify-content:center}
+.row b{color:#FF2E88}
+
+/* === ICON 1 — NEON HALO + WINGS (refined version of current icon) === */
+.icon-1{background:linear-gradient(135deg,#0F0F1A 0%,#1A0F2E 100%);box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 30px rgba(255,46,136,.30),inset 0 0 0 1px rgba(0,240,255,.18)}
+.icon-1 .halo{width:48px;height:14px;border:2.5px solid #FFE600;border-radius:50%;box-shadow:0 0 16px rgba(255,230,0,.7);position:absolute;top:30px;left:50%;transform:translateX(-50%);background:transparent}
+.icon-1 .wings{position:relative;width:84px;height:60px}
+.icon-1 .wings::before,.icon-1 .wings::after{content:'';position:absolute;top:0;width:38px;height:54px;background:linear-gradient(135deg,#FFFFFF 0%,#82DDFF 100%);border-radius:0 100% 0 100%/0 80% 0 80%;filter:drop-shadow(0 0 12px rgba(0,240,255,.6))}
+.icon-1 .wings::before{left:0;transform:scaleX(-1) rotate(-8deg)}
+.icon-1 .wings::after{right:0;transform:rotate(-8deg)}
+
+/* === ICON 2 — GEOMETRIC SERAPH (clip-path 6-winged hexagram) === */
+.icon-2{background:radial-gradient(circle at 30% 30%,#1F1A38 0%,#06060F 100%);box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 36px rgba(0,240,255,.30)}
+.icon-2 svg{width:88px;height:88px;filter:drop-shadow(0 0 14px rgba(255,46,136,.6))}
+
+/* === ICON 3 — MONOGRAM SS (Audiowide stacked letters) === */
+.icon-3{background:linear-gradient(135deg,#FF2E88 0%,#7A1A4F 50%,#06060F 100%);box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 36px rgba(255,46,136,.40)}
+.icon-3 .mono{font-family:'Audiowide',sans-serif;font-size:78px;color:#FFE600;text-shadow:0 0 18px rgba(255,230,0,.55),3px 3px 0 #06060F;letter-spacing:-.05em;font-weight:400;line-height:.85}
+
+/* === ICON 4 — CIRCUIT-WING (angular wings + tech traces) === */
+.icon-4{background:linear-gradient(180deg,#0F0F1A 0%,#06060F 100%);position:relative;box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 36px rgba(0,240,255,.34)}
+.icon-4::before{content:'';position:absolute;inset:8px;border:1px solid rgba(0,240,255,.4);clip-path:polygon(15% 0,100% 0,100% 85%,85% 100%,0 100%,0 15%)}
+.icon-4 svg{width:84px;height:84px;filter:drop-shadow(0 0 12px rgba(0,240,255,.6));position:relative;z-index:1}
+
+/* === ICON 5 — HOLOGRAPHIC HALO (rainbow gradient ring) === */
+.icon-5{background:radial-gradient(circle,#1A0F2E 0%,#06060F 100%);box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 40px rgba(255,180,255,.4)}
+.icon-5 .ring{width:90px;height:90px;border-radius:50%;background:conic-gradient(from 0deg,#FFB4FF 0deg,#82DDFF 90deg,#B4FFD4 180deg,#FFE600 270deg,#FFB4FF 360deg);position:relative;animation:iconRingSpin 8s linear infinite}
+.icon-5 .ring::after{content:'';position:absolute;inset:8px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#1A0F2E 0%,#06060F 100%)}
+.icon-5 .core{position:absolute;color:#FFE600;font-family:'Audiowide',sans-serif;font-size:44px;letter-spacing:0;text-shadow:0 0 12px rgba(255,230,0,.7);z-index:1}
+@keyframes iconRingSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+/* === ICON 6 — CYBERPUNK BADGE (square with corner cuts) === */
+.icon-6{background:linear-gradient(135deg,#06060F,#1F0A2A);clip-path:polygon(15% 0,100% 0,100% 85%,85% 100%,0 100%,0 15%);border-radius:0;box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 36px rgba(255,46,136,.5)}
+.icon-6::before{content:'S';font-family:'Audiowide',sans-serif;font-size:78px;color:#FFE600;text-shadow:0 0 18px rgba(255,230,0,.65),0 0 4px #FF2E88;letter-spacing:-.04em;line-height:1;position:absolute}
+.icon-6::after{content:'';position:absolute;inset:8px;border:1.5px solid rgba(255,46,136,.6);clip-path:polygon(15% 0,100% 0,100% 85%,85% 100%,0 100%,0 15%)}
+
+/* === ICON 7 — PIXEL HALO (retro 8-bit feel) === */
+.icon-7{background:#06060F;image-rendering:pixelated;box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 30px rgba(0,255,136,.3)}
+.icon-7 svg{width:96px;height:96px;filter:drop-shadow(0 0 8px rgba(255,230,0,.6));image-rendering:pixelated}
+
+/* === ICON 8 — DIVINE CYBERPUNK (halo + clip-path wings + neon glow) === */
+.icon-8{background:radial-gradient(ellipse at 50% 30%,#3A1A4A 0%,#06060F 100%);box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 40px rgba(255,46,136,.4),inset 0 0 0 2px rgba(255,230,0,.18)}
+.icon-8 .halo{position:absolute;top:18px;left:50%;transform:translateX(-50%);width:60px;height:18px;border:3px solid #FFE600;border-radius:50%;box-shadow:0 0 24px rgba(255,230,0,.85),0 0 8px rgba(255,230,0,1) inset}
+.icon-8 .wings-cyber{position:absolute;top:42px;left:50%;transform:translateX(-50%);width:90px;height:60px}
+.icon-8 .wings-cyber::before,.icon-8 .wings-cyber::after{
+  content:'';position:absolute;top:0;width:42px;height:60px;
+  background:linear-gradient(135deg,#FFFFFF 0%,#FFB4FF 50%,#FF2E88 100%);
+  filter:drop-shadow(0 0 10px rgba(255,46,136,.7));
+}
+.icon-8 .wings-cyber::before{left:0;clip-path:polygon(100% 0,100% 100%,60% 90%,30% 70%,0 40%,15% 25%,40% 15%,70% 5%)}
+.icon-8 .wings-cyber::after{right:0;clip-path:polygon(0 0,40% 5%,70% 15%,85% 25%,100% 40%,70% 70%,40% 90%,0 100%)}
+
+/* === ICON 9 — SACRED GEOMETRY (hexagram + halo + glyph) === */
+.icon-9{background:linear-gradient(180deg,#1A0F2E 0%,#0A0518 100%);box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 36px rgba(255,224,138,.34)}
+.icon-9 svg{width:100px;height:100px;filter:drop-shadow(0 0 10px rgba(255,224,138,.7))}
+
+/* App-tile preview row at the bottom */
+.dock{margin-top:36px;display:flex;justify-content:center;gap:16px;flex-wrap:wrap}
+.dock-tile{display:flex;flex-direction:column;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.04em;color:#82DDFF}
+.dock-tile .icon{width:64px;height:64px;border-radius:14px;box-shadow:0 6px 16px rgba(0,0,0,.4)}
+.dock-tile .icon-1,.dock-tile .icon-2,.dock-tile .icon-3,.dock-tile .icon-4,.dock-tile .icon-5,.dock-tile .icon-6,.dock-tile .icon-7,.dock-tile .icon-8,.dock-tile .icon-9{transform-origin:center}
+.dock .label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.06em;color:#82DDFF}
+
+.intro{
+  max-width:760px;margin:0 auto 36px;font-family:'JetBrains Mono',monospace;
+  font-size:12px;color:#82DDFF;line-height:1.7;letter-spacing:.04em;text-align:center;
+  padding:18px 22px;background:rgba(15,15,30,.4);border-left:2px solid #FF2E88;border-right:2px solid #00F0FF;
+}
+.intro b{color:#FFE600;text-shadow:0 0 4px rgba(255,230,0,.5)}
+</style>
+</head>
+<body>
+<h1>SERAPHIM STUDIO — ICON OPTIONS</h1>
+<p class="sub">9 directions · pick favourites · pair with the cyberpunk skin · drop into src-tauri/icons/</p>
+
+<div class="intro">
+  Each icon below is built with pure CSS + inline SVG so we can iterate fast. To ship one as the real app icon, we render the chosen design at <b>1024×1024</b> PNG, run it through <b>tauri icon</b> to generate the platform sizes (32×32, 128×128, 128×128@2x, .icns for Mac, .ico for Windows), and replace the files in <b>src-tauri/icons/</b>. Bundle identifier stays the same so existing installs auto-update without losing prefs.
+</div>
+
+<div class="grid">
+
+  <div class="card">
+    <div class="icon icon-1">
+      <div class="halo"></div>
+      <div class="wings"></div>
+    </div>
+    <div class="label">01 · NEON HALO + WINGS</div>
+    <div class="desc">Refined version of the current icon. White wings get a cyan glow, halo gold becomes the alarm-yellow accent. Closest to "evolution not revolution" — existing users won't be surprised.</div>
+    <div class="row">PRO: <b>continuity</b> · CON: similar to existing</div>
+  </div>
+
+  <div class="card">
+    <div class="icon icon-2">
+      <svg viewBox="0 0 100 100" fill="none">
+        <polygon points="50,8 70,45 50,82 30,45" fill="url(#g2a)" stroke="#FF2E88" stroke-width="1.5"/>
+        <polygon points="50,18 64,45 50,72 36,45" fill="none" stroke="#00F0FF" stroke-width="1"/>
+        <polygon points="20,30 50,50 20,70" fill="url(#g2b)" stroke="#FFE600" stroke-width="1"/>
+        <polygon points="80,30 50,50 80,70" fill="url(#g2b)" stroke="#FFE600" stroke-width="1"/>
+        <circle cx="50" cy="14" r="3" fill="#FFE600"/>
+        <defs>
+          <linearGradient id="g2a" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF2E88" stop-opacity=".6"/><stop offset="100%" stop-color="#7A1A4F"/></linearGradient>
+          <linearGradient id="g2b" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00F0FF" stop-opacity=".5"/><stop offset="100%" stop-color="#0A4A60"/></linearGradient>
+        </defs>
+      </svg>
+    </div>
+    <div class="label">02 · GEOMETRIC SERAPH</div>
+    <div class="desc">Six-winged seraph as a hexagram + two flanking triangles. Looks like a sigil. Good for "this is a serious tool" branding without being literal.</div>
+    <div class="row">PRO: <b>distinctive · sigil-like</b> · CON: abstract</div>
+  </div>
+
+  <div class="card">
+    <div class="icon icon-3"><span class="mono">SS</span></div>
+    <div class="label">03 · MONOGRAM SS</div>
+    <div class="desc">Stacked Audiowide "SS" in alarm yellow on a pink-to-black gradient. Reads at 32×32 better than any other option here. Easiest to recognize on a crowded dock or taskbar.</div>
+    <div class="row">PRO: <b>readable @ 32px</b> · CON: literal/typographic</div>
+  </div>
+
+  <div class="card">
+    <div class="icon icon-4">
+      <svg viewBox="0 0 100 100" fill="none">
+        <path d="M50 22 L66 30 L72 50 L66 70 L50 78 L34 70 L28 50 L34 30 Z" fill="url(#g4a)" stroke="#00F0FF" stroke-width="1.2"/>
+        <path d="M22 50 L34 36 L36 64 Z" fill="#FFFFFF" opacity=".75"/>
+        <path d="M78 50 L66 36 L64 64 Z" fill="#FFFFFF" opacity=".75"/>
+        <line x1="40" y1="50" x2="60" y2="50" stroke="#FFE600" stroke-width="1.5" stroke-dasharray="2 2"/>
+        <line x1="50" y1="32" x2="50" y2="68" stroke="#FF2E88" stroke-width="1"/>
+        <circle cx="50" cy="50" r="6" fill="#FFE600" stroke="#FF2E88" stroke-width="1"/>
+        <defs><linearGradient id="g4a" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1A1A3A"/><stop offset="100%" stop-color="#0A0A1A"/></linearGradient></defs>
+      </svg>
+    </div>
+    <div class="label">04 · CIRCUIT-WING</div>
+    <div class="desc">Angular wings with PCB-trace detail in cyan + pink. Most "cyberpunk" of the bunch — wings are clearly tech, not heavenly. Pairs cleanly with the in-app cyberpunk skin.</div>
+    <div class="row">PRO: <b>strong skin match</b> · CON: less divine</div>
+  </div>
+
+  <div class="card">
+    <div class="icon icon-5">
+      <div class="ring"></div>
+      <span class="core">S</span>
+    </div>
+    <div class="label">05 · HOLOGRAPHIC HALO</div>
+    <div class="desc">Rotating iridescent ring around an "S" core. The ring animates 8s — would be still on the actual icon (animation is just for preview here). Reads as both halo and aurora.</div>
+    <div class="row">PRO: <b>premium feel</b> · CON: only ring renders well at 32px</div>
+  </div>
+
+  <div class="card">
+    <div class="icon icon-6"></div>
+    <div class="label">06 · CYBERPUNK BADGE</div>
+    <div class="desc">Clip-path corner cuts (top-left + bottom-right) match the in-app logo + button shape exactly. Single yellow "S" with neon double-shadow. Most consistent with skin.</div>
+    <div class="row">PRO: <b>identical to in-app shape</b> · CON: literal</div>
+  </div>
+
+  <div class="card">
+    <div class="icon icon-7">
+      <svg viewBox="0 0 32 32" fill="none" shape-rendering="crispEdges">
+        <rect x="14" y="4" width="4" height="2" fill="#FFE600"/>
+        <rect x="12" y="6" width="8" height="2" fill="none" stroke="#FFE600" stroke-width="1"/>
+        <rect x="10" y="10" width="2" height="6" fill="#FFFFFF"/>
+        <rect x="20" y="10" width="2" height="6" fill="#FFFFFF"/>
+        <rect x="8" y="12" width="2" height="6" fill="#82DDFF"/>
+        <rect x="22" y="12" width="2" height="6" fill="#82DDFF"/>
+        <rect x="6" y="14" width="2" height="6" fill="#FF2E88"/>
+        <rect x="24" y="14" width="2" height="6" fill="#FF2E88"/>
+        <rect x="14" y="14" width="4" height="8" fill="#FFE600"/>
+        <rect x="14" y="14" width="4" height="2" fill="#FFFFFF"/>
+        <rect x="13" y="22" width="6" height="2" fill="#FFFFFF"/>
+        <rect x="14" y="24" width="4" height="2" fill="#82DDFF"/>
+      </svg>
+    </div>
+    <div class="label">07 · PIXEL HALO</div>
+    <div class="desc">8-bit / arcade pixel-art seraph. Halo + central body + outstretched wings using only square pixels. Stands out hard from every other tool on the dock — but commits to the joke.</div>
+    <div class="row">PRO: <b>memorable</b> · CON: niche aesthetic</div>
+  </div>
+
+  <div class="card">
+    <div class="icon icon-8">
+      <div class="halo"></div>
+      <div class="wings-cyber"></div>
+    </div>
+    <div class="label">08 · DIVINE CYBERPUNK</div>
+    <div class="desc">Yellow halo + clip-path wings in white-to-pink gradient with neon glow. Combines literal angel iconography with cyberpunk material treatment. My pick — best of both.</div>
+    <div class="row">PRO: <b>balances both worlds</b> · MID</div>
+  </div>
+
+  <div class="card">
+    <div class="icon icon-9">
+      <svg viewBox="0 0 100 100" fill="none">
+        <circle cx="50" cy="32" r="14" fill="none" stroke="#FFE600" stroke-width="2"/>
+        <polygon points="50,18 65,42 50,66 35,42" fill="none" stroke="#FF2E88" stroke-width="1.5"/>
+        <polygon points="50,30 60,50 50,70 40,50" fill="none" stroke="#00F0FF" stroke-width="1.2"/>
+        <line x1="20" y1="80" x2="80" y2="80" stroke="#FFE600" stroke-width="1.5" stroke-dasharray="3 2"/>
+        <text x="50" y="86" font-family="Audiowide" font-size="6" fill="#FFE600" text-anchor="middle" letter-spacing=".5">SERAPHIM</text>
+      </svg>
+    </div>
+    <div class="label">09 · SACRED GEOMETRY</div>
+    <div class="desc">Halo + nested rhombus + dotted basement line + tiny "SERAPHIM" wordmark. Most "esoteric/seraph" of the lineup. Could feel too occult depending on intended customer.</div>
+    <div class="row">PRO: <b>ritual/serious feel</b> · CON: small text @ 32px</div>
+  </div>
+
+</div>
+
+<h1 style="margin-top:54px;margin-bottom:8px;font-size:14px">DOCK PREVIEW @ 64×64</h1>
+<p class="sub">how each icon reads at small size on a macOS dock</p>
+<div class="dock">
+  <div class="dock-tile"><div class="icon icon-1" style="width:64px;height:64px;border-radius:14px;font-size:0"><div class="halo" style="top:14px;width:24px;height:7px;border-width:1.5px"></div><div class="wings" style="width:42px;height:30px"></div></div><span class="label">01 NEON</span></div>
+  <div class="dock-tile"><div class="icon icon-2" style="width:64px;height:64px;border-radius:14px"><svg viewBox="0 0 100 100" style="width:48px;height:48px" fill="none"><polygon points="50,8 70,45 50,82 30,45" fill="#FF2E88" opacity=".7" stroke="#FF2E88" stroke-width="2"/><polygon points="20,30 50,50 20,70" fill="#00F0FF" opacity=".5" stroke="#00F0FF" stroke-width="2"/><polygon points="80,30 50,50 80,70" fill="#00F0FF" opacity=".5" stroke="#00F0FF" stroke-width="2"/></svg></div><span class="label">02 GEOMETRIC</span></div>
+  <div class="dock-tile"><div class="icon icon-3" style="width:64px;height:64px;border-radius:14px"><span class="mono" style="font-size:38px">SS</span></div><span class="label">03 MONO</span></div>
+  <div class="dock-tile"><div class="icon icon-4" style="width:64px;height:64px;border-radius:14px"><svg viewBox="0 0 100 100" style="width:48px;height:48px" fill="none"><path d="M50 22 L66 30 L72 50 L66 70 L50 78 L34 70 L28 50 L34 30 Z" fill="#1A1A3A" stroke="#00F0FF" stroke-width="2"/><circle cx="50" cy="50" r="6" fill="#FFE600"/></svg></div><span class="label">04 CIRCUIT</span></div>
+  <div class="dock-tile"><div class="icon icon-5" style="width:64px;height:64px;border-radius:14px"><div class="ring" style="width:46px;height:46px"></div><span class="core" style="font-size:22px">S</span></div><span class="label">05 HOLO</span></div>
+  <div class="dock-tile"><div class="icon icon-6" style="width:64px;height:64px"></div><span class="label">06 BADGE</span></div>
+  <div class="dock-tile"><div class="icon icon-7" style="width:64px;height:64px;border-radius:14px"><svg viewBox="0 0 32 32" style="width:48px;height:48px" fill="none" shape-rendering="crispEdges"><rect x="14" y="4" width="4" height="2" fill="#FFE600"/><rect x="14" y="14" width="4" height="8" fill="#FFE600"/></svg></div><span class="label">07 PIXEL</span></div>
+  <div class="dock-tile"><div class="icon icon-8" style="width:64px;height:64px;border-radius:14px"><div class="halo" style="top:8px;width:32px;height:9px;border-width:1.5px"></div><div class="wings-cyber" style="top:22px;width:46px;height:32px"></div></div><span class="label">08 DIVINE</span></div>
+  <div class="dock-tile"><div class="icon icon-9" style="width:64px;height:64px;border-radius:14px"><svg viewBox="0 0 100 100" style="width:50px;height:50px"><circle cx="50" cy="32" r="14" fill="none" stroke="#FFE600" stroke-width="3"/><polygon points="50,30 60,50 50,70 40,50" fill="none" stroke="#00F0FF" stroke-width="2"/></svg></div><span class="label">09 SACRED</span></div>
+</div>
+
+<p style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5A4677;letter-spacing:.06em;margin-top:42px">REPLY WITH THE NUMBER OF YOUR PICK · I'LL RENDER IT TO 1024×1024 + GENERATE THE TAURI ICON BUNDLE</p>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SNAP CAPTION STUDIO</title>
+<title>SERAPHIM STUDIO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Audiowide&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -131,7 +131,10 @@
      1280px laptop → 1920px desktop → 4K without explicit breakpoints. */
   main{display:grid;grid-template-columns:minmax(0,1fr) clamp(300px, 26vw, 420px);flex:1;overflow:hidden;min-height:0;min-width:0;}
   @media(max-width:1024px){main{grid-template-columns:1fr;grid-template-rows:1fr auto;}.controls{max-height:55vh;}}
-  .workspace{background:var(--bg);display:flex;align-items:center;justify-content:center;padding:clamp(10px,1.5vw,20px) clamp(14px,2.5vw,32px);position:relative;overflow:hidden;min-height:0;min-width:0;}
+  /* v4.3.1: workspace bg now transparent so cyberpunk bg-deco (city skyline,
+     scan beam, grid floor) is visible behind the canvas. The dot-grid pattern
+     in ::before stays for visual structure. */
+  .workspace{background:transparent;display:flex;align-items:center;justify-content:center;padding:clamp(10px,1.5vw,20px) clamp(14px,2.5vw,32px);position:relative;overflow:hidden;min-height:0;min-width:0;}
   .workspace::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);background-size:32px 32px;pointer-events:none;}
   .upload-zone{border:2px dashed var(--border-strong);border-radius:4px;padding:64px 80px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface);}
   .upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:var(--surface-2);}
@@ -296,7 +299,7 @@
   .drive-config-actions button.primary:hover{background:rgba(217,199,122,.08);}
 
   /* Folder picker modal */
-  .picker-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .picker-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;}
   .picker-overlay.hidden{display:none;}
   .picker-modal{background:var(--surface);border:1px solid var(--border-strong);border-radius:4px;width:min(720px, 100%);max-height:calc(100vh - 48px);display:flex;flex-direction:column;overflow:hidden;}
   /* drivePickerBody wraps account row + crumb + actions + scroll-area + foot.
@@ -537,7 +540,7 @@
   /* ============================================================ */
   /* CAROUSEL EDIT VIEW */
   /* ============================================================ */
-  .carousel-view{flex:1;display:flex;flex-direction:column;background:var(--bg);position:relative;z-index:2;min-height:0;overflow:hidden;}
+  .carousel-view{flex:1;display:flex;flex-direction:column;background:transparent;position:relative;z-index:2;min-height:0;overflow:hidden;}
   .carousel-view::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);background-size:32px 32px;pointer-events:none;}
 
   /* Drop zone for carousel */
@@ -786,7 +789,7 @@
   .view-tab.active .tab-icon{opacity:1;}
 
   /* === V3.3: Inspector view === */
-  .inspector-view{flex:1;overflow:auto;padding:24px 32px;background:var(--bg);position:relative;z-index:2;min-height:0;}
+  .inspector-view{flex:1;overflow:auto;padding:24px 32px;background:transparent;position:relative;z-index:2;min-height:0;}
   .inspector-view::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);background-size:32px 32px;pointer-events:none;}
   .inspector-inner{position:relative;z-index:1;max-width:1400px;margin:0 auto;}
   .inspector-intro{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px;gap:24px;flex-wrap:wrap;}
@@ -864,7 +867,7 @@
 </div>
 <div class="app">
 <header>
-<div class="logo"><img class="logo-mark" src="logo.png" alt=""><h1>SNAP CAPTION STUDIO</h1></div>
+<div class="logo"><img class="logo-mark" src="logo.png" alt=""><h1>SERAPHIM STUDIO</h1></div>
 <div class="header-meta" id="headerMeta">v4.0.0 · EDITOR</div>
 <div class="header-actions">
 <div class="recents-wrap" style="position:relative;">
@@ -6561,6 +6564,12 @@ function syncUIToState() {
   document.getElementById('warmth').value = state.warmth;
   document.getElementById('grain').value = state.grain;
   document.getElementById('vignette').value = state.vignette;
+  // v4.3.1: re-sync the --value CSS var on every range input so the gradient
+  // fill matches after programmatic .value= (Trial Reel, Reset, undo/redo).
+  // Without this, sliders drifted visually from their actual numeric value.
+  if (typeof syncRangeFill === 'function') {
+    document.querySelectorAll('input[type="range"]').forEach(r => { try { syncRangeFill(r); } catch (_) {} });
+  }
   document.getElementById('satValue').textContent = state.saturation + '%';
   document.getElementById('conValue').textContent = state.contrast + '%';
   document.getElementById('briValue').textContent = state.brightness + '%';
@@ -6674,7 +6683,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.3.0';
+const APP_VERSION = '4.3.1';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -10919,7 +10928,10 @@ function renderFilterChips() {
   container.innerHTML = html;
 
   container.querySelectorAll('.filter-card').forEach(card => {
-    card.addEventListener('click', () => toggleFilter(card.dataset.fid));
+    card.addEventListener('click', () => {
+      if (typeof SFX !== 'undefined') SFX.click(); // v4.3.1: filter cards are <div>, not <button>, so doc-level delegation skips them
+      toggleFilter(card.dataset.fid);
+    });
   });
 
   renderFilterStack();
@@ -11143,7 +11155,10 @@ function renderEditorFilterChips() {
   }
   container.innerHTML = html;
   container.querySelectorAll('.filter-card').forEach(card => {
-    card.addEventListener('click', () => toggleEditorFilter(card.dataset.fid));
+    card.addEventListener('click', () => {
+      if (typeof SFX !== 'undefined') SFX.click(); // v4.3.1: editor filter cards are <div>, click delegation skips them
+      toggleEditorFilter(card.dataset.fid);
+    });
   });
 
   renderEditorFilterStack();
@@ -11431,6 +11446,10 @@ function bindCarouselEvents() {
       document.documentElement.style.setProperty('--card-size', (pct / 100).toString());
       if (sizeValue) sizeValue.textContent = pct + '%';
       sizeSlider.value = pct;
+      // v4.3.1: programmatic .value= doesn't fire input/change, so the
+      // gradient fill (--value CSS var) needs an explicit sync. Without this,
+      // the FIT button moved the thumb but left the trail at the old position.
+      if (typeof syncRangeFill === 'function') syncRangeFill(sizeSlider);
       if (fromUser) {
         try { localStorage.setItem(SIZE_KEY, String(pct)); } catch (e) {}
         // Throttle canvas redraw — slider 'input' fires on every pixel of drag.
@@ -13821,6 +13840,26 @@ function ensureSettingsModal() {
 // ============================================================================
 const PATCH_NOTES = [
   {
+    version: '4.3.1',
+    date: '2026-05-07',
+    title: 'SERAPHIM STUDIO rebrand + cyberpunk skin bug fixes',
+    sections: [
+      { h: 'Rebrand', items: [
+        'App is now <b>Seraphim Studio</b> (was Snap Caption Studio). Window title, header logo wordmark, browser tab title, update prompts — all relabelled. Icon mockups for the partner are in mockups/seraphim-icon-options.html.',
+        'Bundle identifier stays com.seraphimmgmt.snapcaptionstudio so existing installations keep their preferences + auto-update path. New installs will see the Seraphim Studio name.',
+      ]},
+      { h: 'Fixed', items: [
+        '🔊 <b>Filter clicks now play sound</b>. Filter cards are <code>&lt;div&gt;</code> elements (for layout reasons) so the document-level button click delegation that powers the click SFX skipped them. Added explicit SFX.click() calls in the filter toggle handlers (carousel + editor).',
+        '🎚️ <b>Fit / Reset / Trial Reel sliders now visually match their values</b>. The pink "trail" on range inputs is driven by a CSS variable updated only on input/change events. Programmatic .value= writes (Fit button, Trial Reel randomize, undo/redo replay) didn\'t fire those events, so the trail drifted out of sync. Now syncRangeFill() runs after every programmatic write.',
+        '⬛ <b>Recovery prompt no longer goes under the cyberpunk background</b>. Bumped .picker-overlay z-index from 1000 → 9999 so it sits above any future bg-deco stacking context.',
+        '🌃 <b>Background animations now actually visible</b>. The .workspace, .carousel-view, and .inspector-view containers had opaque background:var(--bg) which was hiding the bg-deco layer entirely. Made them transparent — city skyline, scan beam, grid floor, and side data streams now show through behind the canvas / cards / inspector content.',
+      ]},
+      { h: 'Cyberpunk skin reminder', items: [
+        'If the editor feels sluggish on a slower laptop, open <b>⚙ Settings → 🎨 Theme</b> and pick the <b>LITE</b> preset. Keeps the colors + ornaments, drops the heavy animations. The auto-detect prompt fires within 6s of launch if FPS drops below ~25.',
+      ]},
+    ]
+  },
+  {
     version: '4.3.0',
     date: '2026-05-07',
     title: 'CYBERPUNK SKIN — neon-noir UI overhaul · all features preserved',
@@ -15139,7 +15178,7 @@ function showUpdateModal(version, body) {
   ensureUpdateModal();
   document.getElementById('updateModalTitle').textContent = `Update available · v${version}`;
   document.getElementById('updateBlurb').innerHTML =
-    `A new version of <b>Snap Caption Studio</b> is ready (<b>v${escapeHtml(String(version || ''))}</b>). Install now to get the latest fixes and features. The app will restart.`;
+    `A new version of <b>Seraphim Studio</b> is ready (<b>v${escapeHtml(String(version || ''))}</b>). Install now to get the latest fixes and features. The app will restart.`;
   const notesEl = document.getElementById('updateNotes');
   if (body && String(body).trim()) {
     notesEl.textContent = String(body).trim();
