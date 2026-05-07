@@ -6683,7 +6683,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.3.1';
+const APP_VERSION = '4.3.2';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13839,6 +13839,22 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.3.2',
+    date: '2026-05-07',
+    title: 'New app icon — Holographic Halo · matches the cyberpunk skin',
+    sections: [
+      { h: 'New', items: [
+        '✦ App icon replaced — Holographic Halo design (option 05 from the icon mockups). Iridescent ring (pink → cyan → mint → yellow) around a yellow Audiowide "S", on a deep purple radial background. Source SVG with embedded font lives at src-tauri/icons/seraphim-icon.svg.',
+        'All platform icon sizes regenerated via cargo tauri icon — Windows .ico, macOS .icns, Linux PNGs at 32/64/128/128@2x/256, plus iOS AppIcon set and Android mipmap-launcher PNGs.',
+        'In-app header logo (dist/logo.png) refreshed to the same design at 128×128.',
+      ]},
+      { h: 'How to refine', items: [
+        'If the dock icon looks too dark or the "S" too thin at small sizes, edit src-tauri/icons/seraphim-icon.svg and re-run `cargo tauri icon src-tauri/icons/seraphim-icon.svg -o src-tauri/icons` to regenerate everything.',
+        'mockups/seraphim-icon-options.html still has the other 8 options if you want to switch later.',
+      ]},
+    ]
+  },
   {
     version: '4.3.1',
     date: '2026-05-07',
