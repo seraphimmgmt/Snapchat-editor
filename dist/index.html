@@ -234,8 +234,14 @@
   .caption-options select,.caption-options input[type="range"]{flex:1;max-width:60%;}
   .caption-options select{background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:2px;font-family:'Manrope',sans-serif;font-size:12px;cursor:pointer;}
   .color-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--text-dim);}
-  .color-input-wrap{position:relative;width:36px;height:24px;border-radius:2px;overflow:hidden;border:1px solid var(--border);cursor:pointer;}
-  .color-input-wrap input[type="color"]{position:absolute;inset:-4px;width:calc(100% + 8px);height:calc(100% + 8px);border:none;cursor:pointer;background:transparent;padding:0;}
+  /* v4.4.1: explicit colored layer beneath the native color input so the
+     swatch is always visible — Tauri WebView2 (Windows) renders
+     `<input type="color">` with `background:transparent` as completely
+     invisible. We paint our own swatch via the wrapper's background, then
+     overlay the transparent input to capture clicks. JS keeps the wrapper's
+     CSS variable in sync with the input's value. */
+  .color-input-wrap{position:relative;width:36px;height:24px;border-radius:2px;overflow:hidden;border:1px solid var(--border);cursor:pointer;background:var(--swatch-color, #ffffff);box-shadow:inset 0 0 0 1px rgba(0,0,0,.25);}
+  .color-input-wrap input[type="color"]{position:absolute;inset:-4px;width:calc(100% + 8px);height:calc(100% + 8px);border:none;cursor:pointer;background:transparent;padding:0;opacity:0;}
   .color-row .color-end{display:flex;align-items:center;gap:8px;}
   /* Themed toggle button — used across editor and carousel */
   .none-toggle{background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);padding:7px 12px;border-radius:2px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.1em;cursor:pointer;transition:all .15s;text-transform:uppercase;}
@@ -424,11 +430,15 @@
   .pk-action-btn.pk-action-clear:hover{color:var(--text);border-color:var(--text-dim);background:transparent;}
   .pk-action-note{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;color:var(--text-faint);text-transform:uppercase;padding:5px 0;}
   /* GRID VIEW for picker list — folders & files as tiles */
-  .picker-list.grid-view{display:grid;grid-template-columns:repeat(auto-fill, minmax(132px, 1fr));gap:8px;padding:10px 14px 12px;align-items:start;align-content:start;}
+  /* v4.4.1: explicit grid-auto-rows + align-items:start to stop cards from
+     stretching when the grid container has flex/auto height. Without these
+     the cards would balloon to fill all available vertical space, leaving
+     names floating at the bottom of huge empty boxes. */
+  .picker-list.grid-view{display:grid;grid-template-columns:repeat(auto-fill, minmax(132px, 1fr));grid-auto-rows:max-content;gap:8px;padding:10px 14px 12px;align-items:start;align-content:start;justify-items:stretch;}
   /* Wider-than-tall tiles — feels more like macOS Finder / Files.app icon view
      than the previous awkwardly-tall rectangles. Bigger folder icon, less dead
      space, name has room to breathe. */
-  .picker-list.grid-view .picker-row,.picker-list.grid-view .picker-file-row{display:flex;flex-direction:column;align-items:stretch;padding:14px 10px 10px;gap:6px;position:relative;overflow:hidden;margin:0;border:1px solid var(--border);border-radius:4px;background:var(--surface-2);transition:border-color .12s,background .12s,transform .08s;}
+  .picker-list.grid-view .picker-row,.picker-list.grid-view .picker-file-row{display:flex;flex-direction:column;align-items:stretch;padding:14px 10px 10px;gap:6px;position:relative;overflow:hidden;margin:0;border:1px solid var(--border);border-radius:4px;background:var(--surface-2);transition:border-color .12s,background .12s,transform .08s;align-self:start;height:auto;}
   /* Folders: short, wider-than-tall — most of the tile is the icon + label.
      Files: square-ish so portrait/landscape thumbs both fit reasonably. */
   .picker-list.grid-view .picker-row{aspect-ratio:1/0.82;}
@@ -1309,11 +1319,11 @@ EXPORT TO DRIVE
     <div class="drivex-toolbar">
       <div class="drivex-crumb" id="drivexCrumb"></div>
       <div class="drivex-search">
-        <span class="ico">🔍</span>
+        <span class="ico" id="drivexSearchIco"></span>
         <input id="drivexSearch" placeholder="SEARCH FILES IN THIS FOLDER…">
       </div>
-      <button class="drivex-icon-btn" id="drivexRefreshBtn" title="Refresh">↻</button>
-      <button class="drivex-icon-btn" id="drivexUpBtn" title="Up one folder">↑</button>
+      <button class="drivex-icon-btn" id="drivexRefreshBtn" title="Refresh"></button>
+      <button class="drivex-icon-btn" id="drivexUpBtn" title="Up one folder"></button>
       <button class="drivex-batch-btn" id="drivexBatchBtn">BATCH MAKE</button>
       <button class="drivex-import-btn" id="drivexImportBtn" disabled>IMPORT <span id="drivexImportNum">0</span> →</button>
     </div>
@@ -6802,7 +6812,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.4.0';
+const APP_VERSION = '4.4.1';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -9834,6 +9844,21 @@ async function drivexMoveFile(fileId, fromParentId, toParentId) {
   return resp.json();
 }
 
+// v4.4.1: Cyberpunk-themed SVG icons. Replaces emoji glyphs in the Drive
+// tab — emojis render with the OS's color emoji set (rainbow folder, glossy
+// magnifier) which clashes with the neon-noir cyberpunk aesthetic. These
+// SVGs use currentColor so they pick up the surrounding text color, with a
+// drop-shadow filter for the cyberpunk glow.
+const DRIVEX_SVG = {
+  folder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="38" height="38" style="filter:drop-shadow(0 0 6px rgba(0,240,255,.55))"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="rgba(161,196,253,.18)"/><path d="M3 9h18"/></svg>`,
+  image: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" width="32" height="32" style="filter:drop-shadow(0 0 5px rgba(0,240,255,.4))"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.6" fill="currentColor"/><path d="M21 15l-5-5L5 21"/></svg>`,
+  video: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" width="32" height="32" style="filter:drop-shadow(0 0 5px rgba(255,46,136,.45))"><polygon points="6 4 20 12 6 20" fill="rgba(255,46,136,.25)"/></svg>`,
+  batch: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="34" height="34" style="filter:drop-shadow(0 0 6px rgba(0,240,255,.55))"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><line x1="17.5" y1="14" x2="17.5" y2="21"/><line x1="14" y1="17.5" x2="21" y2="17.5"/></svg>`,
+  search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="filter:drop-shadow(0 0 3px rgba(0,240,255,.6))"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>`,
+  refresh: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>`,
+  upArrow: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>`,
+};
+
 // Drive tab state — separate from the picker modal state
 const drivexState = {
   current: 'root',
@@ -9951,9 +9976,11 @@ function drivexRenderFolders() {
   filtered.forEach(f => {
     const card = document.createElement('div');
     card.className = 'drivex-folder';
-    card.setAttribute('draggable', 'true');
+    // v4.4.1: NOT draggable — Drive doesn't support arbitrary folder order
+    // anyway, and unbound draggable folders were corrupting drivexDragKind state.
+    card.setAttribute('draggable', 'false');
     card.dataset.folderId = f.id;
-    card.innerHTML = `<span class="ic">📁</span>
+    card.innerHTML = `<span class="ic">${DRIVEX_SVG.folder}</span>
       <span class="nm" title="${escHtml(f.name)}">${escHtml(f.name)}</span>
       <span class="mt">folder</span>`;
     card.addEventListener('dblclick', () => drivexNavigateInto(f));
@@ -9964,7 +9991,8 @@ function drivexRenderFolders() {
   // Append a "+ BATCH MAKE" tile
   const slot = document.createElement('div');
   slot.className = 'drivex-folder batch-slot';
-  slot.innerHTML = `<span class="ic">⊞</span><span class="nm">BATCH MAKE</span><span class="mt">create dated folders</span>`;
+  slot.setAttribute('draggable', 'false');
+  slot.innerHTML = `<span class="ic">${DRIVEX_SVG.batch}</span><span class="nm">BATCH MAKE</span><span class="mt">create dated folders</span>`;
   slot.addEventListener('click', drivexOpenBatchMake);
   grid.appendChild(slot);
 }
@@ -9997,9 +10025,12 @@ function drivexRenderFiles() {
       const s = Math.floor((ms / 1000) % 60).toString().padStart(2, '0');
       dur = `<span class="b dur">${m}:${s}</span>`;
     }
-    const thumbStyle = f.thumbnailLink
-      ? `<img loading="lazy" src="${escHtml(f.thumbnailLink)}" alt="">`
-      : (isVideo ? '▶' : '📷');
+    // v4.4.1: draggable="false" on the IMG so the browser's native image drag
+     // doesn't hijack the parent card's dragstart (which is what was breaking
+     // file→folder drag). Cyberpunk SVG icons replace the emoji fallbacks.
+     const thumbStyle = f.thumbnailLink
+      ? `<img loading="lazy" draggable="false" src="${escHtml(f.thumbnailLink)}" alt="">`
+      : (isVideo ? DRIVEX_SVG.video : DRIVEX_SVG.image);
     card.innerHTML = `<div class="thumb">${thumbStyle}<div class="badges"><span class="b">${escHtml(ext)}</span>${dur}</div></div>
       <div class="meta">
         <span class="fname" title="${escHtml(f.name)}">${escHtml(f.name)}</span>
@@ -10430,6 +10461,14 @@ function drivexOnEnterTab() {
 }
 
 function drivexWireOnce() {
+  // v4.4.1: paint themed SVG icons into the toolbar (replaces emoji glyphs)
+  const refreshBtn = document.getElementById('drivexRefreshBtn');
+  if (refreshBtn) refreshBtn.innerHTML = DRIVEX_SVG.refresh;
+  const upBtn = document.getElementById('drivexUpBtn');
+  if (upBtn) upBtn.innerHTML = DRIVEX_SVG.upArrow;
+  const searchIco = document.getElementById('drivexSearchIco');
+  if (searchIco) searchIco.innerHTML = DRIVEX_SVG.search;
+
   document.getElementById('drivexRefreshBtn')?.addEventListener('click', drivexLoadCurrent);
   document.getElementById('drivexUpBtn')?.addEventListener('click', drivexNavigateUp);
   document.getElementById('drivexBatchBtn')?.addEventListener('click', drivexOpenBatchMake);
@@ -14121,6 +14160,37 @@ function initRangeFills() {
   obs.observe(document.body, { childList: true, subtree: true });
 }
 
+/* v4.4.1: Color-input swatch sync — Tauri WebView2 (Windows) renders
+   `<input type="color">` with `background:transparent` as fully invisible.
+   We paint the swatch via the wrapper's CSS variable instead, then keep
+   it in sync with the input's value so changes from the picker update
+   the visible square. */
+function syncColorSwatch(input) {
+  const wrap = input.closest('.color-input-wrap');
+  if (!wrap) return;
+  wrap.style.setProperty('--swatch-color', input.value || '#ffffff');
+}
+function attachColorSwatch(input) {
+  if (input.__swatchBound) return;
+  input.__swatchBound = true;
+  syncColorSwatch(input);
+  input.addEventListener('input', () => syncColorSwatch(input));
+  input.addEventListener('change', () => syncColorSwatch(input));
+}
+function initColorSwatches() {
+  document.querySelectorAll('.color-input-wrap input[type="color"]').forEach(attachColorSwatch);
+  const obs = new MutationObserver((muts) => {
+    for (const m of muts) {
+      m.addedNodes.forEach(n => {
+        if (n.nodeType !== 1) return;
+        if (n.matches && n.matches('.color-input-wrap input[type="color"]')) attachColorSwatch(n);
+        if (n.querySelectorAll) n.querySelectorAll('.color-input-wrap input[type="color"]').forEach(attachColorSwatch);
+      });
+    }
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+}
+
 async function init() {
   buildEmojiPicker();
   buildFontPicker();
@@ -14132,6 +14202,7 @@ async function init() {
   updateDestUI();
   updateHeaderMeta();
   initRangeFills();
+  initColorSwatches();
   // Seed Cloud prefs from the bundled cloud-config.json on first run. Fire and
   // forget — Cloud mode is opt-in, missing config is fine.
   bootstrapCloudPrefs().catch(() => {});
@@ -14633,6 +14704,31 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.4.1',
+    date: '2026-05-07',
+    title: 'Bug bash — Drive drag, picker grid, blurry arrows, themed icons',
+    sections: [
+      { h: 'Critical fixes', items: [
+        '🎯 <b>Drive tab — file → folder drag now actually works</b>. The bug: when you grabbed a file thumbnail to drag it onto a folder, the browser started dragging the <code>&lt;img&gt;</code> element (default behavior for images) — the parent card\'s dragstart never fired, drivexDragKind stayed null, and the folder\'s drop handler silently rejected the drag. Fix: <code>draggable="false"</code> on every Drive thumbnail + CSS hardening (<code>-webkit-user-drag:none; pointer-events:none</code>) so the drag always belongs to the parent card.',
+        '🟦 <b>PICK FROM DRIVE picker — grid view no longer clumps</b>. Cards were stretching to fill the entire grid container height, leaving folder names floating at the bottom of huge empty boxes. Fix: <code>grid-auto-rows:max-content</code> + <code>align-self:start</code> on cards so they size to their content.',
+      ]},
+      { h: 'Cyberpunk skin polish', items: [
+        '✨ <b>>> section header arrows are no longer a fuzzy cyan blob</b>. The parent <code>h3</code>\'s <code>-webkit-text-fill-color:transparent</code> (for the orange→cyan gradient) was cascading to the <code>::before</code> pseudo, hiding the ">>" text and leaving only the glow halo. Forced the prefix to opt out of the gradient.',
+        '🔢 <b>Section change-counter badges show their number</b>. Same root cause — digits inside the badges were inheriting the transparent fill, leaving solid pink dots. Forced badges to use opaque dark text on accent background.',
+        '🟪 <b>Workspace top-left pink corner bracket is back</b>. Two CSS rules both targeted <code>.workspace::before</code> (one for the bracket, one for the dot grid) — the dot grid won, bracket disappeared. Moved the bracket to <code>box-shadow</code> so the pseudo-element is exclusively the dot grid.',
+      ]},
+      { h: 'Themed icons in Drive tab', items: [
+        '🎨 Replaced OS emojis (📁 🔍 ↻ ↑ ⊞ 📷 ▶) with custom inline SVG icons that match the cyberpunk neon aesthetic. Cyan-glow folders, pink-glow video play arrows, hairline strokes for refresh / up-arrow / search. Other tabs still use the existing icons — Drive tab was the most visible problem.',
+      ]},
+      { h: 'Tauri WebView2 hardening', items: [
+        '🎨 <b>Color swatches now always visible on Windows</b>. Tauri WebView2 renders <code>&lt;input type="color"&gt;</code> with <code>background:transparent</code> as completely invisible. Added a fallback colored layer painted via the wrapper\'s <code>--swatch-color</code> CSS variable, kept in sync with the input via JS (initColorSwatches + MutationObserver). The native input now sits transparent on top, capturing clicks while the visible swatch stays painted.',
+      ]},
+      { h: 'Reminder', items: [
+        '📦 If your dock icon still shows the old wings/Snap Caption Studio design, your dock has a stale macOS icon cache. Quit + reopen the app, or run <code>killall Dock</code> in Terminal — the new Holographic Halo icon is what shipped in v4.3.2 onwards.',
+      ]},
+    ]
+  },
   {
     version: '4.4.0',
     date: '2026-05-07',
@@ -16382,28 +16478,34 @@ if (window.__TAURI__ && window.__TAURI__.core) {
   [data-deco-anim="off"] header::before{animation:none}
   @keyframes cybRainbow{from{background-position:0% 0}to{background-position:300% 0}}
 
-  /* Corner brackets on the controls sidebar + workspace + main panels */
+  /* Corner brackets on the controls sidebar + workspace + main panels.
+     v4.4.1: workspace bracket moved to box-shadow so it doesn't conflict
+     with the dot-grid ::before override below. Sidebar/picker-modal
+     brackets stay on ::before (no conflict there). */
   [data-deco-ornaments="on"] .controls,
   [data-deco-ornaments="on"] .workspace,
   [data-deco-ornaments="on"] .picker-modal{position:relative}
   [data-deco-ornaments="on"] .controls::before,
-  [data-deco-ornaments="on"] .workspace::before,
   [data-deco-ornaments="on"] .picker-modal::before{
     content:'';position:absolute;top:0;left:0;width:14px;height:14px;
     border-top:2px solid #FF2E88;border-left:2px solid #FF2E88;
     pointer-events:none;z-index:5;
   }
   [data-deco-ornaments="on"] .controls::after,
-  [data-deco-ornaments="on"] .workspace::after,
   [data-deco-ornaments="on"] .picker-modal::after{
     content:'';position:absolute;bottom:0;right:0;width:14px;height:14px;
     border-bottom:2px solid #00F0FF;border-right:2px solid #00F0FF;
     pointer-events:none;z-index:5;
   }
-  /* The workspace ::before is already used for the dot grid — stack ours
-     using a different pseudo via a wrapping rule below */
+  /* Workspace gets the brackets via box-shadow so the dot-grid ::before
+     rule below can claim the pseudo-element exclusively. */
+  [data-deco-ornaments="on"] .workspace{
+    box-shadow:
+      inset 14px 0 0 -12px #FF2E88, inset 0 14px 0 -12px #FF2E88,
+      inset -14px 0 0 -12px #00F0FF, inset 0 -14px 0 -12px #00F0FF;
+  }
+  /* Workspace ::before — dot grid (no longer fighting with the bracket rule) */
   [data-deco-ornaments="on"] .workspace::before{
-    /* keep dot grid + add bracket as box-shadow on first child instead */
     background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);
     background-size:32px 32px;
     inset:0;width:auto;height:auto;border:none;
@@ -16415,15 +16517,36 @@ if (window.__TAURI__ && window.__TAURI__.core) {
       inset -14px 0 0 -12px #00F0FF, inset 0 -14px 0 -12px #00F0FF;
   }
 
-  /* >> blinking prefix on control-section headers (existing structure) */
+  /* >> blinking prefix on control-section headers (existing structure)
+     v4.4.1: opt OUT of the parent h3's gradient transparent fill — without
+     this, `-webkit-text-fill-color:transparent` cascades to the ::before and
+     the ">>" text vanishes, leaving only the cyan glow halo (looks like a
+     blurry blob in screenshots / on screen). Force the fill back to cyan
+     and clear the inherited gradient background. */
   [data-deco-ornaments="on"] .section-header h3::before{
-    content:'>> ';color:#00F0FF;
+    content:'>> ';
+    color:#00F0FF !important;
+    -webkit-text-fill-color:#00F0FF !important;
+    background:none !important;
+    -webkit-background-clip:initial !important;background-clip:initial !important;
     font-family:'Audiowide',sans-serif;
-    text-shadow:0 0 6px rgba(0,240,255,.6);
+    text-shadow:0 0 4px rgba(0,240,255,.55);
     animation:cybBlink 1.4s steps(2) infinite;
+    margin-right:2px;
   }
   [data-deco-anim="off"] .section-header h3::before{animation:none;opacity:.85}
-  @keyframes cybBlink{50%{opacity:.4}}
+  @keyframes cybBlink{50%{opacity:.45}}
+
+  /* Same fix for the section change-counter badges — they're nested inside h3
+     and the gradient transparent fill was hiding the digit, leaving solid
+     pink dots with no number visible. */
+  .section-header h3 .section-badge{
+    -webkit-text-fill-color:#06060F !important;
+    background:var(--accent) !important;
+    color:#06060F !important;
+    background-clip:initial !important;-webkit-background-clip:initial !important;
+    animation:none !important;
+  }
 
   /* Hazard tape stripe at the top of picker-modal foot (existing modal pattern) */
   [data-deco-ornaments="on"] .picker-foot{position:relative}
@@ -16597,7 +16720,14 @@ if (window.__TAURI__ && window.__TAURI__.core) {
   .drivex-file.selected{border-color:var(--accent-3);box-shadow:0 0 0 2px var(--accent-3),0 0 18px rgba(255,230,0,.4)}
   .drivex-file.selected::before{content:'✓';position:absolute;top:6px;right:6px;width:22px;height:22px;background:var(--accent-3);color:var(--bg);font-weight:900;font-size:13px;display:grid;place-items:center;z-index:2;text-shadow:0 0 4px rgba(0,0,0,.6);box-shadow:0 0 10px rgba(255,230,0,.6)}
   .drivex-file .thumb{aspect-ratio:1/1;background:var(--surface-3) center/cover no-repeat;display:grid;place-items:center;font-size:32px;color:var(--text-dim);position:relative}
-  .drivex-file .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  /* v4.4.1: prevent native image drag from hijacking the parent card's drag.
+     Without this, click-and-drag on the thumbnail starts an IMG drag with
+     dataTransfer set to the image URL, and the card's dragstart never fires
+     — drivexDragKind stays null, so file→folder drops are silently rejected. */
+  .drivex-file .thumb img{width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none;user-drag:none;pointer-events:none;}
+  .drivex-file .thumb svg{pointer-events:none;}
+  /* The parent card stays draggable + clickable */
+  .drivex-file{-webkit-user-drag:element;}
   .drivex-file .badges{position:absolute;left:6px;bottom:6px;display:flex;gap:4px;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.06em}
   .drivex-file .b{padding:2px 5px;background:rgba(0,0,0,.55);color:var(--accent-2);text-shadow:0 0 4px var(--accent-2)}
   .drivex-file .b.dur{background:rgba(0,0,0,.7);color:var(--text)}
