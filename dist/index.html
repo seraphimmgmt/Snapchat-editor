@@ -4669,25 +4669,17 @@ async function exportVideoCloud() {
   }
   const targetFps = getEffectiveExportFps();
 
-  // v4.2.24: split active filter chips into CSS-method (server can render) and
-  // LUT-method (server still can't — needs .cube files, deferred). CSS-method
-  // chips are sent in args.filters; LUT-method ones are dropped with a toast.
-  let cssChipsForCloud = [];
-  let lutChipsSkipped = [];
-  if (state.filters && state.filters.length > 0 && typeof FILTER_BY_ID !== 'undefined') {
+  // v4.2.25: server now bakes both CSS-method (Instagram presets) AND LUT-
+  // method (iPhone presets via .cube files) — send the full active stack.
+  // Server silently skips any unknown ids, so this is forward-compat: if a
+  // newer client adds a filter the server doesn't know yet, the rest of the
+  // stack still bakes correctly.
+  const filtersForCloud = [];
+  if (state.filters && state.filters.length > 0) {
     for (const fid of state.filters) {
-      const f = FILTER_BY_ID[fid];
-      if (!f) continue;
       const strength = state.filterStrengths[fid] != null ? state.filterStrengths[fid] : 50;
-      if (f.method === 'css') {
-        cssChipsForCloud.push({ id: fid, strength });
-      } else if (f.method === 'lut') {
-        lutChipsSkipped.push(f.label);
-      }
+      filtersForCloud.push({ id: fid, strength });
     }
-  }
-  if (lutChipsSkipped.length > 0 && typeof showToast === 'function') {
-    showToast(`⚠ Cloud can't apply ${lutChipsSkipped.join(', ')} yet (LUT filter — switch to Fast/Reliable). Other filters baked normally.`, 'notify');
   }
 
   resetExportSteps();
@@ -4811,10 +4803,11 @@ async function exportVideoCloud() {
     preset: 'fast',  // v4.2.18: was 'medium'. At 15 Mbps target the visual diff
                      // is imperceptible but encode is ~2× faster.
     adjustments,
-    // v4.2.24: server-side filter chips (CSS-method only). LUT-method filters
-    // are filtered out above and warned about via toast — server silently
-    // skips unknown ids anyway, so this is belt-and-suspenders.
-    filters: cssChipsForCloud,
+    // v4.2.25: full filter chip stack (CSS-method + LUT-method). Server
+    // applies CSS via eq/hue/colorchannelmixer + tint blend nodes, and LUT
+    // via lut3d filter on pre-baked .cube files (split + blend for strength).
+    // Stack order preserved.
+    filters: filtersForCloud,
   };
 
   setExportStep('audio', 'skipped');
@@ -6665,7 +6658,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.24';
+const APP_VERSION = '4.2.25';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13724,6 +13717,26 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.2.25',
+    date: '2026-05-07',
+    title: 'iPhone LUT filters now bake on cloud too — full filter parity',
+    sections: [
+      { h: 'New', items: [
+        '☁️ All 9 iPhone LUT-method filters (Vivid, Vivid Warm/Cool, Dramatic, Dramatic Warm/Cool, Mono, Silvertone, Noir) now bake correctly in cloud export. Cloud has full parity with local Fast/Reliable/Legacy/Image — every filter in the library renders the same way regardless of export engine.',
+        '🧊 Server uses ffmpeg\'s lut3d filter on pre-baked 33×33×33 .cube files generated from the JS LUT functions in dist/index.html. Strength interpolation via split + blend(mode=normal): out = strength*lut + (1-strength)*orig — matches the canvas math exactly.',
+        '🎚️ Mixed CSS+LUT stacks preserved in stack order. So [Vivid (LUT), Clarendon (CSS)] runs Vivid first, then Clarendon\'s eq + tint on top — same as local rendering.',
+      ]},
+      { h: 'How it shipped', items: [
+        'New file: infra/render-server/build_luts.py — Python port of the 9 JS LUT functions, generates .cube files into infra/render-server/luts/. Run once to bake; outputs are deterministic and committed (about 8.8 MB total). Re-run only if the JS LUT math changes.',
+        'Server filter_complex builder restructured to handle CSS+LUT mixed pipelines. Each chip becomes one or more nodes; CSS ops fold into inline chains where possible, tints + LUT split-blend pattern get their own nodes. Stack order strictly preserved.',
+        'Health endpoint now reports lut_filter_count + lut_filter_ids so clients can probe what the server supports without trial-and-error.',
+      ]},
+      { h: 'Cleanup', items: [
+        'Removed the v4.2.24 "LUT filters skipped on cloud" toast — no longer needed, since they all bake now. Client now sends the full filter stack to the server in args.filters; server silently skips any unknown ids (forward-compat).',
+      ]},
+    ]
+  },
   {
     version: '4.2.24',
     date: '2026-05-06',
