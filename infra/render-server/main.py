@@ -502,25 +502,34 @@ async def render(
                     cur_input = f"[{new_label}]"
                 elif step['kind'] == 'lut':
                     flush_chain()
-                    # Strength interp pattern:
-                    #   [in] split [a][b];  [b] lut3d [c];  [c][a] blend → out
-                    # blend(mode=normal, all_opacity=s) does: out = top*s +
-                    # bottom*(1-s). top=lut, bottom=orig → s*filtered +
-                    # (1-s)*orig, matching canvas LUT mixing exactly.
+                    # v4.4.2: convert YUV → full-range RGB (gbrp) before lut3d,
+                    # back to YUV after. The .cube files are RGB lookup tables
+                    # generated from JS functions that operate on full-range
+                    # 0-255 sRGB. Without these format conversions, ffmpeg
+                    # passes the YUV planes (Y, U, V) into the cube as if they
+                    # were R, G, B — producing wildly wrong colors AND crushed
+                    # luma (the Y plane is 16-235 limited, so values map into
+                    # the lower part of the LUT, darkening the image). The
+                    # gbrp format keeps RGB in 0-255 full range planar, which
+                    # is what the LUT was designed for.
                     sa = f"a{label_counter}"
                     sb = f"b{label_counter}"
+                    sbr = f"br{label_counter}"   # b in RGB
                     slut = f"l{label_counter}"
+                    slutb = f"lb{label_counter}" # l back in YUV
                     new_label = f"v{label_counter}"
                     label_counter += 1
                     fc_parts.append(f"{cur_input}split[{sa}][{sb}]")
+                    fc_parts.append(f"[{sb}]format=gbrp[{sbr}]")
                     # interp=tetrahedral: 4-point interp inside the cube.
                     # Smoother than the default trilinear near steep curves
                     # (Noir's S-curve, Vivid's midtone lift).
                     fc_parts.append(
-                        f"[{sb}]lut3d=file={step['cube_path']}:interp=tetrahedral[{slut}]"
+                        f"[{sbr}]lut3d=file={step['cube_path']}:interp=tetrahedral[{slut}]"
                     )
+                    fc_parts.append(f"[{slut}]format=yuv420p[{slutb}]")
                     fc_parts.append(
-                        f"[{slut}][{sa}]blend=all_mode=normal:all_opacity={step['strength']:.3f}[{new_label}]"
+                        f"[{slutb}][{sa}]blend=all_mode=normal:all_opacity={step['strength']:.3f}[{new_label}]"
                     )
                     cur_input = f"[{new_label}]"
 

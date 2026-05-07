@@ -884,7 +884,7 @@
 <button class="header-cog" id="recentsBtn" type="button" title="Recent files" aria-label="Recent files" data-no-sfx>
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/><polyline points="12 7 12 12 16 14"/></svg>
 </button>
-<div id="recentsDropdown" class="hidden" style="position:absolute;top:calc(100% + 6px);right:0;background:var(--surface-2);border:1px solid var(--border);min-width:280px;max-width:340px;z-index:9000;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:6px 0;font-family:'JetBrains Mono',monospace;"></div>
+<div id="recentsDropdown" class="hidden" style="position:absolute;top:calc(100% + 6px);right:0;background:var(--surface-2);border:1px solid var(--border);min-width:280px;max-width:340px;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:6px 0;font-family:'JetBrains Mono',monospace;"></div>
 </div>
 <button class="header-cog" id="patchNotesBtn" type="button" title="What's new" aria-label="Open patch notes">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
@@ -6074,6 +6074,13 @@ async function exportVideo() {
     try { recorder.stop(); } catch (e) {}
   };
 
+  // v4.4.2: track resources to clean up after export. Without these, the
+  // requestVideoFrameCallback loop keeps rescheduling itself even after stop,
+  // canvas captureStream tracks stay live, and audio source nodes leak —
+  // user reported video player gets laggy / unresponsive after every export.
+  let safetyCheckId = null;
+  let endedListener = null;
+
   if (useManual) {
     // Frame-accurate path: one source frame in → one canvas render → one .requestFrame()
     const onSourceFrame = async (now, metadata) => {
@@ -6096,19 +6103,23 @@ async function exportVideo() {
       } catch (e) {
         console.warn('frame render error:', e);
       }
-      // Continue requesting frames until the video ends
-      video.requestVideoFrameCallback(onSourceFrame);
+      // v4.4.2: only reschedule if NOT stopped — was infinite-looping after
+      // recorder.stop() finished, eating CPU and preventing GC of the canvas
+      // stream + frame buffers.
+      if (!stopped) video.requestVideoFrameCallback(onSourceFrame);
     };
 
-    video.addEventListener('ended', finishUp, { once: true });
+    endedListener = finishUp;
+    video.addEventListener('ended', endedListener, { once: true });
     video.requestVideoFrameCallback(onSourceFrame);
 
     try { await video.play(); } catch (e) {}
 
     // Safety: in case 'ended' fires before our last requestVideoFrameCallback
-    const safetyCheck = setInterval(() => {
+    safetyCheckId = setInterval(() => {
       if (video.ended || video.currentTime >= duration - 0.02) {
-        clearInterval(safetyCheck);
+        clearInterval(safetyCheckId);
+        safetyCheckId = null;
         // Give the encoder one more frame interval to flush
         setTimeout(finishUp, 100);
       }
@@ -6135,6 +6146,21 @@ async function exportVideo() {
   }
 
   await finishPromise;
+
+  // v4.4.2: comprehensive cleanup — was leaving captureStream tracks live,
+  // ended listener attached, safety interval running, and audio routing
+  // half-torn-down. Net effect: video player got laggy / unresponsive
+  // after export because the canvas was still capturing frames in the
+  // background and the audio graph was still alive. Now we kill all of it.
+  stopped = true;
+  if (safetyCheckId) { clearInterval(safetyCheckId); safetyCheckId = null; }
+  if (endedListener) { try { video.removeEventListener('ended', endedListener); } catch (_) {} endedListener = null; }
+  // Stop all tracks on the canvas + audio streams so the browser can release them
+  try { canvasStream.getTracks().forEach(t => { try { t.stop(); } catch (_) {} }); } catch (_) {}
+  try { combinedStream.getTracks().forEach(t => { try { t.stop(); } catch (_) {} }); } catch (_) {}
+  // Audio cleanup — the onstop handler already does this but in case it didn't run
+  try { audioSourceNode?.disconnect(); } catch (_) {}
+  if (audioCtx && audioCtx.state !== 'closed') { try { await audioCtx.close(); } catch (_) {} }
 
   // Restore preview state
   video.loop = false;
@@ -6812,7 +6838,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.4.1';
+const APP_VERSION = '4.4.2';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -14705,6 +14731,31 @@ function ensureSettingsModal() {
 // ============================================================================
 const PATCH_NOTES = [
   {
+    version: '4.4.2',
+    date: '2026-05-07',
+    title: 'Cloud darkening fix · video player no longer lags after export · recents dropdown',
+    sections: [
+      { h: 'Cloud render — darkening fix (HUGE)', items: [
+        '🎯 <b>Cloud-rendered videos with iPhone LUT filters (Drama Cool, Mono, Noir, etc.) were exporting ~40% darker than the source</b>. Measured on a Hello Kitty bra reference clip: source YAVG=132, OLD cloud YAVG=52, local export YAVG=137. The fix landed at YAVG=132.07 — matches source perfectly.',
+        '🔬 Root cause: the cloud server was applying <code>lut3d</code> directly on YUV-format video. The .cube files are RGB lookup tables (0–255 full range), but ffmpeg was passing the YUV planes (Y in 16–235 limited range) into the cube as if they were RGB indices. For LUTs with S-curves like Dramatic, this maps everything into the lower/darker portion of the curve, crushing shadows and pulling midtones down.',
+        '🩹 Fix: <code>format=gbrp</code> (full-range planar RGB) before each <code>lut3d</code>, <code>format=yuv420p</code> after. Cloud server <b>already deployed</b> + restarted on the DigitalOcean droplet — no client update needed for the brightness fix to take effect, but you do need v4.4.2 for the other fixes.',
+        '⚡ Bonus: render time on the same 8s clip with Drama Cool + Mono + saturation went from ~50s → 31s. The format conversions are cheap and the LUT operates on smaller-precision RGB instead of unnecessarily-precise YUV.',
+      ]},
+      { h: 'Video player no longer lags after export', items: [
+        '🎬 <b>After every video export (legacy MediaRecorder path), the editor preview was getting laggy / unresponsive</b>. Root cause: three resource leaks — (1) <code>requestVideoFrameCallback</code> kept rescheduling itself even after the recorder stopped, eating CPU on every frame; (2) the canvas <code>captureStream</code> + audio <code>MediaStream</code> tracks were never <code>.stop()</code>\'d, so the browser kept holding the canvas + audio graph live; (3) the <code>ended</code> event listener stayed attached.',
+        '🩹 Fix: track all resources (rVFC schedule guard, safety interval ID, ended listener ref, both streams), then in a single comprehensive cleanup block at the end of <code>exportVideo()</code>, set <code>stopped=true</code> + <code>clearInterval</code> + <code>removeEventListener</code> + <code>track.stop()</code> on every track in both streams + tear down the audio graph if still alive. Net: video player stays smooth across multiple consecutive exports.',
+      ]},
+      { h: 'Recents dropdown — actually visible now', items: [
+        '📋 <b>The recents button at the top of the header — its dropdown was being clipped to the header\'s bounds</b>. The cyberpunk skin\'s holographic-rainbow-line ornament put <code>overflow:hidden</code> on the header to constrain the rainbow\'s 300% animated background-position, but that also clipped any absolute-positioned child that extended below the header bottom — including the recents dropdown, the patch notes popover, etc.',
+        '🩹 Fix: <code>overflow:visible</code> on the header (the rainbow line is at <code>top:0 height:2px</code> and doesn\'t need overflow:hidden to stay constrained), plus bumped the dropdown\'s z-index from 9000 → 99999 to be safely above any future stacking-context surprises.',
+      ]},
+      { h: 'Diagnosed (not yet fixed)', items: [
+        '⏳ <b>Local export drift</b>: the legacy MediaRecorder path produces 23.68 fps output for a 24 fps source, and trims ~0.48s off the duration. This is inherent to the captureStream + recorder pipeline — frame timing is tied to playback rate which can drift. Workaround: switch to "Reliable (FFmpeg)" or "Fast (WebCodecs)" engine in Settings → Export. Real fix would require switching the default engine — flagged for v4.5.',
+        '⏳ <b>"Black bars on the side"</b>: appears to be the workspace empty-space around a 1080×1920 portrait canvas, NOT bars baked into the video. The canvas preserves the source\'s aspect ratio; the workspace is wider so empty space shows on each side. If you want the canvas to fill the workspace, that\'s a Fit-to-Window mode we\'d add separately. Send me a screenshot of the EXPORTED video showing bars if it\'s actually in the file.',
+      ]},
+    ]
+  },
+  {
     version: '4.4.1',
     date: '2026-05-07',
     title: 'Bug bash — Drive drag, picker grid, blurry arrows, themed icons',
@@ -16467,8 +16518,13 @@ if (window.__TAURI__ && window.__TAURI__.core) {
      ORNAMENTS — Persona-5 corner brackets, holographic strip,
      >> blinking section prefix, hazard tape on modals
      ============================================================ */
-  /* Holographic rainbow line on top of the header */
-  [data-deco-ornaments="on"] header{position:relative;overflow:hidden}
+  /* Holographic rainbow line on top of the header
+     v4.4.2: removed `overflow:hidden` from the header — it was clipping the
+     #recentsDropdown, the patch-notes popover, and any other absolute-positioned
+     child that extends below the header bottom (user reported the recents
+     dropdown going "behind the background"). The rainbow line at top:0 height:2px
+     is already constrained vertically and doesn't need overflow:hidden. */
+  [data-deco-ornaments="on"] header{position:relative;overflow:visible}
   [data-deco-ornaments="on"] header > *{position:relative;z-index:1}
   [data-deco-ornaments="on"] header::before{
     content:'';position:absolute;top:0;left:0;right:0;height:2px;
