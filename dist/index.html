@@ -887,6 +887,7 @@
 <div class="view-tabs">
 <button class="view-tab active" data-view="editor"><span class="tab-icon">⊞</span> EDITOR</button>
 <button class="view-tab" data-view="carousel"><span class="tab-icon">▦</span> CAROUSEL EDIT</button>
+<button class="view-tab" data-view="drive"><span class="tab-icon">▲</span> DRIVE</button>
 <button class="view-tab" data-view="inspector"><span class="tab-icon">🔍</span> METADATA INSPECTOR</button>
 </div>
 <main id="editorView">
@@ -1293,6 +1294,124 @@ EXPORT TO DRIVE
 </div>
 </aside>
 </div>
+</div>
+
+<!-- ====================================================================
+     DRIVE TAB — full Google Drive browser (v4.4.0)
+     States: signin · loading · default · empty · error
+     Features: folder + file grid · breadcrumb nav · multi-select →
+     import · OS file drop → upload · batch make folders · refresh
+     ==================================================================== -->
+<div id="driveView" class="drive-view-tab hidden">
+  <div class="drive-shell">
+
+    <!-- TOOLBAR -->
+    <div class="drivex-toolbar">
+      <div class="drivex-crumb" id="drivexCrumb"></div>
+      <div class="drivex-search">
+        <span class="ico">🔍</span>
+        <input id="drivexSearch" placeholder="SEARCH FILES IN THIS FOLDER…">
+      </div>
+      <button class="drivex-icon-btn" id="drivexRefreshBtn" title="Refresh">↻</button>
+      <button class="drivex-icon-btn" id="drivexUpBtn" title="Up one folder">↑</button>
+      <button class="drivex-batch-btn" id="drivexBatchBtn">BATCH MAKE</button>
+      <button class="drivex-import-btn" id="drivexImportBtn" disabled>IMPORT <span id="drivexImportNum">0</span> →</button>
+    </div>
+
+    <!-- OS DROP OVERLAY — appears when dragging files from desktop -->
+    <div class="drivex-os-drop" id="drivexOsDrop">
+      <div class="drivex-os-card">
+        <div class="ico">⬇</div>
+        <h3>DROP TO UPLOAD</h3>
+        <p>Files will be added to the current folder</p>
+        <div class="target-line" id="drivexOsTarget">→ My Drive/</div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="drivex-content" id="drivexContent">
+
+      <!-- DEFAULT STATE — folder + file grids -->
+      <div class="drivex-state drivex-state-default" id="drivexStateDefault">
+        <div class="drivex-section-h">
+          FOLDERS <span class="count" id="drivexFolderCount">0 in this directory</span>
+        </div>
+        <div class="drivex-folder-grid" id="drivexFolderGrid"></div>
+
+        <div class="drivex-section-h">
+          FILES <span class="count" id="drivexFileCount">0 files</span>
+          <span class="hint">click to select · double-click to import · right-click for actions</span>
+        </div>
+        <div class="drivex-file-grid" id="drivexFileGrid"></div>
+      </div>
+
+      <!-- EMPTY -->
+      <div class="drivex-state drivex-state-empty" id="drivexStateEmpty" hidden>
+        <div class="drivex-empty-icon">📁</div>
+        <h2>This folder is empty</h2>
+        <p>Drop files from your desktop to upload, or pick a different Drive folder.</p>
+        <div class="drivex-empty-actions">
+          <button class="drivex-ghost-btn" id="drivexEmptyUpBtn">↑ UP ONE FOLDER</button>
+          <button class="drivex-ghost-btn" id="drivexEmptyBatchBtn">⊞ BATCH MAKE FOLDERS</button>
+        </div>
+      </div>
+
+      <!-- LOADING -->
+      <div class="drivex-state drivex-state-loading" id="drivexStateLoading" hidden>
+        <div class="drivex-skel-grid">
+          <div class="drivex-skel"></div><div class="drivex-skel"></div><div class="drivex-skel"></div>
+          <div class="drivex-skel"></div><div class="drivex-skel"></div><div class="drivex-skel"></div>
+          <div class="drivex-skel"></div><div class="drivex-skel"></div>
+        </div>
+        <div class="drivex-loading-msg">▶ FETCHING FILES FROM DRIVE…</div>
+      </div>
+
+      <!-- SIGN-IN -->
+      <div class="drivex-state drivex-state-signin" id="drivexStateSignin" hidden>
+        <div class="drivex-signin-card">
+          <div class="drivex-glogo">▲</div>
+          <h2>Connect Google Drive</h2>
+          <p>Browse, import, and upload directly from inside Seraphim Studio. We only access folders you authorize.</p>
+          <ul class="drivex-perms">
+            <li><span class="k">📁</span> See, create, and modify files in your Drive</li>
+            <li><span class="k">⬆</span> Upload exported videos and images</li>
+            <li><span class="k">⬇</span> Import files into the editor</li>
+            <li><span class="k">🗂</span> Batch-create dated folders for trial reels</li>
+          </ul>
+          <button class="drivex-primary-btn" id="drivexSigninBtn">CONNECT GOOGLE DRIVE</button>
+          <p class="drivex-revoke-hint">Revoke anytime at myaccount.google.com → Security → Third-party apps</p>
+        </div>
+      </div>
+
+      <!-- ERROR -->
+      <div class="drivex-state drivex-state-error" id="drivexStateError" hidden>
+        <div class="drivex-error-card">
+          <h2>Drive request failed</h2>
+          <p id="drivexErrorMsg">We couldn't reach Google Drive to fetch this folder.</p>
+          <pre class="drivex-err-detail" id="drivexErrorDetail"></pre>
+          <div class="drivex-empty-actions">
+            <button class="drivex-ghost-btn" id="drivexErrorRetryBtn">RETRY</button>
+            <button class="drivex-ghost-btn drivex-danger" id="drivexErrorReauthBtn">RE-AUTHENTICATE</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- File context menu -->
+  <div class="drivex-ctxmenu" id="drivexCtxMenu">
+    <div class="drivex-ctx-sub">FILE</div>
+    <div class="drivex-ctx-item" data-ctx="open"><span class="k">▶</span> Open in editor</div>
+    <div class="drivex-ctx-item" data-ctx="open-carousel"><span class="k">▦</span> Add to carousel</div>
+    <div class="drivex-ctx-sep"></div>
+    <div class="drivex-ctx-sub">EXPORT</div>
+    <div class="drivex-ctx-item" data-ctx="download"><span class="k">⬇</span> Download to desktop</div>
+    <div class="drivex-ctx-item" data-ctx="copy-name"><span class="k">⌘</span> Copy file name</div>
+    <div class="drivex-ctx-sep"></div>
+    <div class="drivex-ctx-item" data-ctx="rename" style="color:var(--text-dim)"><span class="k">✎</span> Rename…</div>
+    <div class="drivex-ctx-item drivex-danger" data-ctx="trash"><span class="k">⌫</span> Move to trash</div>
+  </div>
 </div>
 
 <div id="inspectorView" class="inspector-view hidden">
@@ -6683,7 +6802,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.3.3';
+const APP_VERSION = '4.4.0';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -6695,6 +6814,7 @@ function updateHeaderMeta() {
   if (!meta) return;
   const tab = currentView === 'editor' ? 'EDITOR'
             : currentView === 'carousel' ? 'CAROUSEL EDIT'
+            : currentView === 'drive' ? 'DRIVE'
             : currentView === 'inspector' ? 'METADATA INSPECTOR'
             : currentView.toUpperCase();
   let media = '';
@@ -6719,12 +6839,18 @@ function switchView(view) {
   });
   document.getElementById('editorView').classList.toggle('hidden', view !== 'editor');
   document.getElementById('carouselView').classList.toggle('hidden', view !== 'carousel');
+  const driveViewEl = document.getElementById('driveView');
+  if (driveViewEl) driveViewEl.classList.toggle('hidden', view !== 'drive');
   document.getElementById('inspectorView').classList.toggle('hidden', view !== 'inspector');
   // Pause video preview when leaving editor
   if (view !== 'editor' && !video.paused) video.pause();
   // Show or hide carousel drop/edit state
   if (view === 'carousel') {
     syncCarouselView();
+  }
+  // Drive tab — open + load on first activation, refresh on subsequent
+  if (view === 'drive' && typeof drivexOnEnterTab === 'function') {
+    drivexOnEnterTab();
   }
   updateHeaderMeta();
 }
@@ -9671,6 +9797,674 @@ function driveDownloadFile(fileId, fileName, mimeType, onProgress, retried) {
     xhr.onerror = () => reject(new Error(`Network error downloading ${fileName}`));
     xhr.send();
   });
+}
+
+// =====================================================================
+// DRIVE TAB (v4.4.0) — full Drive browser inside the app, separate from
+// the import/export picker modal. Self-contained drivex* namespace.
+// =====================================================================
+
+// Lists every non-trashed child of a folder. Returns {folders, files}
+// where files are filtered to media types (image/* or video/*) so the
+// browser stays focused on what the editor actually consumes.
+async function drivexListChildren(parentId) {
+  const q = encodeURIComponent(
+    `'${parentId}' in parents and trashed = false and ` +
+    `(mimeType = 'application/vnd.google-apps.folder' or mimeType contains 'image/' or mimeType contains 'video/')`
+  );
+  const url = `https://www.googleapis.com/drive/v3/files?q=${q}` +
+    `&fields=files(id,name,mimeType,size,thumbnailLink,videoMediaMetadata,imageMediaMetadata,modifiedTime),nextPageToken` +
+    `&pageSize=500&orderBy=folder,name`;
+  const resp = await driveFetch(url);
+  const data = await resp.json();
+  const folders = [], files = [];
+  for (const f of (data.files || [])) {
+    if (f.mimeType === 'application/vnd.google-apps.folder') folders.push(f);
+    else files.push(f);
+  }
+  return { folders, files };
+}
+
+// Move a file by replacing its parents. Drive supports addParents/removeParents
+// query params. We pass both so the move is atomic from the API's perspective.
+async function drivexMoveFile(fileId, fromParentId, toParentId) {
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}` +
+    `?addParents=${encodeURIComponent(toParentId)}&removeParents=${encodeURIComponent(fromParentId)}&fields=id,parents`;
+  const resp = await driveFetch(url, { method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: '{}' });
+  return resp.json();
+}
+
+// Drive tab state — separate from the picker modal state
+const drivexState = {
+  current: 'root',
+  crumbs: [{ id: 'root', name: 'My Drive' }],
+  loaded: false,            // first-load gate so opening tab triggers initial load
+  loading: false,           // request in flight
+  folders: [],
+  files: [],
+  selection: new Set(),     // file IDs
+  searchTerm: '',
+  ctxFile: null,
+  uploading: false,
+};
+
+function drivexShowState(name) {
+  ['default','empty','loading','signin','error'].forEach(s => {
+    const el = document.getElementById('drivexState' + s.charAt(0).toUpperCase() + s.slice(1));
+    if (!el) return;
+    if (s === name) el.setAttribute('data-active', '');
+    else { el.removeAttribute('data-active'); el.hidden = (s !== name); }
+  });
+  // Show the active panel
+  const active = document.getElementById('drivexState' + name.charAt(0).toUpperCase() + name.slice(1));
+  if (active) { active.hidden = false; active.setAttribute('data-active',''); }
+}
+
+function drivexRenderCrumbs() {
+  const wrap = document.getElementById('drivexCrumb');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  drivexState.crumbs.forEach((c, i) => {
+    if (i > 0) {
+      const sep = document.createElement('span');
+      sep.className = 'ck-sep';
+      sep.textContent = '›';
+      wrap.appendChild(sep);
+    }
+    const isLast = i === drivexState.crumbs.length - 1;
+    const seg = document.createElement('span');
+    seg.className = isLast ? 'ck-current' : 'ck-link';
+    seg.dataset.crumbIdx = String(i);
+    seg.dataset.folderId = c.id;
+    seg.textContent = (i === 0 ? '▲ ' : '') + c.name;
+    if (!isLast) {
+      seg.addEventListener('click', () => drivexNavigateToCrumb(i));
+    }
+    wrap.appendChild(seg);
+  });
+}
+
+function drivexNavigateToCrumb(idx) {
+  drivexState.crumbs = drivexState.crumbs.slice(0, idx + 1);
+  drivexState.current = drivexState.crumbs[idx].id;
+  drivexLoadCurrent();
+}
+
+function drivexNavigateInto(folder) {
+  drivexState.crumbs.push({ id: folder.id, name: folder.name });
+  drivexState.current = folder.id;
+  drivexLoadCurrent();
+}
+
+function drivexNavigateUp() {
+  if (drivexState.crumbs.length <= 1) return;
+  drivexState.crumbs.pop();
+  const back = drivexState.crumbs[drivexState.crumbs.length - 1];
+  drivexState.current = back.id;
+  drivexLoadCurrent();
+}
+
+async function drivexLoadCurrent() {
+  if (!driveGetToken() && !driveGetProfile()) {
+    drivexShowState('signin');
+    return;
+  }
+  drivexState.loading = true;
+  drivexShowState('loading');
+  drivexRenderCrumbs();
+  const refreshBtn = document.getElementById('drivexRefreshBtn');
+  if (refreshBtn) refreshBtn.classList.add('spinning');
+  try {
+    const { folders, files } = await drivexListChildren(drivexState.current);
+    drivexState.folders = folders;
+    drivexState.files = files;
+    drivexState.selection.clear();
+    drivexUpdateImportBtn();
+    drivexState.loaded = true;
+    drivexState.loading = false;
+    if (folders.length === 0 && files.length === 0) {
+      drivexShowState('empty');
+    } else {
+      drivexShowState('default');
+      drivexRenderFolders();
+      drivexRenderFiles();
+    }
+  } catch (e) {
+    drivexState.loading = false;
+    document.getElementById('drivexErrorMsg').textContent = 'We couldn\'t reach Google Drive to fetch this folder.';
+    document.getElementById('drivexErrorDetail').textContent = String(e?.message || e);
+    drivexShowState('error');
+  } finally {
+    if (refreshBtn) refreshBtn.classList.remove('spinning');
+  }
+}
+
+function drivexRenderFolders() {
+  const grid = document.getElementById('drivexFolderGrid');
+  const count = document.getElementById('drivexFolderCount');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const filtered = drivexState.searchTerm
+    ? drivexState.folders.filter(f => f.name.toLowerCase().includes(drivexState.searchTerm))
+    : drivexState.folders;
+  count.textContent = `${filtered.length} folder${filtered.length === 1 ? '' : 's'} in this directory · click to enter · drop files in to upload`;
+  filtered.forEach(f => {
+    const card = document.createElement('div');
+    card.className = 'drivex-folder';
+    card.setAttribute('draggable', 'true');
+    card.dataset.folderId = f.id;
+    card.innerHTML = `<span class="ic">📁</span>
+      <span class="nm" title="${escHtml(f.name)}">${escHtml(f.name)}</span>
+      <span class="mt">folder</span>`;
+    card.addEventListener('dblclick', () => drivexNavigateInto(f));
+    card.addEventListener('click', () => drivexNavigateInto(f));
+    drivexBindFolderDrop(card, f);
+    grid.appendChild(card);
+  });
+  // Append a "+ BATCH MAKE" tile
+  const slot = document.createElement('div');
+  slot.className = 'drivex-folder batch-slot';
+  slot.innerHTML = `<span class="ic">⊞</span><span class="nm">BATCH MAKE</span><span class="mt">create dated folders</span>`;
+  slot.addEventListener('click', drivexOpenBatchMake);
+  grid.appendChild(slot);
+}
+
+function drivexRenderFiles() {
+  const grid = document.getElementById('drivexFileGrid');
+  const count = document.getElementById('drivexFileCount');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const filtered = drivexState.searchTerm
+    ? drivexState.files.filter(f => f.name.toLowerCase().includes(drivexState.searchTerm))
+    : drivexState.files;
+  let totalSize = 0;
+  filtered.forEach(f => totalSize += parseInt(f.size || '0'));
+  count.textContent = `${filtered.length} file${filtered.length === 1 ? '' : 's'} · ${formatBytes(totalSize)} total`;
+  filtered.forEach(f => {
+    const isVideo = (f.mimeType || '').startsWith('video/');
+    const card = document.createElement('div');
+    card.className = 'drivex-file';
+    card.setAttribute('draggable', 'true');
+    card.dataset.fileId = f.id;
+    card.dataset.fileName = f.name;
+    card.dataset.fileMime = f.mimeType;
+    card.dataset.fileSize = f.size || '0';
+    const ext = (f.name.split('.').pop() || '').toUpperCase();
+    let dur = '';
+    if (isVideo && f.videoMediaMetadata?.durationMillis) {
+      const ms = parseInt(f.videoMediaMetadata.durationMillis);
+      const m = Math.floor(ms / 60000);
+      const s = Math.floor((ms / 1000) % 60).toString().padStart(2, '0');
+      dur = `<span class="b dur">${m}:${s}</span>`;
+    }
+    const thumbStyle = f.thumbnailLink
+      ? `<img loading="lazy" src="${escHtml(f.thumbnailLink)}" alt="">`
+      : (isVideo ? '▶' : '📷');
+    card.innerHTML = `<div class="thumb">${thumbStyle}<div class="badges"><span class="b">${escHtml(ext)}</span>${dur}</div></div>
+      <div class="meta">
+        <span class="fname" title="${escHtml(f.name)}">${escHtml(f.name)}</span>
+        <span class="fmeta">${formatBytes(parseInt(f.size||'0'))}${f.modifiedTime ? ' · ' + drivexRelativeTime(f.modifiedTime) : ''}</span>
+      </div>`;
+    card.addEventListener('click', (e) => drivexToggleFileSelect(card, f, e.metaKey || e.ctrlKey));
+    card.addEventListener('dblclick', () => drivexImportFile(f, 'editor'));
+    card.addEventListener('contextmenu', (e) => drivexShowCtxMenu(e, f));
+    drivexBindFileDrag(card, f);
+    grid.appendChild(card);
+  });
+}
+
+function drivexRelativeTime(iso) {
+  try {
+    const t = new Date(iso).getTime();
+    const diff = (Date.now() - t) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+    if (diff < 86400 * 7) return Math.floor(diff/86400) + 'd ago';
+    if (diff < 86400 * 30) return Math.floor(diff/86400/7) + 'w ago';
+    return new Date(iso).toLocaleDateString();
+  } catch (e) { return ''; }
+}
+
+function drivexToggleFileSelect(card, f, isModifierKey) {
+  const id = f.id;
+  if (drivexState.selection.has(id)) {
+    drivexState.selection.delete(id);
+    card.classList.remove('selected');
+  } else {
+    if (!isModifierKey && drivexState.selection.size === 0) {
+      // single-click on first file: just select it
+    }
+    drivexState.selection.add(id);
+    card.classList.add('selected');
+  }
+  drivexUpdateImportBtn();
+}
+
+function drivexUpdateImportBtn() {
+  const btn = document.getElementById('drivexImportBtn');
+  const num = document.getElementById('drivexImportNum');
+  if (!btn) return;
+  const n = drivexState.selection.size;
+  num.textContent = String(n);
+  btn.disabled = n === 0;
+}
+
+async function drivexImportSelected() {
+  if (drivexState.selection.size === 0) return;
+  const files = drivexState.files.filter(f => drivexState.selection.has(f.id));
+  if (files.length === 0) return;
+  // Single video → editor. Single image → editor. Multiple images → carousel.
+  if (files.length === 1) {
+    return drivexImportFile(files[0], 'editor');
+  }
+  // Multiple — push to carousel
+  const blobs = [];
+  for (const f of files) {
+    if ((f.mimeType || '').startsWith('video/')) {
+      showToast(`Skipped ${f.name} — videos go to the editor, one at a time`);
+      continue;
+    }
+    try {
+      const file = await driveDownloadFile(f.id, f.name, f.mimeType);
+      blobs.push(file);
+    } catch (e) {
+      showToast(`Download failed: ${f.name}`);
+    }
+  }
+  if (blobs.length === 0) return;
+  switchView('carousel');
+  await addCarouselFiles(blobs);
+  showToast(`Imported ${blobs.length} file${blobs.length === 1 ? '' : 's'} to carousel`);
+}
+
+async function drivexImportFile(f, target) {
+  try {
+    showToast(`Downloading ${f.name}…`);
+    const file = await driveDownloadFile(f.id, f.name, f.mimeType);
+    if (target === 'carousel') {
+      switchView('carousel');
+      await addCarouselFiles([file]);
+    } else {
+      switchView('editor');
+      await handleFile(file);
+    }
+    showToast(`Imported ${f.name}`);
+  } catch (e) {
+    showToast(`Import failed: ${e?.message || e}`);
+  }
+}
+
+// =====================================================================
+// Drag-and-drop within Drive tab
+// =====================================================================
+let drivexDragSrc = null;
+let drivexDragKind = null;
+let drivexOsDragDepth = 0;
+
+function drivexIsOsFileDrag(e) {
+  return e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+}
+
+function drivexBindFileDrag(card, f) {
+  card.addEventListener('dragstart', (e) => {
+    drivexDragSrc = { card, file: f };
+    drivexDragKind = 'file';
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', f.name); } catch (_) {}
+  });
+  card.addEventListener('dragend', () => {
+    card.classList.remove('dragging');
+    document.querySelectorAll('.drivex-folder.drop-target').forEach(x => x.classList.remove('drop-target'));
+    document.querySelectorAll('.drivex-crumb .drop-target').forEach(x => x.classList.remove('drop-target'));
+    drivexDragSrc = null;
+    drivexDragKind = null;
+  });
+}
+
+function drivexBindFolderDrop(card, folder) {
+  card.addEventListener('dragover', (e) => {
+    if (drivexDragKind === 'file' && drivexDragSrc) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      card.classList.add('drop-target');
+    } else if (drivexIsOsFileDrag(e)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      card.classList.add('os-drop-target');
+    }
+  });
+  card.addEventListener('dragleave', () => {
+    card.classList.remove('drop-target');
+    card.classList.remove('os-drop-target');
+  });
+  card.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();  // prevent the content-level OS drop from firing too
+    card.classList.remove('drop-target');
+    card.classList.remove('os-drop-target');
+
+    if (drivexIsOsFileDrag(e)) {
+      const files = Array.from(e.dataTransfer.files || []);
+      if (files.length > 0) {
+        await drivexUploadFiles(files, folder.id, folder.name);
+      }
+      return;
+    }
+
+    if (drivexDragKind !== 'file' || !drivexDragSrc) return;
+    const f = drivexDragSrc.file;
+    const sourceCard = drivexDragSrc.card;
+    try {
+      await drivexMoveFile(f.id, drivexState.current, folder.id);
+      sourceCard.style.transition = 'opacity .25s, transform .3s';
+      sourceCard.style.opacity = '0';
+      sourceCard.style.transform = 'scale(.6)';
+      setTimeout(() => sourceCard.remove(), 280);
+      drivexState.files = drivexState.files.filter(x => x.id !== f.id);
+      drivexState.selection.delete(f.id);
+      drivexUpdateImportBtn();
+      showToast(`Moved ${f.name} → ${folder.name}/`);
+    } catch (err) {
+      showToast(`Move failed: ${err?.message || err}`);
+    }
+  });
+}
+
+// Breadcrumb drop-target — drag a file UP to a parent folder
+function drivexBindCrumbDrops() {
+  const crumb = document.getElementById('drivexCrumb');
+  if (!crumb) return;
+  crumb.addEventListener('dragover', (e) => {
+    if (drivexDragKind !== 'file' || !drivexDragSrc) return;
+    const seg = e.target.closest?.('.ck-link, .ck-current');
+    if (!seg) return;
+    const idx = parseInt(seg.dataset.crumbIdx || '-1');
+    // Don't allow drop on current folder (we're already there)
+    if (idx === drivexState.crumbs.length - 1) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.drivex-crumb .drop-target').forEach(x => x.classList.remove('drop-target'));
+    seg.classList.add('drop-target');
+  });
+  crumb.addEventListener('dragleave', (e) => {
+    const seg = e.target.closest?.('.ck-link, .ck-current');
+    if (seg) seg.classList.remove('drop-target');
+  });
+  crumb.addEventListener('drop', async (e) => {
+    if (drivexDragKind !== 'file' || !drivexDragSrc) return;
+    const seg = e.target.closest?.('.ck-link, .ck-current');
+    if (!seg) return;
+    const idx = parseInt(seg.dataset.crumbIdx || '-1');
+    if (idx < 0 || idx === drivexState.crumbs.length - 1) return;
+    e.preventDefault();
+    seg.classList.remove('drop-target');
+    const targetCrumb = drivexState.crumbs[idx];
+    const f = drivexDragSrc.file;
+    const sourceCard = drivexDragSrc.card;
+    try {
+      await drivexMoveFile(f.id, drivexState.current, targetCrumb.id);
+      sourceCard.style.transition = 'opacity .25s, transform .3s';
+      sourceCard.style.opacity = '0';
+      sourceCard.style.transform = 'translateY(-30px) scale(.6)';
+      setTimeout(() => sourceCard.remove(), 280);
+      drivexState.files = drivexState.files.filter(x => x.id !== f.id);
+      drivexState.selection.delete(f.id);
+      drivexUpdateImportBtn();
+      showToast(`Moved ${f.name} ↑ to ${targetCrumb.name}/`);
+    } catch (err) {
+      showToast(`Move failed: ${err?.message || err}`);
+    }
+  });
+}
+
+// =====================================================================
+// OS file drop — drop external files into the Drive tab to upload them
+// =====================================================================
+function drivexBindOsDrop() {
+  const content = document.getElementById('drivexContent');
+  const overlay = document.getElementById('drivexOsDrop');
+  const target = document.getElementById('drivexOsTarget');
+  if (!content || !overlay) return;
+
+  content.addEventListener('dragenter', (e) => {
+    if (!drivexIsOsFileDrag(e)) return;
+    e.preventDefault();
+    drivexOsDragDepth++;
+    overlay.classList.add('show');
+    const cur = drivexState.crumbs[drivexState.crumbs.length - 1];
+    if (target) target.textContent = `→ ${cur.name}/  (current folder)`;
+  });
+  content.addEventListener('dragover', (e) => {
+    if (!drivexIsOsFileDrag(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    // Folder hover update is handled by per-folder dragover handlers
+  });
+  content.addEventListener('dragleave', (e) => {
+    if (!drivexIsOsFileDrag(e)) return;
+    drivexOsDragDepth--;
+    if (drivexOsDragDepth <= 0) {
+      drivexOsDragDepth = 0;
+      overlay.classList.remove('show');
+      document.querySelectorAll('.drivex-folder.os-drop-target').forEach(f => f.classList.remove('os-drop-target'));
+    }
+  });
+  content.addEventListener('drop', async (e) => {
+    if (!drivexIsOsFileDrag(e)) return;
+    e.preventDefault();
+    drivexOsDragDepth = 0;
+    overlay.classList.remove('show');
+    document.querySelectorAll('.drivex-folder.os-drop-target').forEach(f => f.classList.remove('os-drop-target'));
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length === 0) return;
+    const cur = drivexState.crumbs[drivexState.crumbs.length - 1];
+    await drivexUploadFiles(files, cur.id, cur.name);
+  });
+}
+
+async function drivexUploadFiles(files, folderId, folderName) {
+  if (drivexState.uploading) {
+    showToast('Upload already in progress — wait for it to finish.');
+    return;
+  }
+  drivexState.uploading = true;
+  let ok = 0;
+  for (const f of files) {
+    try {
+      showToast(`⬆ Uploading ${f.name}…`);
+      await driveUploadFile(folderId, f.name, f, f.type || 'application/octet-stream');
+      ok++;
+    } catch (err) {
+      showToast(`Upload failed: ${f.name}`);
+    }
+  }
+  drivexState.uploading = false;
+  showToast(`✓ Uploaded ${ok}/${files.length} file${files.length === 1 ? '' : 's'} to ${folderName}/`);
+  if (folderId === drivexState.current) {
+    drivexLoadCurrent();
+  }
+}
+
+// =====================================================================
+// Context menu
+// =====================================================================
+function drivexShowCtxMenu(e, f) {
+  e.preventDefault();
+  drivexState.ctxFile = f;
+  const menu = document.getElementById('drivexCtxMenu');
+  if (!menu) return;
+  const x = Math.min(e.clientX, window.innerWidth - 240);
+  const y = Math.min(e.clientY, window.innerHeight - 360);
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  menu.classList.add('show');
+}
+
+function drivexHideCtxMenu() {
+  const menu = document.getElementById('drivexCtxMenu');
+  if (menu) menu.classList.remove('show');
+}
+
+async function drivexHandleCtxAction(action) {
+  const f = drivexState.ctxFile;
+  if (!f) return;
+  drivexHideCtxMenu();
+  switch (action) {
+    case 'open':
+      drivexImportFile(f, 'editor');
+      break;
+    case 'open-carousel':
+      drivexImportFile(f, 'carousel');
+      break;
+    case 'download': {
+      try {
+        showToast(`Downloading ${f.name}…`);
+        const file = await driveDownloadFile(f.id, f.name, f.mimeType);
+        // Trigger a browser download via blob URL
+        const url = URL.createObjectURL(file);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = f.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        showToast(`✓ Downloaded ${f.name}`);
+      } catch (e) {
+        showToast(`Download failed: ${e?.message || e}`);
+      }
+      break;
+    }
+    case 'copy-name':
+      try { await navigator.clipboard.writeText(f.name); showToast('File name copied'); }
+      catch (e) { showToast('Copy failed'); }
+      break;
+    case 'rename': {
+      const newName = prompt('Rename to:', f.name);
+      if (!newName || newName === f.name) return;
+      try {
+        await driveRenameItem(f.id, newName);
+        showToast(`Renamed → ${newName}`);
+        drivexLoadCurrent();
+      } catch (e) {
+        showToast(`Rename failed: ${e?.message || e}`);
+      }
+      break;
+    }
+    case 'trash': {
+      if (!confirm(`Move "${f.name}" to Drive trash? (Restore from drive.google.com within 30 days.)`)) return;
+      try {
+        await driveTrashItem(f.id);
+        showToast(`Moved to trash: ${f.name}`);
+        drivexState.files = drivexState.files.filter(x => x.id !== f.id);
+        drivexState.selection.delete(f.id);
+        drivexRenderFiles();
+        drivexUpdateImportBtn();
+      } catch (e) {
+        showToast(`Trash failed: ${e?.message || e}`);
+      }
+      break;
+    }
+  }
+}
+
+// =====================================================================
+// Batch make — reuses the existing dated-folder helper from the picker
+// =====================================================================
+function drivexOpenBatchMake() {
+  // Reuse the existing driveCreateDatedFolder by routing through the picker
+  // modal's DATED_FOLDER prompt. Easiest path: use the existing modal in
+  // dated-folder mode, scoped to drivexState.current as the parent.
+  // Fallback: prompt for a name and create one folder.
+  const today = new Date();
+  const m = today.getMonth() + 1;
+  const d = today.getDate();
+  const defaultName = `${m}-${String(d).padStart(2,'0')}`;
+  const name = prompt(
+    `Create a dated folder in "${drivexState.crumbs[drivexState.crumbs.length-1].name}"?\n\n` +
+    `Format: M-DD (e.g. ${defaultName} for today). It will get the same subfolders as your dated-folder defaults (Post / Story / Reel).`,
+    defaultName
+  );
+  if (!name) return;
+  (async () => {
+    try {
+      const subs = datedGetSubfolderPrefs().filter(s => s.on).map(s => s.name);
+      showToast(`Creating ${name}…`);
+      await driveCreateDatedFolder(drivexState.current, name, subs);
+      showToast(`✓ Created ${name} (with ${subs.length} subfolders)`);
+      drivexLoadCurrent();
+    } catch (e) {
+      showToast(`Create failed: ${e?.message || e}`);
+    }
+  })();
+}
+
+// =====================================================================
+// Tab entry & wiring
+// =====================================================================
+let _drivexWired = false;
+
+function drivexOnEnterTab() {
+  if (!_drivexWired) {
+    drivexWireOnce();
+    _drivexWired = true;
+  }
+  if (!driveGetToken() && !driveGetProfile()) {
+    drivexShowState('signin');
+    return;
+  }
+  if (!drivexState.loaded) {
+    drivexLoadCurrent();
+  } else {
+    // Already loaded — show whatever state we last had
+    if (drivexState.folders.length === 0 && drivexState.files.length === 0) {
+      drivexShowState('empty');
+    } else {
+      drivexShowState('default');
+      drivexRenderFolders();
+      drivexRenderFiles();
+    }
+  }
+}
+
+function drivexWireOnce() {
+  document.getElementById('drivexRefreshBtn')?.addEventListener('click', drivexLoadCurrent);
+  document.getElementById('drivexUpBtn')?.addEventListener('click', drivexNavigateUp);
+  document.getElementById('drivexBatchBtn')?.addEventListener('click', drivexOpenBatchMake);
+  document.getElementById('drivexImportBtn')?.addEventListener('click', drivexImportSelected);
+  document.getElementById('drivexEmptyUpBtn')?.addEventListener('click', drivexNavigateUp);
+  document.getElementById('drivexEmptyBatchBtn')?.addEventListener('click', drivexOpenBatchMake);
+  document.getElementById('drivexErrorRetryBtn')?.addEventListener('click', drivexLoadCurrent);
+  document.getElementById('drivexErrorReauthBtn')?.addEventListener('click', async () => {
+    try { await driveAuth(true); drivexLoadCurrent(); }
+    catch (e) { showToast(`Auth failed: ${e?.message || e}`); }
+  });
+  document.getElementById('drivexSigninBtn')?.addEventListener('click', async () => {
+    try {
+      await driveAuth();
+      drivexLoadCurrent();
+    } catch (e) {
+      showToast(`Sign-in failed: ${e?.message || e}`);
+    }
+  });
+  document.getElementById('drivexSearch')?.addEventListener('input', (e) => {
+    drivexState.searchTerm = (e.target.value || '').toLowerCase();
+    drivexRenderFolders();
+    drivexRenderFiles();
+  });
+  // Context menu actions
+  document.querySelectorAll('#drivexCtxMenu .drivex-ctx-item').forEach(item => {
+    item.addEventListener('click', () => drivexHandleCtxAction(item.dataset.ctx));
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#drivexCtxMenu')) drivexHideCtxMenu();
+  });
+  // OS drop binding
+  drivexBindOsDrop();
+  // Crumb drop binding
+  drivexBindCrumbDrops();
 }
 
 // Render the file-picker shell: account, breadcrumb, list, footer with Import button
@@ -13840,6 +14634,38 @@ function ensureSettingsModal() {
 // ============================================================================
 const PATCH_NOTES = [
   {
+    version: '4.4.0',
+    date: '2026-05-07',
+    title: 'DRIVE TAB — full Google Drive browser inside the app',
+    sections: [
+      { h: 'New tab', items: [
+        '▲ <b>DRIVE</b> tab now sits between Carousel and Inspector. Browse your entire Google Drive without ever opening the modal picker — folders, files, breadcrumb navigation, search, refresh, the works.',
+        'Folder grid + file grid with thumbnails. Files show extension badge + duration (for videos) + relative modified time. Click to select (multi-select supported), double-click to import to editor.',
+      ]},
+      { h: 'Drag-and-drop in 4 directions', items: [
+        '📁 <b>File → folder</b>: drag any file onto a folder card to move it (uses Drive\'s addParents/removeParents in one PATCH call).',
+        '↑ <b>File → breadcrumb</b>: drag a file onto any parent in the path to move it up the tree.',
+        '⬇ <b>Desktop → Drive</b>: drop files from your desktop straight into the Drive tab. Drops on folder cards upload INTO that folder; drops on the open area upload to the current folder. Cyan dashed overlay tells you what\'s happening.',
+        '↻ Auto-refresh after every move/upload so the grid always matches reality.',
+      ]},
+      { h: 'Multi-select import', items: [
+        'Pick a few files → click <b>IMPORT N →</b> in the toolbar. One file = goes to editor. Multiple images = goes to carousel. Mixed (videos + images) = images to carousel, video toast warns you to import videos one at a time.',
+      ]},
+      { h: 'Right-click context menu', items: [
+        'Right-click any file: Open in editor / Add to carousel / Download to desktop / Copy file name / Rename / Move to trash. Trash uses Drive\'s trash (recoverable for 30 days), not permanent delete.',
+      ]},
+      { h: 'Batch make folders', items: [
+        '⊞ <b>BATCH MAKE</b> button (and matching tile in the folder grid) creates a dated folder using your existing dated-folder defaults — same logic that powers the carousel\'s "Create dated folder" flow. Subfolders are created in one batch.',
+      ]},
+      { h: 'Six states', items: [
+        'Sign-in card if you haven\'t connected Drive yet · loading skeleton while fetching · empty-folder card with quick actions · default grid · error card with re-authenticate button · OS-drop overlay during external drag.',
+      ]},
+      { h: 'Reuses existing infra', items: [
+        'OAuth flow + token refresh + driveAuth/driveFetch/driveDownloadFile/driveUploadFile/driveRenameItem/driveTrashItem/driveCreateDatedFolder are all the same battle-tested functions powering the picker modal. No new auth surface, no duplicate code paths.',
+      ]},
+    ]
+  },
+  {
     version: '4.3.3',
     date: '2026-05-07',
     title: 'Auto-updater fix — v4.3.1 / v4.3.2 finally published',
@@ -15699,6 +16525,140 @@ if (window.__TAURI__ && window.__TAURI__.core) {
   .perf-modal button:hover{border-color:#FFE600;color:#FFE600}
   .perf-modal button.primary{background:#FFE600;color:var(--bg);border-color:#FFE600;font-weight:700}
   .perf-modal button.primary:hover{filter:brightness(1.15)}
+
+  /* ====================================================================
+     DRIVE TAB (v4.4.0) — full Google Drive browser inside the app.
+     Self-contained .drivex-* class namespace so nothing collides with
+     the existing Drive picker modal.
+     ==================================================================== */
+  #driveView.drive-view-tab{flex:1;display:flex;flex-direction:column;min-height:0;background:transparent;position:relative;overflow:hidden}
+  #driveView.drive-view-tab.hidden{display:none}
+  #driveView .drive-shell{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
+
+  /* Toolbar — breadcrumb · search · view controls · batch · import */
+  .drivex-toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px;background:var(--surface);border-bottom:1px solid var(--border)}
+  .drivex-crumb{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-faint);letter-spacing:.04em;flex-wrap:wrap;min-width:0}
+  .drivex-crumb .ck-link,.drivex-crumb .ck-current{padding:4px 8px;border:1px solid transparent;transition:all .15s ease}
+  .drivex-crumb .ck-link{color:var(--text-dim);cursor:pointer}
+  .drivex-crumb .ck-link:hover{color:var(--text)}
+  .drivex-crumb .ck-current{color:var(--accent);text-shadow:0 0 6px var(--accent-glow);font-weight:700}
+  .drivex-crumb .ck-sep{color:var(--text-faint);opacity:.5}
+  .drivex-crumb .ck-link.drop-target,.drivex-crumb .ck-current.drop-target{background:rgba(255,230,0,.12);color:var(--accent-3);border:1px solid var(--accent-3);text-shadow:0 0 6px var(--accent-3);box-shadow:0 0 14px rgba(255,230,0,.4)}
+
+  .drivex-search{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--surface-2);border:1px solid var(--border);flex:1;max-width:340px;min-width:180px;transition:border-color .2s ease,box-shadow .2s ease}
+  .drivex-search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+  .drivex-search input{flex:1;font-family:'JetBrains Mono',monospace;font-size:12px;background:transparent;border:none;color:var(--text);outline:none}
+  .drivex-search input::placeholder{color:var(--text-faint)}
+  .drivex-search .ico{color:var(--accent-2);font-size:14px}
+
+  .drivex-icon-btn{width:32px;height:32px;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);font-size:14px;transition:all .2s ease;cursor:pointer}
+  .drivex-icon-btn:hover{border-color:var(--accent);color:var(--accent);box-shadow:0 0 10px var(--accent-glow)}
+  .drivex-icon-btn.spinning{animation:drivexSpin 0.7s linear infinite}
+  @keyframes drivexSpin{to{transform:rotate(360deg)}}
+
+  .drivex-batch-btn{padding:8px 14px;font-family:'Audiowide','Antonio',sans-serif;font-size:11px;letter-spacing:.16em;background:transparent;border:1px solid var(--accent-2);color:var(--accent-2);cursor:pointer;transition:all .2s ease;clip-path:polygon(6% 0,100% 0,94% 100%,0 100%)}
+  .drivex-batch-btn:hover{background:var(--accent-2);color:var(--bg);box-shadow:0 0 16px var(--accent-2-glow)}
+
+  .drivex-import-btn{padding:8px 16px;font-family:'Audiowide','Antonio',sans-serif;font-size:11px;letter-spacing:.16em;background:var(--accent);color:var(--bg);border:1px solid var(--accent);cursor:pointer;transition:all .2s ease;clip-path:polygon(6% 0,100% 0,94% 100%,0 100%);font-weight:700}
+  .drivex-import-btn:hover:not(:disabled){box-shadow:0 0 18px var(--accent-glow);filter:brightness(1.1)}
+  .drivex-import-btn:disabled{opacity:.35;cursor:not-allowed;filter:grayscale(.6)}
+
+  /* Content area — scroll, OS-drop overlay anchor */
+  .drivex-content{flex:1;overflow-y:auto;padding:18px 20px;position:relative;min-height:0}
+  .drivex-state{display:none}
+  .drivex-state[data-active]{display:block}
+  .drivex-state-default[data-active]{display:block}
+
+  .drivex-section-h{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-family:'Audiowide','Antonio',sans-serif;font-weight:400;font-size:11px;letter-spacing:.18em;color:var(--text-dim);text-transform:uppercase}
+  .drivex-section-h::before{content:'>> ';color:var(--accent-2);text-shadow:0 0 4px var(--accent-2)}
+  .drivex-section-h .count{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);letter-spacing:.06em;text-transform:none}
+  .drivex-section-h .hint{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.04em;text-transform:none;margin-left:auto}
+  .drivex-section-h::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+
+  /* FOLDER CARDS */
+  .drivex-folder-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+  .drivex-folder{position:relative;background:var(--surface-2);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 12px 12px;cursor:pointer;transition:transform .25s cubic-bezier(.34,1.56,.64,1),border-color .2s ease,box-shadow .2s ease;user-select:none}
+  .drivex-folder:hover{border-color:var(--accent);box-shadow:0 0 14px var(--accent-glow);transform:translateY(-2px)}
+  .drivex-folder.dragging{opacity:.4;cursor:grabbing}
+  .drivex-folder.drop-target{border-color:var(--accent-3);background:rgba(255,230,0,.08);box-shadow:0 0 0 2px var(--accent-3),0 0 20px rgba(255,230,0,.4);transform:scale(1.04)}
+  .drivex-folder.drop-target::after{content:'DROP TO MOVE';position:absolute;inset:0;display:grid;place-items:center;font-family:'Audiowide','Antonio',sans-serif;font-size:10px;letter-spacing:.18em;color:var(--accent-3);background:rgba(0,0,0,.55);text-shadow:0 0 8px var(--accent-3);pointer-events:none}
+  .drivex-folder .ic{font-size:38px;color:#A1C4FD;filter:drop-shadow(0 0 8px rgba(161,196,253,.5))}
+  .drivex-folder .nm{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);letter-spacing:.04em;text-align:center;overflow:hidden;text-overflow:ellipsis;max-width:100%;white-space:nowrap}
+  .drivex-folder .mt{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.04em}
+  .drivex-folder.batch-slot{background:transparent;border:1.5px dashed var(--border-strong);color:var(--text-faint)}
+  .drivex-folder.batch-slot:hover{border-color:var(--accent-2);color:var(--accent-2);box-shadow:0 0 10px var(--accent-2-glow)}
+  .drivex-folder.batch-slot .ic{color:var(--accent-2)}
+
+  /* FILE CARDS */
+  .drivex-file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+  .drivex-file{position:relative;background:var(--surface-2);border:1px solid var(--border);cursor:pointer;transition:all .25s cubic-bezier(.34,1.56,.64,1);user-select:none;overflow:hidden}
+  .drivex-file:hover{border-color:var(--accent);box-shadow:0 0 14px var(--accent-glow);transform:translateY(-2px)}
+  .drivex-file.dragging{opacity:.4;cursor:grabbing}
+  .drivex-file.selected{border-color:var(--accent-3);box-shadow:0 0 0 2px var(--accent-3),0 0 18px rgba(255,230,0,.4)}
+  .drivex-file.selected::before{content:'✓';position:absolute;top:6px;right:6px;width:22px;height:22px;background:var(--accent-3);color:var(--bg);font-weight:900;font-size:13px;display:grid;place-items:center;z-index:2;text-shadow:0 0 4px rgba(0,0,0,.6);box-shadow:0 0 10px rgba(255,230,0,.6)}
+  .drivex-file .thumb{aspect-ratio:1/1;background:var(--surface-3) center/cover no-repeat;display:grid;place-items:center;font-size:32px;color:var(--text-dim);position:relative}
+  .drivex-file .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .drivex-file .badges{position:absolute;left:6px;bottom:6px;display:flex;gap:4px;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.06em}
+  .drivex-file .b{padding:2px 5px;background:rgba(0,0,0,.55);color:var(--accent-2);text-shadow:0 0 4px var(--accent-2)}
+  .drivex-file .b.dur{background:rgba(0,0,0,.7);color:var(--text)}
+  .drivex-file .meta{padding:8px 9px;border-top:1px solid var(--border);background:var(--surface-2)}
+  .drivex-file .fname{display:block;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .drivex-file .fmeta{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.04em;margin-top:2px}
+
+  /* OS drop-target ring on folders during external drag */
+  .drivex-folder.os-drop-target{border-color:var(--accent-2);background:rgba(0,240,255,.08);box-shadow:0 0 0 2px var(--accent-2),0 0 22px var(--accent-2-glow);transform:scale(1.04)}
+  .drivex-folder.os-drop-target::after{content:'DROP HERE TO UPLOAD';position:absolute;inset:0;display:grid;place-items:center;font-family:'Audiowide','Antonio',sans-serif;font-size:9px;letter-spacing:.18em;color:var(--accent-2);background:rgba(0,0,0,.55);text-shadow:0 0 8px var(--accent-2);pointer-events:none}
+
+  /* OS DROP OVERLAY — full content overlay */
+  .drivex-os-drop{position:absolute;inset:64px 0 0 0;z-index:30;background:rgba(0,240,255,.06);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);border:3px dashed var(--accent-2);display:none;place-items:center;pointer-events:none;animation:drivexDropPulse 1.2s ease-in-out infinite}
+  .drivex-os-drop.show{display:grid}
+  @keyframes drivexDropPulse{0%,100%{box-shadow:inset 0 0 60px rgba(0,240,255,.15),0 0 30px rgba(0,240,255,.3)}50%{box-shadow:inset 0 0 100px rgba(0,240,255,.30),0 0 50px rgba(0,240,255,.5)}}
+  .drivex-os-card{text-align:center;padding:28px 44px;background:rgba(15,15,26,.92);border:2px solid var(--accent-2);clip-path:polygon(3% 0,100% 0,97% 100%,0 100%);box-shadow:0 0 40px var(--accent-2-glow)}
+  .drivex-os-card .ico{font-size:48px;color:var(--accent-2);text-shadow:0 0 18px var(--accent-2);margin-bottom:6px;animation:drivexBob 1.5s ease-in-out infinite}
+  @keyframes drivexBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  .drivex-os-card h3{font-family:'Audiowide','Antonio',sans-serif;font-size:18px;letter-spacing:.16em;color:var(--accent-2);margin:0 0 6px;text-shadow:0 0 12px var(--accent-2)}
+  .drivex-os-card p{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:.06em;margin:0}
+  .drivex-os-card .target-line{margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent-3);letter-spacing:.08em;text-shadow:0 0 6px var(--accent-3)}
+
+  /* EMPTY / SIGN-IN / LOADING / ERROR states */
+  .drivex-state-empty,.drivex-state-signin,.drivex-state-error{text-align:center;padding:60px 24px;display:none}
+  .drivex-state-empty[data-active],.drivex-state-signin[data-active],.drivex-state-error[data-active]{display:block}
+  .drivex-empty-icon{font-size:60px;color:var(--text-faint);margin-bottom:14px;filter:drop-shadow(0 0 10px var(--accent-glow))}
+  .drivex-state-empty h2,.drivex-state-signin h2,.drivex-state-error h2{font-family:'Audiowide','Antonio',sans-serif;font-size:22px;letter-spacing:.14em;color:var(--text);margin:0 0 8px}
+  .drivex-state-empty p,.drivex-state-signin p,.drivex-state-error p{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);max-width:520px;margin:0 auto 16px;line-height:1.6}
+  .drivex-empty-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .drivex-ghost-btn{padding:9px 16px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;background:transparent;border:1px solid var(--border-strong);color:var(--text);cursor:pointer;text-transform:uppercase;transition:all .2s ease}
+  .drivex-ghost-btn:hover{border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px var(--accent-glow)}
+  .drivex-ghost-btn.drivex-danger{color:var(--red);border-color:var(--red)}
+  .drivex-ghost-btn.drivex-danger:hover{background:var(--red);color:var(--bg);box-shadow:0 0 12px rgba(255,59,92,.5)}
+
+  .drivex-signin-card{max-width:520px;margin:0 auto;padding:36px 32px;background:var(--surface);border:1px solid var(--border);clip-path:polygon(2% 0,100% 0,98% 100%,0 100%)}
+  .drivex-glogo{font-size:48px;color:var(--accent);margin-bottom:8px;text-shadow:0 0 16px var(--accent-glow)}
+  .drivex-perms{list-style:none;padding:0;margin:14px 0;display:flex;flex-direction:column;gap:8px;text-align:left}
+  .drivex-perms li{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface-2);border:1px solid var(--border)}
+  .drivex-perms .k{color:var(--accent-2);width:22px;text-align:center;font-size:14px}
+  .drivex-primary-btn{width:100%;padding:13px 20px;font-family:'Audiowide','Antonio',sans-serif;font-size:13px;letter-spacing:.16em;background:var(--accent);color:var(--bg);border:none;cursor:pointer;font-weight:700;text-transform:uppercase;transition:all .2s ease;clip-path:polygon(3% 0,100% 0,97% 100%,0 100%);margin-top:6px}
+  .drivex-primary-btn:hover{box-shadow:0 0 18px var(--accent-glow);filter:brightness(1.1)}
+  .drivex-revoke-hint{font-size:10px;color:var(--text-faint);font-style:italic;margin:14px 0 0}
+
+  .drivex-error-card{max-width:540px;margin:0 auto;padding:24px;background:var(--surface);border:1px solid var(--red);clip-path:polygon(2% 0,100% 0,98% 100%,0 100%)}
+  .drivex-err-detail{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);background:var(--surface-2);padding:10px 12px;text-align:left;white-space:pre-wrap;max-height:140px;overflow-y:auto;border:1px solid var(--border);margin:0 0 16px}
+
+  /* LOADING skeleton */
+  .drivex-skel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:18px}
+  .drivex-skel{aspect-ratio:1/1.18;background:linear-gradient(90deg,var(--surface-2) 0,var(--surface-3) 50%,var(--surface-2) 100%);background-size:200% 100%;animation:drivexShimmer 1.4s linear infinite}
+  @keyframes drivexShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  .drivex-loading-msg{text-align:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent-2);letter-spacing:.10em;text-shadow:0 0 6px var(--accent-2)}
+
+  /* CONTEXT MENU */
+  .drivex-ctxmenu{position:fixed;z-index:99999;display:none;background:var(--surface);border:1px solid var(--accent);box-shadow:0 0 30px var(--accent-glow),0 14px 44px rgba(0,0,0,.6);min-width:220px;padding:6px 0;clip-path:polygon(0 0,100% 0,100% 96%,96% 100%,0 100%)}
+  .drivex-ctxmenu.show{display:block}
+  .drivex-ctx-item{display:flex;align-items:center;gap:10px;padding:9px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);letter-spacing:.04em;cursor:pointer;transition:all .12s ease}
+  .drivex-ctx-item:hover{background:rgba(255,46,136,.10);color:var(--accent);text-shadow:0 0 4px var(--accent)}
+  .drivex-ctx-item.drivex-danger:hover{background:rgba(255,59,92,.12);color:var(--red);text-shadow:0 0 4px var(--red)}
+  .drivex-ctx-item .k{color:var(--accent-2);width:16px;text-align:center}
+  .drivex-ctx-sep{height:1px;background:var(--border);margin:5px 0}
+  .drivex-ctx-sub{padding:6px 14px 4px;font-family:'Audiowide','Antonio',sans-serif;font-size:9px;letter-spacing:.16em;color:var(--text-faint)}
 </style>
 <div class="picker-overlay hidden" id="drivePickerOverlay">
 <div class="picker-modal" id="drivePickerModal">
