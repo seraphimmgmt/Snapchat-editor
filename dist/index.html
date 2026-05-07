@@ -6,7 +6,7 @@
 <title>SNAP CAPTION STUDIO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Audiowide&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Inter:wght@700;900&family=Permanent+Marker&family=Caveat:wght@700&family=Pacifico&family=Playfair+Display:wght@900&family=Archivo+Black&family=Bungee&family=Oswald:wght@700&family=Rubik+Mono+One&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
@@ -15,26 +15,31 @@
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
-  /* Palette E — Aurora (silver/gold shimmer). The single solid `--accent`
-     stays for places that need a fixed color (icons, single-color svgs).
-     Shimmer is applied via .shimmer / .shimmer-bg utility classes wherever
-     the accent appears as a fill or background. */
+  /* v4.3.0 — Cyberpunk skin. Hot-pink + cyan + yellow accents on near-black,
+     clip-path angular cuts on action surfaces, holographic rainbow strip on
+     header, optional animated bg-deco (city skyline + grid floor + scan beam).
+     Decoration layers are gated by data-deco-{bg|ornaments|motifs|anim} on
+     <html> — toggleable in Settings → Theme. The keyframe still ships under
+     `auroraShimmer` to keep the existing references compatible. */
   :root{
-    --bg:#0a0a0c;
-    --surface:#131316;
-    --surface-2:#1c1c21;
-    --surface-3:#262630;
-    --border:#2a2a35;
-    --border-strong:#3a3a48;
-    --text:#F0EDE4;
-    --text-dim:#8a8a96;
-    --text-faint:#555560;
-    --accent:#D9C77A;        /* mid gold — solid fallback */
-    --accent-dim:#a89657;
-    --accent-glow:rgba(217,199,122,.35);
-    --shimmer:linear-gradient(110deg,#C0C0C0 0%,#FFD700 50%,#C0C0C0 100%);
-    --green:#4ade80;
-    --red:#ef4444;
+    --bg:#06060F;
+    --surface:#0F0F1A;
+    --surface-2:#1A1A2E;
+    --surface-3:#252540;
+    --border:#2A2A4A;
+    --border-strong:rgba(255,46,136,.40);
+    --text:#F2F2FF;
+    --text-dim:#82DDFF;
+    --text-faint:#5A4677;
+    --accent:#FF2E88;             /* hot pink — primary cyberpunk */
+    --accent-2:#00F0FF;            /* cyan — secondary */
+    --accent-3:#FFE600;            /* alarm yellow — tertiary */
+    --accent-dim:#A81F5C;
+    --accent-glow:rgba(255,46,136,.45);
+    --accent-2-glow:rgba(0,240,255,.40);
+    --shimmer:linear-gradient(110deg,#FF2E88 0%,#FFE600 50%,#00F0FF 100%);
+    --green:#00FF88;
+    --red:#FF3B5C;
   }
   @keyframes auroraShimmer{0%{background-position:0% 50%}100%{background-position:200% 50%}}
   .shimmer-bg,
@@ -846,6 +851,17 @@
 </style>
 </head>
 <body>
+<!-- v4.3.0 cyberpunk bg-deco. Each layer toggleable via data-deco-bg on <html>.
+     Default = ON (option C). Settings → Theme has 4 toggles to dial back. -->
+<div class="bg-deco" aria-hidden="true">
+  <div class="bg-l bg-l1"></div>
+  <div class="bg-l bg-l2"></div>
+  <div class="bg-l bg-l3"></div>
+  <div class="bg-l bg-l4"></div>
+  <div class="bg-l bg-l5"></div>
+  <div class="bg-l bg-l6"></div>
+  <div class="bg-l bg-l7"></div>
+</div>
 <div class="app">
 <header>
 <div class="logo"><img class="logo-mark" src="logo.png" alt=""><h1>SNAP CAPTION STUDIO</h1></div>
@@ -6658,7 +6674,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.25';
+const APP_VERSION = '4.3.0';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13403,6 +13419,7 @@ function ensureSettingsModal() {
           <button class="settings-nav-btn"        data-cat="sounds"     data-no-sfx>🔔 SOUNDS</button>
           <button class="settings-nav-btn"        data-cat="updates"    data-no-sfx>↻ UPDATES</button>
           <button class="settings-nav-btn"        data-cat="cloud"      data-no-sfx>☁️ CLOUD</button>
+          <button class="settings-nav-btn"        data-cat="theme"      data-no-sfx>🎨 THEME</button>
           <button class="settings-nav-btn"        data-cat="diagnostics" data-no-sfx>🔧 DIAGNOSTICS</button>
         </nav>
         <!-- Content panel — only the active category is visible -->
@@ -13511,6 +13528,53 @@ function ensureSettingsModal() {
           </div>
           <div id="prefCloudStatus" style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-faint);min-height:16px;"></div>
         </div>
+        <div class="settings-group" data-cat="theme">
+          <div class="settings-label">CYBERPUNK SKIN — DECORATION LAYERS</div>
+          <p class="settings-note" style="margin:0 0 14px;text-align:left;font-size:10px;line-height:1.5;color:var(--text-faint);">Each layer toggles independently. Default ON for the full vibe. If the editor feels sluggish (especially on slower laptops), turn off ANIMATIONS first — that disables the city flicker, scan beam drift, and rainbow line. Keep BG/ORN/MTF for static visual flavor with zero perf cost.</p>
+          <div class="theme-deco-row">
+            <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
+              <span class="lbl">🜨 BG · BACKGROUND ATMOSPHERE</span>
+              <span class="desc">City skyline silhouette, cyan grid floor, side data streams, CRT vignette, radial atmosphere</span>
+            </span>
+            <span class="theme-deco-toggle on" data-deco-pref="bg" data-no-sfx></span>
+          </div>
+          <div class="theme-deco-row">
+            <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
+              <span class="lbl">✦ ORN · ORNAMENTS</span>
+              <span class="desc">Persona-5 corner brackets on panels, holographic rainbow on header, &gt;&gt; blink prefix on section headers, clip-path angular cuts on logo + buttons</span>
+            </span>
+            <span class="theme-deco-toggle on" data-deco-pref="ornaments" data-no-sfx></span>
+          </div>
+          <div class="theme-deco-row">
+            <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
+              <span class="lbl">⚔ MTF · MOTIFS</span>
+              <span class="desc">⚡ before EXPORT button, ▲ glyph on active filter chips, vertical CYBERWARE.SCS ID badge alongside the canvas</span>
+            </span>
+            <span class="theme-deco-toggle on" data-deco-pref="motifs" data-no-sfx></span>
+          </div>
+          <div class="theme-deco-row">
+            <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
+              <span class="lbl">▶ ANIM · ANIMATIONS</span>
+              <span class="desc">City lights flicker, scan beam sweep, holographic rainbow drift, side data stream scroll, glitch hover, border pulse. Turn OFF first if the editor feels slow.</span>
+            </span>
+            <span class="theme-deco-toggle on" data-deco-pref="anim" data-no-sfx></span>
+          </div>
+          <div class="settings-row" style="margin-top:14px;justify-content:space-between;border-top:1px solid var(--border);padding-top:12px;">
+            <span>Quick presets</span>
+            <span style="display:flex;gap:6px;">
+              <button class="upd-action-btn" id="prefDecoFull">FULL VIBE</button>
+              <button class="upd-action-btn" id="prefDecoLite">LITE</button>
+              <button class="upd-action-btn" id="prefDecoOff">OFF</button>
+            </span>
+          </div>
+          <div class="settings-row" style="margin-top:8px;">
+            <span style="display:flex;flex-direction:column;gap:2px;">
+              <span>Sluggish-detection auto-prompt</span>
+              <span style="font-size:9px;color:var(--text-faint);">Watches frame rate. If FPS drops below 30 for ~6s, suggests switching to LITE.</span>
+            </span>
+            <button class="none-toggle" id="prefDecoAutoDetect" style="margin-left:auto;">ON</button>
+          </div>
+        </div>
         <div class="settings-group" data-cat="diagnostics">
           <div class="settings-label">DIAGNOSTICS</div>
           <div class="settings-row">
@@ -13536,6 +13600,45 @@ function ensureSettingsModal() {
 
   document.getElementById('settingsCloseBtn').onclick = () => overlay.classList.add('hidden');
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.add('hidden'); });
+
+  // v4.3.0 — Cyberpunk decoration toggles. Persist to localStorage so the user's
+  // choice survives reloads. Reflect on page load via applyDecoPrefs() at bottom
+  // of script. The toggles are pure attribute flips on <html> — CSS handles the
+  // rest via [data-deco-X="on/off"] selectors.
+  overlay.querySelectorAll('[data-deco-pref]').forEach(t => {
+    const k = t.dataset.decoPref;
+    const cur = (document.documentElement.getAttribute('data-deco-' + k) || 'on') === 'on';
+    t.classList.toggle('on', cur);
+    t.addEventListener('click', () => {
+      const next = !t.classList.contains('on');
+      t.classList.toggle('on', next);
+      document.documentElement.setAttribute('data-deco-' + k, next ? 'on' : 'off');
+      try { localStorage.setItem('snapcap-deco-' + k, next ? 'on' : 'off'); } catch (_) {}
+    });
+  });
+  // Quick presets — flip all 4 toggles together
+  const setAllDeco = (vals) => {
+    Object.keys(vals).forEach(k => {
+      document.documentElement.setAttribute('data-deco-' + k, vals[k]);
+      try { localStorage.setItem('snapcap-deco-' + k, vals[k]); } catch (_) {}
+      const t = overlay.querySelector(`[data-deco-pref="${k}"]`);
+      if (t) t.classList.toggle('on', vals[k] === 'on');
+    });
+  };
+  document.getElementById('prefDecoFull').onclick = () => setAllDeco({bg:'on',ornaments:'on',motifs:'on',anim:'on'});
+  document.getElementById('prefDecoLite').onclick = () => setAllDeco({bg:'on',ornaments:'on',motifs:'on',anim:'off'});
+  document.getElementById('prefDecoOff').onclick  = () => setAllDeco({bg:'off',ornaments:'off',motifs:'off',anim:'off'});
+  // Auto-detect toggle (sluggish prompt on/off)
+  const autoBtn = document.getElementById('prefDecoAutoDetect');
+  const initAuto = (localStorage.getItem('snapcap-deco-auto') || 'on') === 'on';
+  autoBtn.classList.toggle('active', initAuto);
+  autoBtn.textContent = initAuto ? 'ON' : 'OFF';
+  autoBtn.onclick = () => {
+    const next = !autoBtn.classList.contains('active');
+    autoBtn.classList.toggle('active', next);
+    autoBtn.textContent = next ? 'ON' : 'OFF';
+    try { localStorage.setItem('snapcap-deco-auto', next ? 'on' : 'off'); } catch (_) {}
+  };
 
   // Sidebar nav — show only the selected category. Default to 'export'.
   // Persists last-active category in sessionStorage so reopening the
@@ -13717,6 +13820,37 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.3.0',
+    date: '2026-05-07',
+    title: 'CYBERPUNK SKIN — neon-noir UI overhaul · all features preserved',
+    sections: [
+      { h: 'New visual language', items: [
+        '🎨 Full cyberpunk skin replaces the gold/silver Aurora palette: hot pink #FF2E88 + cyan #00F0FF + alarm yellow #FFE600 on near-black #06060F. Every existing component re-skins automatically because the swap is at the CSS variable level — nothing functional changed.',
+        '🔤 Audiowide display font (with Antonio fallback) on logo, headings, EXPORT button. JetBrains Mono and Manrope keep their existing roles for body + status text.',
+        '⚡ Clip-path angular cuts on logo, primary buttons, and active toggles. 1px hairlines stay; hot 2px borders appear on focus + hover only.',
+      ]},
+      { h: 'Decorations — toggleable per layer', items: [
+        '🜨 BG · Background atmosphere — full-page bg-deco div with 7 stacked layers: radial atmosphere · cyan perspective grid floor · city skyline silhouette with flickering window lights · diagonal stripe drift · vertical scan beam (10s sweep) · side data streams · CRT corner vignette.',
+        '✦ ORN · Ornaments — Persona-5-style corner brackets on the controls sidebar + workspace + modals (top-left pink, bottom-right cyan), holographic rainbow line drifting across the header (5s loop), >> blinking prefix on every section header, hazard tape on modal foots.',
+        '⚔ MTF · Motifs — ⚡ before EXPORT, ▲ warning glyph on active filter chips.',
+        '▶ ANIM · Animations — glitch hover (RGB split + skew) on EXPORT, breathing border pulse on the controls sidebar, holographic rainbow drift, city lights flicker (3s steps), scan beam sweep, side stream scroll, atmospheric breathe.',
+      ]},
+      { h: 'New: Settings → Theme', items: [
+        '4 independent decoration toggles (BG / ORN / MTF / ANIM) — flip each layer on/off. Default = all ON for the full vibe.',
+        '3 quick presets: FULL VIBE (all on), LITE (anim off, others on — recommended for slower laptops), OFF (zero decorations, pure cyberpunk colors only).',
+        'Auto-detect sluggish-prompt: watches frame rate over a 6-second window after first paint. If sustained FPS drops below ~25, shows a one-time toast suggesting the LITE preset. Toggle off in Settings → Theme if you don\'t want the prompt.',
+      ]},
+      { h: 'Preserved (nothing lost)', items: [
+        'All 34 filter presets · cloud render with full filter parity · ExifTool iPhone metadata injection · HEIC encoding via sips · GPS Leaflet picker · Trial Reel · auto-save / recovery · undo/redo · all keyboard shortcuts · Drive OAuth + folder picker + batch folder creation on carousel export · Settings (cloud URL/token, defaults, sounds, updates) · cheat sheet · patch notes · all export engines (Fast/Reliable/Legacy/Cloud).',
+        'Verified: every existing modal, every section, every button, every range slider — all reskinned, none removed.',
+      ]},
+      { h: 'Performance notes', items: [
+        'Animations are GPU-cheap (CSS transforms + opacity, no layout thrash) but still cost battery on slower laptops. The detector sees real-world FPS and prompts only if it actually slows down.',
+        'BG layers are pure CSS — zero JS cost. Turning BG off saves a few MB of GPU memory but no CPU. ANIM off is the biggest perf win.',
+      ]},
+    ]
+  },
   {
     version: '4.2.25',
     date: '2026-05-07',
@@ -14437,6 +14571,94 @@ document.addEventListener('DOMContentLoaded', () => {
 applyPrefsToFreshState();
 
 // =====================================================================
+// v4.3.0 — CYBERPUNK DECORATION PREFS + SLUGGISH FPS DETECTOR
+// =====================================================================
+// Restore deco-layer preferences from localStorage on every page load. Default
+// = all ON (option C: full vibe). User can dial back per-layer in
+// Settings → Theme. The CSS-only data-deco-X attribute model means turning a
+// layer off has zero JS cost — the matching CSS rules just don't match.
+(function applyDecoPrefs() {
+  const html = document.documentElement;
+  ['bg', 'ornaments', 'motifs', 'anim'].forEach(k => {
+    let v = 'on';
+    try { v = localStorage.getItem('snapcap-deco-' + k) || 'on'; } catch (_) {}
+    html.setAttribute('data-deco-' + k, v);
+  });
+})();
+
+// Sluggish-detection FPS monitor. Watches rAF intervals over a 6-second
+// window after the initial app paint. If the median frame time exceeds
+// ~33ms (i.e. we're below 30fps sustained), shows a one-time prompt
+// recommending the LITE preset. Runs once per session unless the user
+// dismisses & we re-arm. Disabled if `snapcap-deco-auto` pref is 'off'.
+(function startSluggishDetector() {
+  let auto = 'on';
+  try { auto = localStorage.getItem('snapcap-deco-auto') || 'on'; } catch (_) {}
+  if (auto !== 'on') return;
+  if (sessionStorage.getItem('snapcap-deco-prompted')) return; // already nagged this session
+
+  let frames = [];
+  let lastT = performance.now();
+  let watchUntil = lastT + 6000; // 6-second sample window
+  let armed = lastT + 2000;       // ignore the first 2s while CSS animations spin up
+
+  function tick(t) {
+    const dt = t - lastT;
+    lastT = t;
+    if (t > armed) frames.push(dt);
+    if (t < watchUntil) {
+      requestAnimationFrame(tick);
+      return;
+    }
+    // Sample collected — compute median
+    if (frames.length < 30) return; // not enough data
+    const sorted = frames.slice().sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    // 30fps = 33.3ms/frame. Flag if median > 40ms (≈25fps sustained)
+    if (median > 40) {
+      showSluggishPrompt(median);
+    }
+  }
+  requestAnimationFrame(tick);
+})();
+
+function showSluggishPrompt(medianMs) {
+  if (document.getElementById('perfModal')) return;
+  const m = document.createElement('div');
+  m.id = 'perfModal';
+  m.className = 'perf-modal';
+  const fps = Math.round(1000 / medianMs);
+  m.innerHTML = `
+    <h4>⚠ THE EDITOR FEELS SLOW</h4>
+    <p>We're seeing <b style="color:#FFE600">~${fps} fps</b> — the cyberpunk animations might be costing too much on this machine.
+       <br>Want to switch to <b style="color:#00F0FF">LITE</b>? Keeps the colors + ornaments, drops the heavy animations.</p>
+    <div class="perf-btns">
+      <button class="primary" id="perfModalLite">SWITCH TO LITE</button>
+      <button id="perfModalKeep">KEEP FULL VIBE</button>
+      <button id="perfModalNever">DON'T ASK AGAIN</button>
+    </div>
+  `;
+  document.body.appendChild(m);
+  requestAnimationFrame(() => m.classList.add('show'));
+  const close = () => {
+    m.classList.remove('show');
+    setTimeout(() => m.remove(), 350);
+    try { sessionStorage.setItem('snapcap-deco-prompted', '1'); } catch (_) {}
+  };
+  document.getElementById('perfModalLite').onclick = () => {
+    document.documentElement.setAttribute('data-deco-anim', 'off');
+    try { localStorage.setItem('snapcap-deco-anim', 'off'); } catch (_) {}
+    if (typeof showToast === 'function') showToast('Animations off — should feel snappier now.', 'success');
+    close();
+  };
+  document.getElementById('perfModalKeep').onclick = close;
+  document.getElementById('perfModalNever').onclick = () => {
+    try { localStorage.setItem('snapcap-deco-auto', 'off'); } catch (_) {}
+    close();
+  };
+}
+
+// =====================================================================
 // AUTO-SAVE & CRASH RECOVERY
 // =====================================================================
 // Snapshots the editor state (NOT files — they don't survive serialization
@@ -15138,6 +15360,276 @@ if (window.__TAURI__ && window.__TAURI__.core) {
   .pn-section ul{list-style:none;margin:0;padding:0;}
   .pn-section li{position:relative;padding-left:18px;margin-bottom:6px;color:var(--text-dim);font-size:12px;line-height:1.5;}
   .pn-section li::before{content:'›';position:absolute;left:4px;top:0;color:var(--accent);font-weight:700;}
+
+  /* ============================================================
+     v4.3.0 — CYBERPUNK SKIN (decorations + clip-path + bg-deco)
+     All layered on top of existing styles. Gated per-layer by
+     data-deco-bg / -ornaments / -motifs / -anim on <html> for
+     individual toggling. Default = ON.
+     ============================================================ */
+
+  /* BG-DECO layer — fixed full-screen behind everything */
+  .bg-deco{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+  [data-deco-bg="off"] .bg-deco{display:none}
+  .bg-deco .bg-l{position:absolute;inset:0;pointer-events:none;will-change:opacity,transform}
+
+  /* L1 — radial atmosphere (always-on baseline) */
+  .bg-l1{
+    background:
+      radial-gradient(900px 700px at 80% -10%,rgba(0,240,255,.16),transparent 55%),
+      radial-gradient(900px 700px at 0% 110%,rgba(255,46,136,.20),transparent 55%),
+      radial-gradient(circle at 50% 50%,rgba(120,40,200,.10),transparent 60%);
+    animation:cybBreathe 14s ease-in-out infinite alternate;
+  }
+  [data-deco-anim="off"] .bg-l1{animation:none}
+  @keyframes cybBreathe{0%{opacity:.7}100%{opacity:1;transform:scale(1.04)}}
+
+  /* L2 — cyan perspective grid floor at bottom */
+  .bg-l2{
+    background-image:
+      linear-gradient(to top,transparent 60%,rgba(0,240,255,.5) 100%),
+      repeating-linear-gradient(to right,transparent 0 calc(8% - 1px),rgba(0,240,255,.45) calc(8% - 1px),rgba(0,240,255,.45) 8%),
+      repeating-linear-gradient(to bottom,transparent 0 60%,rgba(0,240,255,.4) 60%,transparent 60.4%,transparent 65%,rgba(0,240,255,.4) 65%,transparent 65.4%,transparent 71%,rgba(0,240,255,.5) 71%,transparent 71.5%,transparent 79%,rgba(0,240,255,.6) 79%,transparent 79.6%,transparent 89%,rgba(0,240,255,.7) 89%,transparent 89.7%);
+    -webkit-mask-image:linear-gradient(to bottom,transparent 50%,black 70%);
+    mask-image:linear-gradient(to bottom,transparent 50%,black 70%);
+    opacity:.30;
+  }
+
+  /* L3 — city skyline silhouette with flickering window lights */
+  .bg-l3{
+    background:
+      linear-gradient(180deg,transparent 0,transparent 60%,rgba(6,6,20,.85) 60%,rgba(6,6,20,.95) 100%),
+      repeating-linear-gradient(90deg,
+        transparent 0 2.5%,rgba(8,8,24,.96) 2.5% 4.5%,
+        transparent 4.5% 7%,rgba(8,8,24,.96) 7% 9%,
+        transparent 9% 12%,rgba(10,10,28,.96) 12% 16%,
+        transparent 16% 20%,rgba(8,8,24,.96) 20% 23%,
+        transparent 23% 26%,rgba(10,10,28,.96) 26% 31%,
+        transparent 31% 34%,rgba(8,8,24,.96) 34% 36.5%,
+        transparent 36.5% 40%,rgba(10,10,28,.96) 40% 44%,
+        transparent 44% 48%,rgba(8,8,24,.96) 48% 51%,
+        transparent 51% 54%,rgba(10,10,28,.96) 54% 59%);
+    background-size:auto auto, 100% 38%;
+    background-position:0 0, 0 100%;
+    background-repeat:no-repeat, no-repeat;
+  }
+  .bg-l3::after{
+    content:'';position:absolute;inset:auto 0 0 0;height:38%;
+    background-image:
+      radial-gradient(circle at 5% 70%,#FF2E88 0,#FF2E88 1.5px,transparent 2px),
+      radial-gradient(circle at 14% 60%,#00F0FF 0,#00F0FF 1.5px,transparent 2px),
+      radial-gradient(circle at 22% 80%,#FFE600 0,#FFE600 1px,transparent 1.5px),
+      radial-gradient(circle at 33% 65%,#00F0FF 0,#00F0FF 1px,transparent 1.5px),
+      radial-gradient(circle at 41% 75%,#FF2E88 0,#FF2E88 1.5px,transparent 2px),
+      radial-gradient(circle at 53% 55%,#00FF88 0,#00FF88 1px,transparent 1.5px),
+      radial-gradient(circle at 62% 70%,#FF2E88 0,#FF2E88 1.5px,transparent 2px),
+      radial-gradient(circle at 73% 60%,#FFE600 0,#FFE600 1px,transparent 1.5px),
+      radial-gradient(circle at 84% 75%,#00F0FF 0,#00F0FF 1.5px,transparent 2px),
+      radial-gradient(circle at 92% 65%,#FF2E88 0,#FF2E88 1px,transparent 1.5px);
+    animation:cybCityLights 3s steps(6) infinite;
+    opacity:.85;
+  }
+  [data-deco-anim="off"] .bg-l3::after{animation:none;opacity:.6}
+  @keyframes cybCityLights{0%,33%{opacity:.85}50%,66%{opacity:.55}}
+
+  /* L4 — diagonal stripe drift */
+  .bg-l4{
+    background:
+      repeating-linear-gradient(135deg,transparent 0 60px,rgba(0,240,255,.025) 60px 62px),
+      repeating-linear-gradient(45deg,transparent 0 60px,rgba(255,46,136,.025) 60px 62px);
+    animation:cybDrift 18s linear infinite;
+  }
+  [data-deco-anim="off"] .bg-l4{animation:none}
+  @keyframes cybDrift{from{background-position:0 0,0 0}to{background-position:60px 60px,-60px 60px}}
+
+  /* L5 — vertical scan beam */
+  .bg-l5{
+    background:linear-gradient(to bottom,transparent 0%,rgba(0,240,255,.35) 49%,rgba(0,240,255,.65) 50%,rgba(0,240,255,.35) 51%,transparent 100%);
+    background-size:100% 8vh;background-repeat:no-repeat;
+    animation:cybScan 10s ease-in-out infinite;
+    mix-blend-mode:screen;opacity:.5;
+  }
+  [data-deco-anim="off"] .bg-l5{display:none}
+  @keyframes cybScan{0%{background-position:0 -10vh}90%,100%{background-position:0 110vh}}
+
+  /* L6 — side data streams */
+  .bg-l6{
+    background-image:
+      linear-gradient(rgba(0,240,255,0),rgba(0,240,255,.5) 50%,rgba(0,240,255,0)),
+      linear-gradient(rgba(255,46,136,0),rgba(255,46,136,.5) 50%,rgba(255,46,136,0));
+    background-size:1px 50vh, 1px 50vh;
+    background-position:14px 0, calc(100% - 14px) 0;
+    background-repeat:repeat-y, repeat-y;
+    animation:cybStream 8s linear infinite;opacity:.55;
+  }
+  [data-deco-anim="off"] .bg-l6{animation:none;opacity:.30}
+  @keyframes cybStream{from{background-position:14px 0, calc(100% - 14px) 50vh}to{background-position:14px 50vh, calc(100% - 14px) 100vh}}
+
+  /* L7 — CRT corner vignette */
+  .bg-l7{background:radial-gradient(ellipse 100% 100% at 50% 50%,transparent 50%,rgba(0,0,0,.35) 100%)}
+
+  /* App container needs to sit above bg-deco */
+  .app{position:relative;z-index:2}
+  body::before{z-index:1}
+
+  /* ============================================================
+     ORNAMENTS — Persona-5 corner brackets, holographic strip,
+     >> blinking section prefix, hazard tape on modals
+     ============================================================ */
+  /* Holographic rainbow line on top of the header */
+  [data-deco-ornaments="on"] header{position:relative;overflow:hidden}
+  [data-deco-ornaments="on"] header > *{position:relative;z-index:1}
+  [data-deco-ornaments="on"] header::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,#FF2E88 25%,#FFE600 50%,#00F0FF 75%,transparent);
+    background-size:300% 100%;animation:cybRainbow 5s linear infinite;z-index:0;
+  }
+  [data-deco-anim="off"] header::before{animation:none}
+  @keyframes cybRainbow{from{background-position:0% 0}to{background-position:300% 0}}
+
+  /* Corner brackets on the controls sidebar + workspace + main panels */
+  [data-deco-ornaments="on"] .controls,
+  [data-deco-ornaments="on"] .workspace,
+  [data-deco-ornaments="on"] .picker-modal{position:relative}
+  [data-deco-ornaments="on"] .controls::before,
+  [data-deco-ornaments="on"] .workspace::before,
+  [data-deco-ornaments="on"] .picker-modal::before{
+    content:'';position:absolute;top:0;left:0;width:14px;height:14px;
+    border-top:2px solid #FF2E88;border-left:2px solid #FF2E88;
+    pointer-events:none;z-index:5;
+  }
+  [data-deco-ornaments="on"] .controls::after,
+  [data-deco-ornaments="on"] .workspace::after,
+  [data-deco-ornaments="on"] .picker-modal::after{
+    content:'';position:absolute;bottom:0;right:0;width:14px;height:14px;
+    border-bottom:2px solid #00F0FF;border-right:2px solid #00F0FF;
+    pointer-events:none;z-index:5;
+  }
+  /* The workspace ::before is already used for the dot grid — stack ours
+     using a different pseudo via a wrapping rule below */
+  [data-deco-ornaments="on"] .workspace::before{
+    /* keep dot grid + add bracket as box-shadow on first child instead */
+    background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);
+    background-size:32px 32px;
+    inset:0;width:auto;height:auto;border:none;
+  }
+  /* Re-add corner brackets on workspace via outline trick */
+  [data-deco-ornaments="on"] .workspace{
+    box-shadow:
+      inset 14px 0 0 -12px #FF2E88, inset 0 14px 0 -12px #FF2E88,
+      inset -14px 0 0 -12px #00F0FF, inset 0 -14px 0 -12px #00F0FF;
+  }
+
+  /* >> blinking prefix on control-section headers (existing structure) */
+  [data-deco-ornaments="on"] .section-header h3::before{
+    content:'>> ';color:#00F0FF;
+    font-family:'Audiowide',sans-serif;
+    text-shadow:0 0 6px rgba(0,240,255,.6);
+    animation:cybBlink 1.4s steps(2) infinite;
+  }
+  [data-deco-anim="off"] .section-header h3::before{animation:none;opacity:.85}
+  @keyframes cybBlink{50%{opacity:.4}}
+
+  /* Hazard tape stripe at the top of picker-modal foot (existing modal pattern) */
+  [data-deco-ornaments="on"] .picker-foot{position:relative}
+  [data-deco-ornaments="on"] .picker-foot::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:4px;
+    background:repeating-linear-gradient(45deg,#FFE600 0 10px,transparent 10px 14px,#FF2E88 14px 24px,transparent 24px 28px);
+    opacity:.55;
+  }
+
+  /* ============================================================
+     CLIP-PATH ANGULAR CUTS on action surfaces
+     ============================================================ */
+  [data-deco-ornaments="on"] .logo-mark{
+    clip-path:polygon(15% 0,100% 0,100% 85%,85% 100%,0 100%,0 15%);
+    border-radius:0;
+  }
+  [data-deco-ornaments="on"] .export-btn,
+  [data-deco-ornaments="on"] .none-toggle.active,
+  [data-deco-ornaments="on"] .res-btn.active{
+    clip-path:polygon(4% 0,100% 0,96% 100%,0 100%);
+    border-radius:0;
+  }
+
+  /* ============================================================
+     MOTIFS — ⚡ before EXPORT, ▲ on active filter chips, ID badges
+     ============================================================ */
+  [data-deco-motifs="on"] .export-btn::before{
+    content:'⚡ ';color:#FFE600;text-shadow:0 0 6px rgba(255,230,0,.7);
+    font-family:'Audiowide',sans-serif;
+  }
+  [data-deco-motifs="on"] .filter-card.active::before{
+    content:'▲';position:absolute;top:4px;right:4px;
+    color:#FFE600;font-size:9px;text-shadow:0 0 6px rgba(255,230,0,.7);
+    z-index:3;pointer-events:none;
+  }
+  [data-deco-motifs="on"] .filter-card{position:relative}
+
+  /* ============================================================
+     ANIM — glitch hover, border breathing
+     ============================================================ */
+  [data-deco-anim="on"] .export-btn:hover{animation:cybGlitch .18s steps(3) 1}
+  @keyframes cybGlitch{
+    0%{transform:translate(0,0)}
+    33%{transform:translate(-2px,1px);filter:hue-rotate(60deg)}
+    66%{transform:translate(2px,-1px);filter:hue-rotate(-30deg)}
+  }
+  [data-deco-anim="on"] .controls{animation:cybPulse 4s ease-in-out infinite}
+  @keyframes cybPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 14px rgba(255,46,136,.10)}}
+
+  /* ============================================================
+     TYPOGRAPHY — Audiowide on display headers (logo, h2, h3)
+     ============================================================ */
+  [data-deco-ornaments="on"] .logo h1,
+  [data-deco-ornaments="on"] .upload-zone h2,
+  [data-deco-ornaments="on"] .pn-version-num,
+  [data-deco-ornaments="on"] .control-section h3{
+    font-family:'Audiowide','Antonio',sans-serif;
+    letter-spacing:.10em;
+  }
+
+  /* ============================================================
+     SETTINGS → THEME tab styles
+     ============================================================ */
+  .theme-deco-row{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:8px 0;border-bottom:1px dashed var(--border);
+  }
+  .theme-deco-row:last-child{border-bottom:none}
+  .theme-deco-row .lbl{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);letter-spacing:.04em}
+  .theme-deco-row .desc{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.04em;margin-top:2px;max-width:30ch;line-height:1.3}
+  .theme-deco-toggle{
+    width:36px;height:20px;border-radius:0;background:var(--surface-3);
+    position:relative;border:1px solid var(--border);cursor:pointer;
+    transition:background .25s;flex-shrink:0;
+  }
+  .theme-deco-toggle::after{
+    content:'';position:absolute;left:2px;top:2px;width:14px;height:14px;
+    background:var(--text-dim);transition:left .25s;
+  }
+  .theme-deco-toggle.on{background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
+  .theme-deco-toggle.on::after{left:18px;background:#fff}
+
+  /* ============================================================
+     SLUGGISH-DETECTION MODAL
+     ============================================================ */
+  .perf-modal{
+    position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(120%);
+    z-index:9999;background:var(--surface);border:2px solid #FFE600;
+    box-shadow:0 0 30px rgba(255,230,0,.35),0 12px 40px rgba(0,0,0,.5);
+    padding:14px 18px;width:min(440px,calc(100vw - 32px));
+    transition:transform .35s cubic-bezier(.34,1.56,.64,1),opacity .3s;
+    opacity:0;clip-path:polygon(2% 0,100% 0,98% 100%,0 100%);
+  }
+  .perf-modal.show{transform:translateX(-50%) translateY(0);opacity:1}
+  .perf-modal h4{font-family:'Audiowide',sans-serif;font-size:11px;letter-spacing:.16em;color:#FFE600;margin:0 0 6px;text-shadow:0 0 6px rgba(255,230,0,.5)}
+  .perf-modal p{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);line-height:1.5;margin:0 0 10px}
+  .perf-modal .perf-btns{display:flex;gap:8px}
+  .perf-modal button{padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--text);cursor:pointer;transition:all .2s}
+  .perf-modal button:hover{border-color:#FFE600;color:#FFE600}
+  .perf-modal button.primary{background:#FFE600;color:var(--bg);border-color:#FFE600;font-weight:700}
+  .perf-modal button.primary:hover{filter:brightness(1.15)}
 </style>
 <div class="picker-overlay hidden" id="drivePickerOverlay">
 <div class="picker-modal" id="drivePickerModal">

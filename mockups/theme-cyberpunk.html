@@ -1,0 +1,1927 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="dark" data-tab="editor" data-carousel-view="rail" data-deco-bg="on" data-deco-ornaments="on" data-deco-motifs="on" data-deco-anim="on">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Snap Caption Studio · CYBERPUNK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   BASE
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;min-height:100%}
+:root{
+  --bg:#06060F;
+  --surface:rgba(15,15,30,.65);
+  --surface-2:rgba(0,255,255,.05);
+  --surface-3:rgba(255,46,136,.08);
+  --surface-soft:rgba(0,255,255,.02);
+  --border:rgba(0,255,255,.18);
+  --border-strong:rgba(255,46,136,.55);
+  --text:#F2F2FF;--text-dim:#82DDFF;--text-faint:#5A4677;
+  --accent:#FF2E88;--accent-2:#00F0FF;--accent-3:#FFE600;
+  --accent-soft:rgba(255,46,136,.10);--accent-glow:rgba(255,46,136,.45);
+  --danger:#FF3B5C;--warn:#FFCC00;--success:#00FF88;
+  --radius:4px;--radius-sm:2px;
+  --shadow:0 0 0 1px rgba(0,255,255,.20),0 12px 40px rgba(255,46,136,.15);
+  --blur:blur(20px) saturate(180%);
+  --bar-bg:rgba(6,6,15,.75);--modal-back:rgba(6,6,15,.7);--toast-bg:rgba(15,15,30,.92);
+  --font-display:'Audiowide','Inter',system-ui,sans-serif;
+  --font-body:'Inter',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --font-orbit:'Orbitron','Audiowide',monospace;
+  --ease:cubic-bezier(.5,0,.1,1);--ease-bounce:cubic-bezier(.34,1.56,.64,1);--ease-page:cubic-bezier(.16,1,.3,1);
+}
+[data-mode="light"]:root,[data-mode="light"]{
+  --bg:#F0F0FF;
+  --surface:rgba(255,255,255,.85);
+  --surface-2:#E5E5FF;--surface-3:#D8D8F5;--surface-soft:rgba(255,255,255,.5);
+  --border:rgba(60,40,140,.18);--border-strong:rgba(255,46,136,.50);
+  --text:#0A0A1F;--text-dim:#3D3D70;--text-faint:#7A7AA8;
+  --accent:#E91E63;--accent-2:#0096C7;--accent-3:#F57C00;
+  --accent-soft:rgba(233,30,99,.10);--accent-glow:rgba(233,30,99,.30);
+  --danger:#D32F2F;--warn:#F57C00;--success:#2E7D32;
+  --shadow:0 0 0 1px rgba(60,40,140,.14),0 12px 32px rgba(233,30,99,.10);
+  --bar-bg:rgba(240,240,255,.92);--modal-back:rgba(60,40,140,.40);--toast-bg:#FFFFFF;
+}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:var(--font-body);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  transition:background .8s var(--ease-page),color .8s var(--ease-page);
+  overflow-x:hidden;position:relative;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;letter-spacing:inherit}
+input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--radius-sm)}
+::selection{background:var(--accent);color:var(--bg)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--accent),var(--accent-2));border-radius:0;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,var(--accent-2),var(--accent))}
+
+/* ============================================================
+   BACKGROUND DECORATION LAYER (improved)
+   ============================================================ */
+.bg-deco{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+[data-deco-bg="off"] .bg-deco{display:none}
+.bg-deco .bg-l{position:absolute;inset:0;pointer-events:none}
+
+/* L1 — base radial atmosphere */
+.bg-l1{
+  background:
+    radial-gradient(900px 700px at 80% -10%,rgba(0,240,255,.16),transparent 55%),
+    radial-gradient(900px 700px at 0% 110%,rgba(255,46,136,.20),transparent 55%),
+    radial-gradient(circle at 50% 50%,rgba(120,40,200,.10),transparent 60%);
+  animation:cybBreathe 14s ease-in-out infinite alternate;
+}
+@keyframes cybBreathe{0%{opacity:.7}100%{opacity:1;transform:scale(1.04)}}
+
+/* L2 — cyan perspective grid floor at bottom */
+.bg-l2{
+  background-image:
+    linear-gradient(to top,transparent 60%,rgba(0,240,255,.5) 100%),
+    repeating-linear-gradient(to right,transparent 0 calc(8% - 1px),rgba(0,240,255,.45) calc(8% - 1px),rgba(0,240,255,.45) 8%),
+    repeating-linear-gradient(to bottom,transparent 0 60%,rgba(0,240,255,.4) 60%,transparent 60.4%,transparent 65%,rgba(0,240,255,.4) 65%,transparent 65.4%,transparent 71%,rgba(0,240,255,.5) 71%,transparent 71.5%,transparent 79%,rgba(0,240,255,.6) 79%,transparent 79.6%,transparent 89%,rgba(0,240,255,.7) 89%,transparent 89.7%);
+  -webkit-mask-image:linear-gradient(to bottom,transparent 50%,black 70%);
+  mask-image:linear-gradient(to bottom,transparent 50%,black 70%);
+  opacity:.45;
+}
+
+/* L3 — city skyline silhouette */
+.bg-l3{
+  background:
+    /* skyline buildings via clip-path-like gradients */
+    linear-gradient(180deg,transparent 0,transparent 60%,rgba(6,6,20,.85) 60%,rgba(6,6,20,.95) 100%),
+    repeating-linear-gradient(90deg,
+      transparent 0 2.5%,rgba(8,8,24,.96) 2.5% 4.5%,
+      transparent 4.5% 7%,rgba(8,8,24,.96) 7% 9%,
+      transparent 9% 12%,rgba(10,10,28,.96) 12% 16%,
+      transparent 16% 20%,rgba(8,8,24,.96) 20% 23%,
+      transparent 23% 26%,rgba(10,10,28,.96) 26% 31%,
+      transparent 31% 34%,rgba(8,8,24,.96) 34% 36.5%,
+      transparent 36.5% 40%,rgba(10,10,28,.96) 40% 44%,
+      transparent 44% 48%,rgba(8,8,24,.96) 48% 51%,
+      transparent 51% 54%,rgba(10,10,28,.96) 54% 59%);
+  background-size:auto auto, 100% 38%;
+  background-position:0 0, 0 100%;
+  background-repeat:no-repeat, no-repeat;
+}
+.bg-l3::after{
+  content:'';position:absolute;inset:auto 0 0 0;height:38%;
+  background-image:
+    radial-gradient(circle at 5% 70%,#FF2E88 0,#FF2E88 1.5px,transparent 2px),
+    radial-gradient(circle at 14% 60%,#00F0FF 0,#00F0FF 1.5px,transparent 2px),
+    radial-gradient(circle at 22% 80%,#FFE600 0,#FFE600 1px,transparent 1.5px),
+    radial-gradient(circle at 33% 65%,#00F0FF 0,#00F0FF 1px,transparent 1.5px),
+    radial-gradient(circle at 41% 75%,#FF2E88 0,#FF2E88 1.5px,transparent 2px),
+    radial-gradient(circle at 53% 55%,#00FF88 0,#00FF88 1px,transparent 1.5px),
+    radial-gradient(circle at 62% 70%,#FF2E88 0,#FF2E88 1.5px,transparent 2px),
+    radial-gradient(circle at 73% 60%,#FFE600 0,#FFE600 1px,transparent 1.5px),
+    radial-gradient(circle at 84% 75%,#00F0FF 0,#00F0FF 1.5px,transparent 2px),
+    radial-gradient(circle at 92% 65%,#FF2E88 0,#FF2E88 1px,transparent 1.5px);
+  animation:cybCityLights 3s steps(6) infinite;
+  opacity:.85;
+}
+@keyframes cybCityLights{0%,33%{opacity:.85}50%,66%{opacity:.55}}
+
+/* L4 — diagonal stripe drift */
+.bg-l4{
+  background:
+    repeating-linear-gradient(135deg,transparent 0 60px,rgba(0,240,255,.025) 60px 62px),
+    repeating-linear-gradient(45deg,transparent 0 60px,rgba(255,46,136,.025) 60px 62px);
+  animation:cybDrift 18s linear infinite;
+}
+@keyframes cybDrift{from{background-position:0 0,0 0}to{background-position:60px 60px,-60px 60px}}
+
+/* L5 — vertical scan beam */
+.bg-l5{
+  background:linear-gradient(to bottom,transparent 0%,rgba(0,240,255,.35) 49%,rgba(0,240,255,.65) 50%,rgba(0,240,255,.35) 51%,transparent 100%);
+  background-size:100% 8vh;
+  background-repeat:no-repeat;
+  animation:cybScan 10s ease-in-out infinite;
+  mix-blend-mode:screen;
+  opacity:.7;
+}
+[data-mode="light"] .bg-l5{mix-blend-mode:multiply;opacity:.4}
+@keyframes cybScan{0%{background-position:0 -10vh}90%,100%{background-position:0 110vh}}
+
+/* L6 — side data streams (binary glyphs via background-image trick) */
+.bg-l6{
+  background-image:
+    linear-gradient(to bottom,
+      rgba(0,240,255,.0) 0%, rgba(0,240,255,.4) 8%,
+      rgba(0,240,255,.0) 12%, rgba(0,240,255,.5) 22%,
+      rgba(0,240,255,.0) 28%, rgba(0,240,255,.35) 40%,
+      rgba(0,240,255,.0) 50%, rgba(0,240,255,.5) 60%,
+      rgba(0,240,255,.0) 70%, rgba(0,240,255,.4) 82%,
+      rgba(0,240,255,.0) 100%);
+  background-size:1px 100vh;background-repeat:no-repeat;
+  background-position:18px 0, calc(100% - 18px) 0;
+  background-image:
+    linear-gradient(rgba(0,240,255,.0),rgba(0,240,255,.5) 50%,rgba(0,240,255,.0)),
+    linear-gradient(rgba(255,46,136,.0),rgba(255,46,136,.5) 50%,rgba(255,46,136,.0));
+  background-size:1px 50vh, 1px 50vh;
+  background-position:14px 0, calc(100% - 14px) 0;
+  background-repeat:repeat-y, repeat-y;
+  animation:cybStream 8s linear infinite;
+  opacity:.55;
+}
+@keyframes cybStream{from{background-position:14px 0, calc(100% - 14px) 50vh}to{background-position:14px 50vh, calc(100% - 14px) 100vh}}
+
+/* L7 — CRT corner vignette */
+.bg-l7{
+  background:radial-gradient(ellipse 100% 100% at 50% 50%,transparent 50%,rgba(0,0,0,.35) 100%);
+  pointer-events:none;
+}
+[data-mode="light"] .bg-l7{display:none}
+
+/* ============================================================
+   TOPBAR
+   ============================================================ */
+.topbar{
+  position:sticky;top:0;z-index:60;
+  display:grid;grid-template-columns:auto 1fr auto auto auto auto;gap:12px;align-items:center;
+  padding:14px 24px;
+  background:var(--bar-bg);
+  backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);
+  border-bottom:1px solid var(--border);
+  font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;
+}
+[data-deco-ornaments="on"] .topbar::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,#FF2E88 25%,#FFE600 50%,#00F0FF 75%,transparent);
+  background-size:300% 100%;
+  animation:cybRainbow 5s linear infinite;
+}
+@keyframes cybRainbow{from{background-position:0% 0}to{background-position:300% 0}}
+.topbar > *{position:relative;z-index:1}
+
+.brand{display:flex;flex-direction:column;gap:2px;min-width:160px}
+.brand b{font-family:var(--font-display);font-weight:400;font-size:13px;letter-spacing:.18em;color:var(--text)}
+.brand span{color:var(--text-faint);font-size:9px;letter-spacing:.14em;display:flex;align-items:center;gap:6px}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success);animation:pulseGreen 1.6s ease-in-out infinite}
+@keyframes pulseGreen{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+
+.statusbox{display:flex;flex-direction:column;gap:2px;justify-content:center;align-items:flex-end;font-family:var(--font-mono);font-size:9px;letter-spacing:.06em;color:var(--text-faint)}
+.statusbox .verb{color:var(--accent-2);text-shadow:0 0 6px var(--accent-2)}
+.statusbox .ping{display:flex;align-items:center;gap:4px}
+.statusbox .ping b{color:var(--success);font-weight:500}
+.statusbox .ping i{font-style:normal;color:var(--accent);font-weight:500}
+
+.power{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:.08em}
+.power-bar{display:inline-flex;gap:2px;height:11px;align-items:center}
+.power-bar i{width:3px;background:var(--success);box-shadow:0 0 4px var(--success);display:inline-block;height:100%;font-style:normal}
+.power-bar i:nth-child(1){height:30%}.power-bar i:nth-child(2){height:55%}.power-bar i:nth-child(3){height:78%}.power-bar i:nth-child(4){height:100%}
+.power-bar i:nth-child(5){height:100%;opacity:.3}
+
+.toggle-group{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px}
+.toggle-group button{padding:6px 11px;font-family:var(--font-mono);font-size:9px;letter-spacing:.12em;color:var(--text-faint);text-transform:uppercase;border-radius:0;transition:all .25s var(--ease)}
+.toggle-group button:hover{color:var(--text)}
+.toggle-group button.active{background:var(--accent);color:var(--bg);font-weight:600}
+
+/* ============================================================
+   APP LAYOUT
+   ============================================================ */
+.app{
+  display:grid;grid-template-columns:1fr 360px;gap:20px;
+  max-width:1320px;margin:20px auto 80px;padding:0 24px;
+  position:relative;z-index:2;
+  animation:appEnter .8s var(--ease-page) both;
+}
+@media (max-width:980px){.app{grid-template-columns:1fr}}
+@keyframes appEnter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+.appbar{
+  grid-column:1/-1;
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  padding:14px 18px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  position:relative;
+}
+[data-deco-ornaments="on"] .appbar::before{
+  content:'';position:absolute;top:-1px;left:-1px;width:14px;height:14px;
+  border-top:2px solid var(--accent);border-left:2px solid var(--accent);pointer-events:none;
+}
+[data-deco-ornaments="on"] .appbar::after{
+  content:'';position:absolute;bottom:-1px;right:-1px;width:14px;height:14px;
+  border-bottom:2px solid var(--accent-2);border-right:2px solid var(--accent-2);pointer-events:none;
+}
+
+.logo{
+  width:38px;height:38px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;
+  font-family:var(--font-display);font-size:11px;letter-spacing:0;
+  clip-path:polygon(15% 0,100% 0,100% 85%,85% 100%,0 100%,0 15%);
+  flex-shrink:0;
+  box-shadow:0 0 16px var(--accent-glow),inset 0 0 0 1px rgba(255,255,255,.18);
+}
+
+.tabs{display:flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:var(--radius-sm)}
+.tab{
+  padding:7px 14px;font-family:var(--font-display);font-size:10px;letter-spacing:.14em;
+  color:var(--text-faint);border-radius:0;transition:all .25s var(--ease);
+}
+.tab:hover{color:var(--text)}
+.tab.active{background:var(--accent);color:var(--bg);box-shadow:0 0 12px var(--accent-glow)}
+
+.appbar__meta{
+  margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text-faint);letter-spacing:.06em;
+  display:flex;align-items:center;gap:12px;
+}
+.appbar__meta b{color:var(--text)}
+.appbar__actions{display:flex;gap:6px}
+.iconbtn{
+  width:32px;height:32px;display:grid;place-items:center;
+  border-radius:var(--radius-sm);color:var(--text-dim);font-size:14px;
+  border:1px solid transparent;
+  transition:all .2s var(--ease);
+}
+.iconbtn:hover{background:var(--surface-2);color:var(--accent);border-color:var(--accent);box-shadow:0 0 12px var(--accent-glow);transform:translateY(-1px)}
+
+/* ============================================================
+   PANELS — preview / carousel / drive / inspector / about
+   ============================================================ */
+.panel{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:18px;display:none;flex-direction:column;gap:14px;
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  position:relative;
+}
+[data-deco-ornaments="on"] .panel::before{content:'';position:absolute;top:-1px;left:-1px;width:14px;height:14px;border-top:2px solid var(--accent);border-left:2px solid var(--accent);pointer-events:none;z-index:3}
+[data-deco-ornaments="on"] .panel::after{content:'';position:absolute;bottom:-1px;right:-1px;width:14px;height:14px;border-bottom:2px solid var(--accent-2);border-right:2px solid var(--accent-2);pointer-events:none;z-index:3}
+
+[data-tab="editor"] .panel--editor{display:flex}
+[data-tab="carousel"] .panel--carousel{display:flex}
+[data-tab="drive"] .panel--drive{display:flex}
+[data-tab="inspector"] .panel--inspector{display:flex}
+[data-tab="about"] .panel--about{display:flex}
+
+[data-tab="editor"] .sidebar--editor{display:flex}
+[data-tab="carousel"] .sidebar--carousel{display:flex}
+[data-tab="drive"] .sidebar--drive{display:flex}
+[data-tab="inspector"] .sidebar--inspector{display:flex}
+[data-tab="about"] .sidebar--about{display:flex}
+
+.sidebar{display:none;flex-direction:column;gap:14px}
+.sidebar > *{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+}
+
+/* Sections */
+.ctrl-section{padding:14px 16px;animation:sectionEnter .6s var(--ease-page) both;position:relative;counter-increment:cybSec}
+[data-deco-ornaments="on"] .ctrl-section::before{content:'';position:absolute;top:-1px;left:-1px;width:14px;height:14px;border-top:2px solid var(--accent);border-left:2px solid var(--accent);pointer-events:none;z-index:3}
+[data-deco-ornaments="on"] .ctrl-section::after{content:'';position:absolute;bottom:-1px;right:-1px;width:14px;height:14px;border-bottom:2px solid var(--accent-2);border-right:2px solid var(--accent-2);pointer-events:none;z-index:3}
+.ctrl-section:nth-child(2){animation-delay:.04s}.ctrl-section:nth-child(3){animation-delay:.08s}.ctrl-section:nth-child(4){animation-delay:.12s}.ctrl-section:nth-child(5){animation-delay:.16s}
+@keyframes sectionEnter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.sidebar{counter-reset:cybSec}
+
+.section-head{display:flex;align-items:center;justify-content:space-between;width:100%;padding:0 0 6px;position:relative}
+.section-head h3{margin:0;font-family:var(--font-display);font-size:11px;letter-spacing:.18em;color:var(--text);display:flex;align-items:center;gap:10px;flex:1;font-weight:400;text-transform:uppercase}
+[data-deco-ornaments="on"] .section-head h3::before{content:'>> ';color:var(--accent-2);animation:cybBlink 1.4s steps(2) infinite;text-shadow:0 0 6px var(--accent-2)}
+[data-deco-ornaments="on"] .section-head h3::after{content:'// ' counter(cybSec, decimal-leading-zero);font-family:var(--font-display);font-size:.75em;color:var(--accent-2);letter-spacing:.05em;margin-left:auto;text-shadow:0 0 6px var(--accent-2);opacity:.85}
+@keyframes cybBlink{50%{opacity:.4}}
+.section-head:hover h3{color:var(--accent)}
+.badge{font-family:var(--font-mono);font-size:9px;background:var(--accent);color:var(--bg);width:18px;height:18px;display:grid;place-items:center;border-radius:0;font-weight:600;clip-path:polygon(15% 0,100% 0,100% 85%,85% 100%,0 100%,0 15%)}
+.chev{font-family:var(--font-mono);font-size:14px;color:var(--text-faint);transition:transform .25s var(--ease);display:inline-block;transform:rotate(90deg);margin-left:8px}
+.ctrl-section.collapsed .chev{transform:rotate(0deg)}
+.ctrl-section.collapsed .section-body{display:none}
+.section-body{padding-top:14px;display:flex;flex-direction:column;gap:10px}
+
+/* Controls */
+.input{
+  width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+  border-radius:var(--radius-sm);padding:10px 12px;
+  font-family:var(--font-body);font-size:13px;
+  transition:border-color .2s var(--ease),box-shadow .2s var(--ease);
+}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+textarea.input{resize:vertical;min-height:64px}
+
+.font-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.font-card{padding:10px 8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text-dim);text-align:center;transition:all .2s var(--ease)}
+.font-card:hover{border-color:var(--border-strong);color:var(--text);box-shadow:0 0 10px var(--accent-glow)}
+.font-card.active{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);box-shadow:0 0 12px var(--accent-glow)}
+
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;background:var(--surface-2);border-radius:var(--radius-sm)}
+.seg-btn{padding:7px 10px;font-family:var(--font-display);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);transition:all .2s var(--ease)}
+.seg-btn:hover{color:var(--text)}
+.seg-btn.active{background:var(--accent);color:var(--bg);font-weight:600;box-shadow:0 0 10px var(--accent-glow)}
+
+.slider{display:grid;grid-template-columns:1fr auto;gap:4px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim)}
+.slider .val{color:var(--accent-2);font-weight:600;text-shadow:0 0 4px var(--accent-2)}
+.slider input[type=range]{grid-column:1/-1;-webkit-appearance:none;width:100%;height:4px;background:var(--surface-2);border-radius:0;margin-top:6px}
+.slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;background:var(--accent);border-radius:0;cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 8px var(--accent-glow);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+
+.filter-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.filter-card{position:relative;display:flex;flex-direction:column;gap:4px;padding:0 0 4px;background:var(--surface-2);border:2px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-mono);font-size:9px;color:var(--text-dim);letter-spacing:.06em;text-align:center;cursor:pointer;overflow:hidden;transition:all .2s var(--ease)}
+.filter-card:hover{transform:translateY(-2px);border-color:var(--border-strong);box-shadow:0 0 12px var(--accent-glow)}
+.filter-card .thumb{aspect-ratio:1/1;width:100%;background:var(--thumb,linear-gradient(135deg,#ff6b6b,#74c0fc))}
+.filter-card .label{padding:4px 0;font-weight:600}
+.filter-card.active{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 0 18px var(--accent-glow)}
+[data-deco-motifs="on"] .filter-card.active::after{content:'▲';position:absolute;top:4px;right:4px;color:#FFE600;font-size:9px;text-shadow:0 0 6px rgba(255,230,0,.7);z-index:2}
+
+.toggle-row{display:flex;justify-content:space-between;align-items:center;font-family:var(--font-mono);font-size:11px;color:var(--text-dim)}
+.tswitch{width:36px;height:20px;border-radius:0;background:var(--surface-2);position:relative;border:1px solid var(--border);cursor:pointer;transition:background .25s var(--ease)}
+.tswitch::after{content:'';position:absolute;left:2px;top:2px;width:14px;height:14px;background:var(--text-dim);transition:left .25s var(--ease-bounce)}
+.tswitch.on{background:var(--accent)}
+.tswitch.on::after{left:18px;background:#fff}
+
+.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-family:var(--font-mono);font-size:11px;align-items:center}
+.kv dt{color:var(--text-faint);letter-spacing:.04em;font-size:10px;text-transform:uppercase}
+.kv dd{margin:0;color:var(--text)}
+
+/* ============================================================
+   PREVIEW (editor)
+   ============================================================ */
+.canvas-wrap{
+  position:relative;background:var(--surface-2);border-radius:var(--radius-sm);
+  aspect-ratio:9/16;max-height:560px;margin:0 auto;width:max-content;overflow:hidden;
+  box-shadow:0 0 0 1px var(--border),0 24px 60px rgba(0,0,0,.45),0 0 30px var(--accent-glow);
+  cursor:crosshair;
+}
+.canvas-media{
+  width:100%;height:100%;
+  background:conic-gradient(from 220deg at 30% 30%,#ff6b6b,#f6b25b,#74c0fc,#845ef7,#ff6b6b);
+  filter:saturate(110%) contrast(105%);animation:bgShift 18s linear infinite;
+}
+@keyframes bgShift{0%{filter:saturate(110%) contrast(105%) hue-rotate(0)}100%{filter:saturate(110%) contrast(105%) hue-rotate(360deg)}}
+.canvas-cap{position:absolute;left:0;right:0;bottom:25%;display:flex;justify-content:center;pointer-events:none}
+.canvas-cap span{
+  background:rgba(0,0,0,.55);color:#fff;
+  font-family:var(--font-display);font-size:18px;
+  padding:10px 18px;letter-spacing:.04em;
+  clip-path:polygon(2% 0,100% 0,98% 100%,0 100%);
+}
+[data-deco-ornaments="on"] .canvas-radar{
+  position:absolute;right:8px;bottom:8px;width:60px;height:60px;
+  border:1px solid var(--accent-2);border-radius:50%;
+  background:radial-gradient(circle at 50% 50%,rgba(0,240,255,.12) 0%,transparent 70%);
+  pointer-events:none;
+}
+[data-deco-ornaments="on"] .canvas-radar::before{
+  content:'';position:absolute;inset:25%;border:1px solid rgba(0,240,255,.4);border-radius:50%;
+}
+[data-deco-ornaments="on"] .canvas-radar::after{
+  content:'';position:absolute;left:50%;top:50%;width:50%;height:1px;
+  background:linear-gradient(to right,rgba(0,240,255,.9),transparent);
+  transform-origin:left center;
+  animation:cybRadarSweep 3s linear infinite;
+}
+@keyframes cybRadarSweep{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.radar-blip{position:absolute;width:3px;height:3px;background:var(--accent);border-radius:50%;box-shadow:0 0 4px var(--accent)}
+.radar-blip:nth-child(1){left:60%;top:25%}
+.radar-blip:nth-child(2){left:30%;top:45%}
+.radar-blip:nth-child(3){left:70%;top:70%}
+
+/* preview canvas — vertical id badge */
+[data-deco-ornaments="on"] .preview-controls{position:relative}
+[data-deco-ornaments="on"] .preview-controls::after{
+  content:'> CYBERWARE.SCS // ID 0xFE3D // STATUS:ONLINE';
+  position:absolute;top:50%;right:-10px;writing-mode:vertical-rl;
+  font-family:var(--font-mono);font-size:8px;color:var(--accent-2);letter-spacing:.18em;white-space:nowrap;
+  text-shadow:0 0 6px rgba(0,240,255,.6);opacity:.7;pointer-events:none;
+}
+
+.preview-controls{display:flex;align-items:center;gap:12px;padding:8px 4px}
+.play-btn{width:42px;height:42px;display:grid;place-items:center;background:var(--accent);color:var(--bg);border-radius:0;font-size:14px;clip-path:polygon(15% 0,100% 0,100% 85%,85% 100%,0 100%,0 15%);transition:transform .2s var(--ease-bounce);box-shadow:0 0 16px var(--accent-glow)}
+.play-btn:hover{transform:scale(1.06)}
+.scrub{position:relative;flex:1;height:6px}
+.scrub-rail{position:absolute;inset:0;background:var(--surface-2);border-radius:0}
+.scrub-fill{position:absolute;left:0;top:0;height:100%;width:42%;background:linear-gradient(90deg,var(--accent),var(--accent-2));box-shadow:0 0 8px var(--accent-glow)}
+.scrub-head{position:absolute;left:42%;top:50%;width:10px;height:14px;background:var(--accent-2);transform:translate(-50%,-50%);box-shadow:0 0 6px var(--accent-2)}
+.time{font-family:var(--font-mono);font-size:11px;color:var(--text-faint);letter-spacing:.06em}
+
+.bottom-row{display:flex;flex-wrap:wrap;gap:8px}
+.btn-primary{
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#fff;
+  font-family:var(--font-display);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  padding:11px 22px;clip-path:polygon(4% 0,100% 0,96% 100%,0 100%);
+  transition:filter .2s var(--ease),transform .2s var(--ease);
+  box-shadow:0 0 18px var(--accent-glow);
+  position:relative;
+}
+.btn-primary:hover{filter:brightness(1.15) saturate(1.1);transform:translateY(-1px)}
+[data-deco-motifs="on"] .btn-primary::before{content:'⚡ ';color:#FFE600;text-shadow:0 0 6px rgba(255,230,0,.6)}
+[data-deco-anim="on"] .btn-primary:hover{animation:cybGlitch .18s steps(3) 1}
+@keyframes cybGlitch{0%{transform:translate(0,-1px)}33%{transform:translate(-2px,0);filter:hue-rotate(60deg)}66%{transform:translate(2px,-2px);filter:hue-rotate(-30deg)}}
+
+.btn-ghost{
+  background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  padding:11px 16px;border-radius:0;transition:all .2s var(--ease);
+}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);box-shadow:0 0 10px var(--accent-glow);transform:translateY(-1px)}
+
+.demo-strip{
+  display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;
+  background:var(--surface-2);border:1px solid var(--border);
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+}
+.demo-strip > span{color:var(--text-faint);align-self:center;margin-right:4px}
+
+/* ============================================================
+   CAROUSEL — rail + grid sub-views
+   ============================================================ */
+.carousel-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.carousel-head h4{margin:0;font-family:var(--font-display);font-size:11px;letter-spacing:.18em;text-transform:uppercase}
+.carousel-head .meta{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em}
+
+.cribbon{display:flex;justify-content:space-between;gap:8px;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);font-family:var(--font-mono);font-size:11px;color:var(--text-dim);align-items:center;flex-wrap:wrap}
+.cribbon b{color:var(--text)}
+.cribbon .pill{background:var(--accent-soft);color:var(--accent);padding:3px 10px;font-size:10px;letter-spacing:.1em;border:1px solid var(--accent)}
+
+[data-carousel-view="rail"] .crail{display:flex;gap:14px;overflow-x:auto;padding:8px 4px 14px;scroll-snap-type:x mandatory}
+[data-carousel-view="grid"] .crail{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;padding:8px 4px 14px;overflow-x:visible}
+.crail::-webkit-scrollbar{height:6px}
+
+.ccard{flex:0 0 auto;width:200px;aspect-ratio:9/16;position:relative;overflow:hidden;background:var(--cthumb,linear-gradient(135deg,#ff6b6b,#f6b25b));box-shadow:0 0 0 1px var(--border),0 14px 30px rgba(0,0,0,.28);scroll-snap-align:center;transition:transform .35s var(--ease-bounce),box-shadow .3s var(--ease);cursor:pointer;clip-path:polygon(4% 0,100% 0,100% 96%,96% 100%,0 100%,0 4%)}
+[data-carousel-view="grid"] .ccard{width:100%}
+.ccard:hover{transform:translateY(-3px) scale(1.01)}
+.ccard.active{transform:translateY(-4px);box-shadow:0 0 0 2px var(--accent),0 24px 50px var(--accent-glow)}
+.ccard__cropwin{position:absolute;left:6%;top:8%;right:6%;bottom:14%;border:2px dashed #FFE600;pointer-events:none}
+.ccard__num{position:absolute;top:6px;left:8px;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;background:rgba(0,0,0,.7);color:var(--accent-2);padding:3px 7px;border:1px solid var(--accent-2);text-shadow:0 0 4px var(--accent-2)}
+
+.cdots{display:flex;gap:6px;justify-content:center;padding:4px 0}
+.cdot{width:8px;height:8px;background:var(--surface-3);transition:all .25s var(--ease)}
+.cdot.active{background:var(--accent);transform:scale(1.4);box-shadow:0 0 8px var(--accent)}
+
+/* ============================================================
+   DRIVE VIEW
+   ============================================================ */
+.drive-toolbar{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);
+  font-family:var(--font-mono);font-size:11px;color:var(--text-dim);
+}
+.drive-toolbar .breadcrumb{display:flex;gap:8px;align-items:center}
+.drive-toolbar .breadcrumb b{color:var(--accent-2)}
+.drive-search{flex:1;max-width:300px}
+.drive-search input{background:var(--surface);border:1px solid var(--border);padding:7px 10px;width:100%;color:var(--text);font-family:var(--font-mono);font-size:11px}
+.drive-search input::placeholder{color:var(--text-faint)}
+
+.drive-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;padding:4px}
+.drive-grid--modal{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;max-height:340px;overflow-y:auto;padding:4px}
+.drive-file{
+  position:relative;padding:0;
+  background:var(--surface-2);border:1px solid var(--border);
+  overflow:hidden;cursor:pointer;
+  transition:transform .25s var(--ease-bounce),border-color .2s var(--ease),box-shadow .2s var(--ease);
+  display:flex;flex-direction:column;
+}
+.drive-file:hover{border-color:var(--accent);box-shadow:0 0 18px var(--accent-glow);transform:translateY(-3px)}
+.drive-file.selected{border-color:var(--accent-2);box-shadow:0 0 0 2px var(--accent-2),0 0 22px rgba(0,240,255,.4)}
+.drive-thumb{aspect-ratio:1/1;background:var(--dthumb,linear-gradient(135deg,#1a1a3a,#0a0a1a));position:relative;display:grid;place-items:center;font-size:28px;color:var(--accent-2);text-shadow:0 0 12px var(--accent-2)}
+.drive-thumb .badge-type{position:absolute;top:8px;left:8px;font-family:var(--font-mono);font-size:8px;letter-spacing:.10em;background:rgba(0,0,0,.75);color:var(--accent-2);padding:3px 7px;border:1px solid var(--accent-2);text-shadow:0 0 4px var(--accent-2)}
+.drive-thumb .badge-dur{position:absolute;bottom:8px;right:8px;font-family:var(--font-mono);font-size:9px;letter-spacing:.04em;background:rgba(0,0,0,.75);color:#fff;padding:3px 6px;border:1px solid rgba(255,255,255,.2)}
+.drive-info{padding:10px 12px;display:flex;flex-direction:column;gap:3px;background:var(--surface-2)}
+.drive-info .name{font-family:var(--font-mono);font-size:12px;color:var(--text);letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25}
+.drive-info .meta{font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:.04em;line-height:1.3}
+.drive-file.selected::before{content:'✓';position:absolute;top:10px;right:10px;width:22px;height:22px;background:var(--accent-2);color:var(--bg);display:grid;place-items:center;font-size:13px;font-weight:700;clip-path:polygon(15% 0,100% 0,100% 85%,85% 100%,0 100%,0 15%);box-shadow:0 0 10px var(--accent-2);z-index:2}
+
+.drive-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding-top:8px;border-top:1px dashed var(--border)}
+.drive-stats{font-family:var(--font-mono);font-size:11px;color:var(--text-faint)}
+.drive-stats b{color:var(--accent-2)}
+
+/* ============================================================
+   INSPECTOR
+   ============================================================ */
+.inspector-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:14px}
+.inspector-tabs button{padding:8px 14px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;color:var(--text-faint);text-transform:uppercase;border-bottom:2px solid transparent;transition:all .2s var(--ease)}
+.inspector-tabs button:hover{color:var(--text)}
+.inspector-tabs button.active{color:var(--accent);border-bottom-color:var(--accent);text-shadow:0 0 6px var(--accent-glow)}
+
+.inspector-section{padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);font-family:var(--font-mono);font-size:11px;line-height:1.7;margin-bottom:8px}
+.inspector-section h5{margin:0 0 8px;font-family:var(--font-display);font-size:9px;letter-spacing:.2em;color:var(--accent-2);text-transform:uppercase;font-weight:400;text-shadow:0 0 4px var(--accent-2)}
+.inspector-section .row{display:grid;grid-template-columns:140px 1fr;gap:8px;padding:3px 0;border-bottom:1px dashed var(--border)}
+.inspector-section .row:last-child{border-bottom:none}
+.inspector-section .row .k{color:var(--text-faint);letter-spacing:.04em}
+.inspector-section .row .v{color:var(--text)}
+.itab-content{animation:itabFade .3s var(--ease-page) both}
+@keyframes itabFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* COMPARE table */
+.cmp{background:var(--surface-2);border:1px solid var(--border);font-family:var(--font-mono);font-size:11px;overflow:hidden}
+.cmp__head{display:grid;grid-template-columns:140px 1fr 1fr 30px;border-bottom:1px solid var(--accent-2);font-size:9px;letter-spacing:.18em;text-transform:uppercase}
+.cmp__head .cmp-src{padding:10px 14px;color:var(--accent-2);background:rgba(0,240,255,.08);text-shadow:0 0 4px var(--accent-2)}
+.cmp__head .cmp-out{padding:10px 14px;color:var(--accent);background:rgba(255,46,136,.08);text-shadow:0 0 4px var(--accent-glow);grid-column:2 / span 2}
+.cmp__body{display:flex;flex-direction:column}
+.cmp-row{display:grid;grid-template-columns:140px 1fr 1fr 30px;align-items:center;padding:7px 0;border-bottom:1px dashed var(--border)}
+.cmp-row:last-child{border-bottom:none}
+.cmp-row .cmp-key{padding:0 14px;color:var(--text-faint);letter-spacing:.04em;font-size:10px;text-transform:uppercase}
+.cmp-row .cmp-src-v{padding:0 14px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmp-row .cmp-out-v{padding:0 14px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmp-row .cmp-flag{font-family:var(--font-mono);font-size:14px;text-align:center}
+.cmp-row[data-diff="same"] .cmp-flag{color:var(--success);text-shadow:0 0 4px var(--success)}
+.cmp-row[data-diff="changed"]{background:rgba(255,204,0,.05)}
+.cmp-row[data-diff="changed"] .cmp-out-v{color:var(--warn);text-shadow:0 0 4px rgba(255,204,0,.4)}
+.cmp-row[data-diff="changed"] .cmp-flag{color:var(--warn);text-shadow:0 0 4px var(--warn)}
+.cmp-row[data-diff="added"]{background:rgba(255,46,136,.05)}
+.cmp-row[data-diff="added"] .cmp-out-v{color:var(--accent);text-shadow:0 0 4px var(--accent-glow)}
+.cmp-row[data-diff="added"] .cmp-flag{color:var(--accent);text-shadow:0 0 4px var(--accent-glow)}
+
+/* Filter strength stack (editor sidebar) */
+.fstack{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.fstack:empty{display:none}
+.fstack-item{padding:8px 10px;background:var(--surface-2);border:1px solid var(--border);position:relative}
+.fstack-item .frow{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center;font-family:var(--font-mono);font-size:9px}
+.fstack-item .fnum{background:var(--accent-2);color:var(--bg);font-weight:700;width:14px;height:14px;display:grid;place-items:center;font-size:8px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.fstack-item .fname{color:var(--text);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.fstack-item .fval{color:var(--accent-2);min-width:24px;text-align:right;font-weight:600;text-shadow:0 0 4px var(--accent-2)}
+.fstack-item .frm{color:var(--text-faint);cursor:pointer;font-size:14px;line-height:1;padding:0 4px}
+.fstack-item .frm:hover{color:var(--danger)}
+.fstack-item input[type=range]{width:100%;margin-top:6px;-webkit-appearance:none;height:3px;background:var(--surface-3)}
+.fstack-item input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;background:var(--accent-2);cursor:pointer;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);box-shadow:0 0 6px var(--accent-2)}
+
+/* ============================================================
+   ABOUT
+   ============================================================ */
+.about-hero{padding:18px 4px;border-bottom:1px solid var(--border)}
+.about-hero h2{margin:0;font-family:var(--font-display);font-size:38px;letter-spacing:.04em;line-height:1;color:var(--text);text-transform:uppercase;text-shadow:0 0 18px var(--accent-glow)}
+.about-hero h2 em{font-style:normal;font-size:13px;font-family:var(--font-mono);letter-spacing:.18em;color:var(--accent-2);font-weight:600;display:block;margin-top:6px;text-shadow:0 0 6px var(--accent-2)}
+.about-hero p{margin:14px 0 0;font-size:14px;color:var(--text-dim);line-height:1.55;max-width:60ch}
+
+.about-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:14px 4px}
+.about-card{background:var(--surface-2);border:1px solid var(--border);padding:14px 16px;display:flex;flex-direction:column;gap:8px;position:relative;transition:all .2s var(--ease)}
+.about-card:hover{border-color:var(--accent);box-shadow:0 0 14px var(--accent-glow)}
+.about-card h4{margin:0;font-family:var(--font-display);font-size:9px;letter-spacing:.2em;color:var(--accent-2);text-transform:uppercase;font-weight:400;text-shadow:0 0 4px var(--accent-2)}
+.about-card .body{font-size:12px;color:var(--text);line-height:1.5}
+.about-card .body ul{margin:0;padding-left:14px;display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text-dim)}
+
+.swatches{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.swatch{width:32px;height:32px;border:1px solid var(--border);background:var(--swatch-color);transition:transform .2s var(--ease-bounce)}
+.swatch:hover{transform:scale(1.15) translateY(-2px);box-shadow:0 0 10px currentColor}
+
+#aboutPrompt{cursor:text;background:var(--surface-2);color:var(--text);border:1px solid var(--border);font-family:var(--font-mono);font-size:11px;line-height:1.55;padding:12px;width:100%;min-height:240px;resize:vertical;white-space:pre}
+#aboutPrompt:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+
+/* ============================================================
+   MODALS
+   ============================================================ */
+.modal-back{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:var(--modal-back);backdrop-filter:blur(8px) saturate(120%);-webkit-backdrop-filter:blur(8px) saturate(120%);animation:backFade .25s var(--ease) both;padding:24px}
+.modal-back.show{display:flex}
+@keyframes backFade{from{opacity:0}to{opacity:1}}
+.modal{background:var(--surface);border:1px solid var(--border-strong);box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 30px var(--accent-glow);padding:0;width:min(560px,calc(100vw - 48px));max-height:calc(100vh - 48px);overflow:auto;animation:modalIn .4s var(--ease-bounce) both;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);position:relative}
+.modal::before{content:'';position:absolute;top:-1px;left:-1px;width:14px;height:14px;border-top:2px solid var(--accent);border-left:2px solid var(--accent);pointer-events:none}
+.modal::after{content:'';position:absolute;bottom:-1px;right:-1px;width:14px;height:14px;border-bottom:2px solid var(--accent-2);border-right:2px solid var(--accent-2);pointer-events:none}
+.modal--lg{width:min(720px,calc(100vw - 48px))}
+.modal--xl{width:min(960px,calc(100vw - 48px))}
+@keyframes modalIn{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:none}}
+.modal__head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);position:relative}
+.modal__head h3{margin:0;font-family:var(--font-display);font-size:13px;letter-spacing:.16em;text-transform:uppercase;display:flex;align-items:center;gap:10px;font-weight:400}
+.modal__head h3 .ico{color:var(--accent-2);font-size:18px;text-shadow:0 0 8px var(--accent-2)}
+.modal__close{width:32px;height:32px;display:grid;place-items:center;color:var(--text-faint);font-size:18px;transition:all .2s var(--ease)}
+.modal__close:hover{background:var(--surface-2);color:var(--accent);transform:rotate(90deg);box-shadow:0 0 10px var(--accent-glow)}
+.modal__body{padding:22px}
+.modal__foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--border);background:var(--surface-soft);position:relative}
+.modal__foot::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:repeating-linear-gradient(45deg,#FFE600 0 10px,transparent 10px 14px,#FF2E88 14px 24px,transparent 24px 28px);opacity:.5}
+
+.kbd{display:inline-block;padding:2px 7px;font-family:var(--font-mono);font-size:10px;border:1px solid var(--border-strong);border-bottom-width:2px;background:var(--surface-2);color:var(--text);letter-spacing:.04em}
+
+.snapshot{background:var(--surface-2);border:1px solid var(--border);padding:12px 14px;font-family:var(--font-mono);font-size:11px;line-height:1.7}
+.snapshot span.k{color:var(--text-faint);margin-right:8px}
+
+.cheatlist{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px}
+.cheatlist .row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border)}
+.cheatlist .row .lab{font-size:12px;color:var(--text-dim)}
+.cheatlist .row .ks{display:flex;gap:4px}
+
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:14px 0}
+.step{padding:8px;text-align:center;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;background:var(--surface-2);border:1px solid var(--border);color:var(--text-faint)}
+.step.done{color:var(--accent-2);border-color:var(--accent-2);background:var(--accent-soft);text-shadow:0 0 4px var(--accent-2)}
+.step.active{color:var(--text);border-color:var(--accent);background:var(--surface-2);position:relative;overflow:hidden;text-shadow:0 0 4px var(--accent-glow)}
+.step.active::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--accent-glow),transparent);animation:cybSweep 1.6s linear infinite}
+@keyframes cybSweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+.progress{width:100%;height:8px;background:var(--surface-2);border:1px solid var(--border);overflow:hidden;position:relative}
+.progress__bar{height:100%;width:62%;background:linear-gradient(90deg,var(--accent),var(--accent-2));position:relative;animation:cybGlow 1.6s ease-in-out infinite}
+@keyframes cybGlow{0%,100%{box-shadow:0 0 10px var(--accent-glow)}50%{box-shadow:0 0 24px var(--accent-glow)}}
+.progress__bar::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);animation:cybSweep 2s linear infinite}
+
+.map-fake{position:relative;aspect-ratio:16/10;background:radial-gradient(circle at 30% 40%,rgba(0,240,255,.18),transparent 50%),radial-gradient(circle at 70% 70%,rgba(255,46,136,.15),transparent 60%),var(--surface-2);overflow:hidden;border:1px solid var(--border)}
+.map-fake::before{content:'';position:absolute;inset:0;background-image:linear-gradient(var(--accent-2) 1px,transparent 1px),linear-gradient(90deg,var(--accent-2) 1px,transparent 1px);background-size:32px 32px;opacity:.18}
+.map-pin{position:absolute;left:54%;top:46%;width:14px;height:14px;background:var(--accent);box-shadow:0 0 0 4px var(--accent-glow),0 4px 14px rgba(0,0,0,.5);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);animation:cybPin .6s var(--ease-bounce);transform:translate(-50%,-100%)}
+@keyframes cybPin{0%{transform:translate(-50%,-220%);opacity:0}60%{transform:translate(-50%,-90%);opacity:1}100%{transform:translate(-50%,-100%)}}
+
+.dice{font-size:64px;display:block;text-align:center;animation:cybDice 1s var(--ease-bounce) infinite;filter:drop-shadow(0 0 14px var(--accent-glow))}
+@keyframes cybDice{0%{transform:rotate(0)}50%{transform:rotate(180deg) scale(1.1)}100%{transform:rotate(360deg)}}
+
+.patch-list{display:flex;flex-direction:column;gap:14px}
+.patch{padding:14px;background:var(--surface-2);border-left:3px solid var(--accent)}
+.patch__head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
+.patch__head .ver{font-family:var(--font-display);font-size:14px;letter-spacing:.04em;color:var(--accent-2);text-shadow:0 0 4px var(--accent-2)}
+.patch__head .date{font-family:var(--font-mono);color:var(--text-faint);font-size:10px}
+.patch__title{font-size:13px;color:var(--text);margin:0 0 8px}
+.patch__bullets{margin:0;padding-left:18px;font-size:12px;color:var(--text-dim);display:flex;flex-direction:column;gap:4px}
+
+.tabs-strip{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:14px}
+.tabs-strip .stab{padding:9px 13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;color:var(--text-faint);text-transform:uppercase;border-bottom:2px solid transparent;transition:all .2s var(--ease)}
+.tabs-strip .stab:hover{color:var(--text)}
+.tabs-strip .stab.active{color:var(--accent);border-bottom-color:var(--accent);text-shadow:0 0 6px var(--accent-glow)}
+
+/* TOAST */
+.toast{position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(120%);z-index:90;background:var(--toast-bg);border:1px solid var(--border-strong);color:var(--text);padding:12px 18px;font-family:var(--font-mono);font-size:11px;letter-spacing:.04em;box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 30px var(--accent-glow);display:flex;align-items:center;gap:10px;pointer-events:none;transition:transform .35s var(--ease-bounce),opacity .35s var(--ease);opacity:0;backdrop-filter:var(--blur);clip-path:polygon(2% 0,100% 0,98% 100%,0 100%)}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast::before{content:'';width:8px;height:8px;background:var(--accent);box-shadow:0 0 8px var(--accent);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.toast.error::before{background:var(--danger)}.toast.warn::before{background:var(--warn)}
+</style>
+</head>
+<body>
+
+<!-- BACKGROUND DECORATION LAYER -->
+<div class="bg-deco" aria-hidden="true">
+  <div class="bg-l bg-l1"></div>
+  <div class="bg-l bg-l2"></div>
+  <div class="bg-l bg-l3"></div>
+  <div class="bg-l bg-l4"></div>
+  <div class="bg-l bg-l5"></div>
+  <div class="bg-l bg-l6"></div>
+  <div class="bg-l bg-l7"></div>
+</div>
+
+<header class="topbar">
+  <div class="brand">
+    <b>SNAP CAPTION STUDIO</b>
+    <span><span class="status-dot"></span><span id="statusVerb">DECRYPTING</span> · v4.2.25</span>
+  </div>
+  <div class="statusbox">
+    <span class="verb" id="systemVerb">SYSTEM // CYBERWARE_ONLINE</span>
+    <span class="ping">PING <b>14ms</b> · TX <b>↑1.2MB</b> · RX <i>↓842KB</i></span>
+  </div>
+  <div class="power">
+    PWR <span class="power-bar"><i></i><i></i><i></i><i></i><i></i></span> 88%
+  </div>
+  <div class="toggle-group">
+    <button data-mode-pick="light" title="Light">☀ LIGHT</button>
+    <button class="active" data-mode-pick="dark" title="Dark">☾ DARK</button>
+  </div>
+  <div class="toggle-group">
+    <button class="active" data-deco-toggle="bg" title="Background">🜨 BG</button>
+    <button class="active" data-deco-toggle="ornaments" title="Ornaments">✦ ORN</button>
+    <button class="active" data-deco-toggle="motifs" title="Motifs">⚔ MTF</button>
+    <button class="active" data-deco-toggle="anim" title="Animations">▶ ANIM</button>
+  </div>
+  <div></div>
+</header>
+
+<main class="app">
+
+  <div class="appbar">
+    <div class="logo">SCS</div>
+    <div class="tabs">
+      <button class="tab active" data-tab-pick="editor">EDITOR</button>
+      <button class="tab" data-tab-pick="carousel">CAROUSEL</button>
+      <button class="tab" data-tab-pick="drive">DRIVE ●</button>
+      <button class="tab" data-tab-pick="inspector">INSPECTOR</button>
+      <button class="tab" data-tab-pick="about">ABOUT</button>
+    </div>
+    <div class="appbar__meta" id="appbarMeta">v4.2.25 · EDITOR · VIDEO · 1080×1920 · 5.0S</div>
+    <div class="appbar__actions">
+      <button class="iconbtn" data-modal="patchnotes" title="Patch notes">★</button>
+      <button class="iconbtn" data-modal="cheatsheet" title="Shortcuts">?</button>
+      <button class="iconbtn" data-modal="settings" title="Settings">⚙</button>
+    </div>
+  </div>
+
+  <!-- EDITOR -->
+  <section class="panel panel--editor">
+    <div class="canvas-wrap">
+      <div class="canvas-media"></div>
+      <div class="canvas-cap"><span>caught the sunrise from the rooftop ☀️</span></div>
+      <div class="canvas-radar"><span class="radar-blip"></span><span class="radar-blip"></span><span class="radar-blip"></span></div>
+    </div>
+    <div class="preview-controls">
+      <button class="play-btn" id="playBtn">▶</button>
+      <div class="scrub" id="scrub"><div class="scrub-rail"></div><div class="scrub-fill"></div><div class="scrub-head"></div></div>
+      <span class="time" id="timeLabel">00:02 / 00:05</span>
+      <button class="iconbtn" id="mirrorBtn" title="Mirror flip">⇄</button>
+      <button class="iconbtn" data-modal="trialreel" title="Trial reel">⚄</button>
+    </div>
+    <div class="bottom-row">
+      <button class="btn-primary" data-modal="exporting">EXPORT</button>
+      <button class="btn-ghost" data-modal="filters">FILTERS</button>
+      <button class="btn-ghost" data-modal="gps">GPS</button>
+      <button class="btn-ghost" data-modal="recovery">RECOVERY</button>
+      <button class="btn-ghost" data-modal="cheatsheet">SHORTCUTS</button>
+      <button class="btn-ghost" data-modal="patchnotes">PATCH NOTES</button>
+      <button class="btn-ghost" data-modal="settings">SETTINGS</button>
+    </div>
+    <div class="bottom-row" style="border-top:1px dashed var(--border);padding-top:10px">
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);align-self:center;letter-spacing:.08em">☁ DRIVE FLOW →</span>
+      <button class="btn-ghost" data-modal="drive-connect">CONNECT</button>
+      <button class="btn-ghost" data-modal="drive-picker">CHOOSE FOLDER</button>
+      <button class="btn-ghost" data-modal="drive-import">IMPORT IMAGES</button>
+      <button class="btn-ghost" data-modal="drive-export">UPLOAD STATUS</button>
+    </div>
+    <div class="demo-strip">
+      <span>SOUND DEMO →</span>
+      <button class="btn-ghost" data-snd="click">CLICK</button>
+      <button class="btn-ghost" data-snd="success">SUCCESS</button>
+      <button class="btn-ghost" data-snd="error">ERROR</button>
+      <button class="btn-ghost" data-snd="notify">NOTIFY</button>
+      <button class="btn-ghost" data-toast="success">TOAST OK</button>
+      <button class="btn-ghost" data-toast="error">TOAST ERR</button>
+      <button class="btn-ghost" data-toast="warn">TOAST WARN</button>
+    </div>
+  </section>
+
+  <!-- CAROUSEL -->
+  <section class="panel panel--carousel">
+    <div class="carousel-head">
+      <h4>CAROUSEL · 12 IMAGES · 9:16</h4>
+      <div class="seg" style="grid-template-columns:repeat(2,1fr);width:140px">
+        <button class="seg-btn active" data-carousel-pick="rail">RAIL</button>
+        <button class="seg-btn" data-carousel-pick="grid">GRID</button>
+      </div>
+    </div>
+    <div class="cribbon">
+      <span><b>LINKED</b> filters apply to all <span class="pill">ON</span></span>
+      <span><b>RATIO</b> 1080×1920</span>
+      <span><b>SELECTED</b> 1/12</span>
+    </div>
+    <div class="crail" id="crail">
+      <!-- 12 cards -->
+      <div class="ccard active" style="--cthumb:linear-gradient(135deg,#FF9A8B,#FF6A88,#FF99AC)"><span class="ccard__num">01 · IMG_0421</span><div class="ccard__cropwin"></div></div>
+      <div class="ccard" style="--cthumb:linear-gradient(135deg,#A1C4FD,#C2E9FB)"><span class="ccard__num">02 · IMG_0422</span><div class="ccard__cropwin"></div></div>
+      <div class="ccard" style="--cthumb:linear-gradient(135deg,#84FAB0,#8FD3F4)"><span class="ccard__num">03 · IMG_0423</span><div class="ccard__cropwin"></div></div>
+      <div class="ccard" style="--cthumb:linear-gradient(135deg,#FCB69F,#FFECD2)"><span class="ccard__num">04 · IMG_0424</span><div class="ccard__cropwin"></div></div>
+      <div class="ccard" style="--cthumb:linear-gradient(135deg,#D299C2,#FEF9D7)"><span class="ccard__num">05 · IMG_0425</span><div class="ccard__cropwin"></div></div>
+      <div class="ccard" style="--cthumb:linear-gradient(135deg,#FBC2EB,#A6C1EE)"><span class="ccard__num">06 · IMG_0426</span><div class="ccard__cropwin"></div></div>
+      <div class="ccard" style="--cthumb:linear-gradient(135deg,#3a0339,#FF6A88)"><span class="ccard__num">07 · IMG_0427</span><div class="ccard__cropwin"></div></div>
+      <div class="ccard" style="--cthumb:linear-gradient(135deg,#0093E9,#80D0C7)"><span class="ccard__num">08 · IMG_0428</span><div class="ccard__cropwin"></div></div>
+      <div class="ccard" style="--cthumb:linear-gradient(135deg,#FF0844,#FFB199)"><span class="ccard__num">09 · IMG_0429</span><div class="ccard__cropwin"></div></div>
+      <div class="ccard" style="--cthumb:linear-gradient(135deg,#7028E4,#E5B2CA)"><span class="ccard__num">10 · IMG_0430</span><div class="ccard__cropwin"></div></div>
+      <div class="ccard" style="--cthumb:linear-gradient(135deg,#FA709A,#FEE140)"><span class="ccard__num">11 · IMG_0431</span><div class="ccard__cropwin"></div></div>
+      <div class="ccard" style="--cthumb:linear-gradient(135deg,#30CFD0,#330867)"><span class="ccard__num">12 · IMG_0432</span><div class="ccard__cropwin"></div></div>
+    </div>
+    <div class="cdots" id="cdots">
+      <span class="cdot active"></span><span class="cdot"></span><span class="cdot"></span><span class="cdot"></span>
+      <span class="cdot"></span><span class="cdot"></span><span class="cdot"></span><span class="cdot"></span>
+      <span class="cdot"></span><span class="cdot"></span><span class="cdot"></span><span class="cdot"></span>
+    </div>
+    <div class="bottom-row">
+      <button class="btn-primary" data-modal="exporting">EXPORT 12 IMAGES</button>
+      <button class="btn-ghost" data-modal="filters">LINKED FILTERS</button>
+      <button class="btn-ghost" data-modal="gps">GPS PER CARD</button>
+      <button class="btn-ghost" data-modal="drive-picker">EXPORT TO DRIVE</button>
+      <button class="btn-ghost">SAVE TEMPLATE</button>
+      <button class="btn-ghost" data-modal="drive-import">+ IMPORT FROM DRIVE</button>
+    </div>
+  </section>
+
+  <!-- DRIVE -->
+  <section class="panel panel--drive">
+    <div class="drive-toolbar">
+      <div class="breadcrumb">
+        <span style="color:var(--accent)">▲</span>
+        <span style="color:var(--text-dim)">My Drive</span>
+        <span>›</span>
+        <span style="color:var(--text-dim)">Snap Caption</span>
+        <span>›</span>
+        <b>Trial Reels 2026</b>
+      </div>
+      <div class="drive-search">
+        <input placeholder="🔍 SEARCH FILES OR PASTE DRIVE URL…">
+      </div>
+      <div class="seg" style="grid-template-columns:repeat(4,auto);width:auto">
+        <button class="seg-btn active">ALL</button>
+        <button class="seg-btn">IMAGES</button>
+        <button class="seg-btn">VIDEOS</button>
+        <button class="seg-btn">RECENT</button>
+      </div>
+    </div>
+    <div class="drive-grid" id="driveGrid">
+      <div class="drive-file selected" data-drive-file>
+        <div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#ff6b6b,#f6b25b)">📷<span class="badge-type">HEIC</span></div>
+        <div class="drive-info"><div class="name">IMG_0421.HEIC</div><div class="meta">2.4 MB · 2 days ago</div></div>
+      </div>
+      <div class="drive-file" data-drive-file>
+        <div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#74c0fc,#9775fa)">▶<span class="badge-type">MP4</span><span class="badge-dur">0:12</span></div>
+        <div class="drive-info"><div class="name">IMG_0422.MP4</div><div class="meta">8.1 MB · 2 days ago</div></div>
+      </div>
+      <div class="drive-file" data-drive-file>
+        <div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#A1C4FD,#C2E9FB)">📷<span class="badge-type">HEIC</span></div>
+        <div class="drive-info"><div class="name">IMG_0423.HEIC</div><div class="meta">3.2 MB · 3 days ago</div></div>
+      </div>
+      <div class="drive-file" data-drive-file>
+        <div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#84FAB0,#8FD3F4)">📷<span class="badge-type">HEIC</span></div>
+        <div class="drive-info"><div class="name">IMG_0424.HEIC</div><div class="meta">2.7 MB · 3 days ago</div></div>
+      </div>
+      <div class="drive-file" data-drive-file>
+        <div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#FCB69F,#FFECD2)">▶<span class="badge-type">MP4</span><span class="badge-dur">0:08</span></div>
+        <div class="drive-info"><div class="name">IMG_0425.MP4</div><div class="meta">5.4 MB · 4 days ago</div></div>
+      </div>
+      <div class="drive-file" data-drive-file>
+        <div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#D299C2,#FEF9D7)">📷<span class="badge-type">JPG</span></div>
+        <div class="drive-info"><div class="name">trial_001.JPG</div><div class="meta">1.8 MB · 4 days ago</div></div>
+      </div>
+      <div class="drive-file" data-drive-file>
+        <div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#FBC2EB,#A6C1EE)">📷<span class="badge-type">HEIC</span></div>
+        <div class="drive-info"><div class="name">IMG_0426.HEIC</div><div class="meta">2.9 MB · 5 days ago</div></div>
+      </div>
+      <div class="drive-file" data-drive-file>
+        <div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#3a0339,#FF6A88)">▶<span class="badge-type">MP4</span><span class="badge-dur">0:15</span></div>
+        <div class="drive-info"><div class="name">night_walk.MP4</div><div class="meta">12.6 MB · 5 days ago</div></div>
+      </div>
+      <div class="drive-file" data-drive-file>
+        <div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#0093E9,#80D0C7)">📷<span class="badge-type">PNG</span></div>
+        <div class="drive-info"><div class="name">moodboard.PNG</div><div class="meta">4.1 MB · 1 week ago</div></div>
+      </div>
+      <div class="drive-file" data-drive-file>
+        <div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#FF0844,#FFB199)">📷<span class="badge-type">HEIC</span></div>
+        <div class="drive-info"><div class="name">IMG_0427.HEIC</div><div class="meta">3.5 MB · 1 week ago</div></div>
+      </div>
+      <div class="drive-file" data-drive-file>
+        <div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#7028E4,#E5B2CA)">▶<span class="badge-type">MP4</span><span class="badge-dur">0:22</span></div>
+        <div class="drive-info"><div class="name">rooftop_view.MP4</div><div class="meta">18.2 MB · 1 week ago</div></div>
+      </div>
+      <div class="drive-file" data-drive-file>
+        <div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#30CFD0,#330867)">📷<span class="badge-type">HEIC</span></div>
+        <div class="drive-info"><div class="name">IMG_0428.HEIC</div><div class="meta">2.1 MB · 1 week ago</div></div>
+      </div>
+    </div>
+    <div class="drive-bottom">
+      <span class="drive-stats"><b>1</b> selected · <b>2.4 MB</b> total · 12 files in folder</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost" id="driveSelectAll">SELECT ALL</button>
+        <button class="btn-ghost" data-modal="drive-picker">CHANGE FOLDER</button>
+        <button class="btn-primary" data-modal="exporting">IMPORT 1 SELECTED</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSPECTOR -->
+  <section class="panel panel--inspector">
+    <div class="inspector-tabs">
+      <button class="active" data-itab-pick="basic">BASIC</button>
+      <button data-itab-pick="exif">EXIF</button>
+      <button data-itab-pick="gps">GPS</button>
+      <button data-itab-pick="apple">APPLE</button>
+      <button data-itab-pick="iptc">IPTC</button>
+      <button data-itab-pick="xmp">XMP</button>
+      <button data-itab-pick="compare" style="color:var(--accent);text-shadow:0 0 6px var(--accent-glow)">COMPARE ▲▼</button>
+      <button data-itab-pick="raw">RAW HEX</button>
+    </div>
+
+    <div class="itab-content" data-itab-content="basic">
+      <div class="inspector-section">
+        <h5>BASIC</h5>
+        <div class="row"><span class="k">FILENAME</span><span class="v">IMG_0421.HEIC</span></div>
+        <div class="row"><span class="k">SIZE</span><span class="v">2.4 MB · 4032 × 3024 px</span></div>
+        <div class="row"><span class="k">FORMAT</span><span class="v">HEIC · BT.709 · sRGB</span></div>
+        <div class="row"><span class="k">CREATED</span><span class="v">2026-05-05 14:22:18 EST</span></div>
+        <div class="row"><span class="k">MODIFIED</span><span class="v">2026-05-07 09:14:02 EST</span></div>
+        <div class="row"><span class="k">FILE SOURCE</span><span class="v">Drive · /Trial Reels 2026</span></div>
+        <div class="row"><span class="k">HASH (SHA-1)</span><span class="v">a4f6e2b1c83d... (truncated)</span></div>
+      </div>
+    </div>
+
+    <div class="itab-content" data-itab-content="exif" hidden>
+      <div class="inspector-section">
+        <h5>EXIF · CAMERA</h5>
+        <div class="row"><span class="k">MAKE</span><span class="v">Apple</span></div>
+        <div class="row"><span class="k">MODEL</span><span class="v">iPhone 17 Pro Max</span></div>
+        <div class="row"><span class="k">LENS</span><span class="v">26 mm f/1.78 (Main)</span></div>
+        <div class="row"><span class="k">FOCAL LENGTH</span><span class="v">5.96 mm (35mm equivalent: 26 mm)</span></div>
+        <div class="row"><span class="k">ISO</span><span class="v">100</span></div>
+        <div class="row"><span class="k">SHUTTER</span><span class="v">1/240 s</span></div>
+        <div class="row"><span class="k">APERTURE</span><span class="v">f/1.78</span></div>
+        <div class="row"><span class="k">EXPOSURE</span><span class="v">+0.00 EV</span></div>
+        <div class="row"><span class="k">FLASH</span><span class="v">Off · Did not fire</span></div>
+        <div class="row"><span class="k">METERING</span><span class="v">Multi-spot · pattern</span></div>
+        <div class="row"><span class="k">WB</span><span class="v">Auto · 5500 K</span></div>
+        <div class="row"><span class="k">SOFTWARE</span><span class="v">iOS 19.2 (build 23C20)</span></div>
+      </div>
+    </div>
+
+    <div class="itab-content" data-itab-content="gps" hidden>
+      <div class="inspector-section">
+        <h5>EXIF · GPS</h5>
+        <div class="row"><span class="k">LATITUDE</span><span class="v">40°42'46"N (40.7128)</span></div>
+        <div class="row"><span class="k">LONGITUDE</span><span class="v">74°00'21"W (-74.0060)</span></div>
+        <div class="row"><span class="k">ALTITUDE</span><span class="v">42 m above sea level</span></div>
+        <div class="row"><span class="k">SPEED</span><span class="v">0.4 m/s (walking)</span></div>
+        <div class="row"><span class="k">DIRECTION</span><span class="v">182° true · facing south</span></div>
+        <div class="row"><span class="k">DOP</span><span class="v">3.2 (good)</span></div>
+        <div class="row"><span class="k">SATELLITES</span><span class="v">9 visible · 6 used</span></div>
+        <div class="row"><span class="k">NEAR</span><span class="v">Manhattan, NY · United States</span></div>
+        <div class="row"><span class="k">PROCESSED</span><span class="v">Reverse-geocoded via Nominatim · cached 2d</span></div>
+      </div>
+      <div class="map-fake" style="margin-top:8px"><div class="map-pin"></div></div>
+    </div>
+
+    <div class="itab-content" data-itab-content="apple" hidden>
+      <div class="inspector-section">
+        <h5>APPLE MAKERNOTE</h5>
+        <div class="row"><span class="k">RUN TIME</span><span class="v">3.4824930042 s</span></div>
+        <div class="row"><span class="k">HDR TYPE</span><span class="v">HDRGainMap (Apple Smart HDR 5)</span></div>
+        <div class="row"><span class="k">CONTENT ID</span><span class="v">F6E4B1A2-1C3D-4E5F-9A8B-7C6D5E4F3A2B</span></div>
+        <div class="row"><span class="k">LIVE PHOTO</span><span class="v">Linked to IMG_0421.MOV (3.4 s)</span></div>
+        <div class="row"><span class="k">PHOTO MODE</span><span class="v">Photographic Styles · Standard</span></div>
+        <div class="row"><span class="k">PROCESSING</span><span class="v">Deep Fusion · Smart HDR · Night Off</span></div>
+        <div class="row"><span class="k">DEPTH MAP</span><span class="v">None (Main lens · no portrait)</span></div>
+      </div>
+      <div class="inspector-section">
+        <h5>EMBEDDED THUMBNAILS</h5>
+        <div class="row"><span class="k">THUMB 1</span><span class="v">160 × 120 · JPEG</span></div>
+        <div class="row"><span class="k">THUMB 2</span><span class="v">320 × 240 · JPEG</span></div>
+        <div class="row"><span class="k">PREVIEW</span><span class="v">2016 × 1512 · JPEG</span></div>
+      </div>
+    </div>
+
+    <div class="itab-content" data-itab-content="iptc" hidden>
+      <div class="inspector-section">
+        <h5>IPTC · CONTENT</h5>
+        <div class="row"><span class="k">CAPTION</span><span class="v">caught the sunrise from the rooftop ☀️</span></div>
+        <div class="row"><span class="k">KEYWORDS</span><span class="v">— (none)</span></div>
+        <div class="row"><span class="k">CATEGORY</span><span class="v">— (none)</span></div>
+        <div class="row"><span class="k">CREATOR</span><span class="v">shon@seraphim.mgmt</span></div>
+        <div class="row"><span class="k">RIGHTS</span><span class="v">© 2026 Seraphim Management</span></div>
+        <div class="row"><span class="k">CITY</span><span class="v">Manhattan</span></div>
+        <div class="row"><span class="k">COUNTRY</span><span class="v">United States</span></div>
+      </div>
+    </div>
+
+    <div class="itab-content" data-itab-content="xmp" hidden>
+      <div class="inspector-section">
+        <h5>XMP · ADOBE</h5>
+        <div class="row"><span class="k">RATING</span><span class="v">— (not set)</span></div>
+        <div class="row"><span class="k">LABEL</span><span class="v">— (not set)</span></div>
+        <div class="row"><span class="k">SUBJECT</span><span class="v">[ "rooftop", "sunrise" ]</span></div>
+        <div class="row"><span class="k">DERIVED FROM</span><span class="v">— (no parent doc)</span></div>
+        <div class="row"><span class="k">DOCUMENT ID</span><span class="v">xmp.did:F6E4B1A2-1C3D-4E5F</span></div>
+        <div class="row"><span class="k">HISTORY</span><span class="v">1 entry · created 2026-05-05</span></div>
+      </div>
+    </div>
+
+    <div class="itab-content" data-itab-content="compare" hidden>
+      <p style="margin:0 0 12px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim);letter-spacing:.04em">
+        Compare what's <span style="color:var(--accent-2)">in the source file</span> against what
+        <span style="color:var(--accent)">Snap Caption will write on export</span>. Differences are
+        flagged. Toggle the iPhone-metadata override in the sidebar to see what changes.
+      </p>
+      <div class="cmp">
+        <div class="cmp__head">
+          <span class="cmp-src">SOURCE · IMG_0421.HEIC</span>
+          <span class="cmp-out">OUTPUT · after iPhone metadata override</span>
+        </div>
+        <div class="cmp__body">
+          <div class="cmp-row" data-diff="same"><span class="cmp-key">MAKE</span><span class="cmp-src-v">Apple</span><span class="cmp-out-v">Apple</span><span class="cmp-flag">✓</span></div>
+          <div class="cmp-row" data-diff="same"><span class="cmp-key">MODEL</span><span class="cmp-src-v">iPhone 17 Pro Max</span><span class="cmp-out-v">iPhone 17 Pro Max</span><span class="cmp-flag">✓</span></div>
+          <div class="cmp-row" data-diff="changed"><span class="cmp-key">DATE TAKEN</span><span class="cmp-src-v">2026-05-05 14:22:18</span><span class="cmp-out-v">2026-05-07 09:38:14 (rand ±8h)</span><span class="cmp-flag">⚠</span></div>
+          <div class="cmp-row" data-diff="changed"><span class="cmp-key">CONTENT ID</span><span class="cmp-src-v">F6E4B1A2-...</span><span class="cmp-out-v">A2C8D9E4-... (regenerated)</span><span class="cmp-flag">⚠</span></div>
+          <div class="cmp-row" data-diff="same"><span class="cmp-key">LATITUDE</span><span class="cmp-src-v">40.7128</span><span class="cmp-out-v">40.7128</span><span class="cmp-flag">✓</span></div>
+          <div class="cmp-row" data-diff="same"><span class="cmp-key">LONGITUDE</span><span class="cmp-src-v">-74.0060</span><span class="cmp-out-v">-74.0060</span><span class="cmp-flag">✓</span></div>
+          <div class="cmp-row" data-diff="added"><span class="cmp-key">RUN TIME</span><span class="cmp-src-v">3.4824930042 s</span><span class="cmp-out-v">5.1837042191 s (regenerated)</span><span class="cmp-flag">⚠</span></div>
+          <div class="cmp-row" data-diff="added"><span class="cmp-key">HDR TYPE</span><span class="cmp-src-v">HDRGainMap</span><span class="cmp-out-v">HDRGainMap (preserved)</span><span class="cmp-flag">✓</span></div>
+          <div class="cmp-row" data-diff="changed"><span class="cmp-key">SOFTWARE</span><span class="cmp-src-v">iOS 19.2 (23C20)</span><span class="cmp-out-v">iOS 19.2 (23C20)</span><span class="cmp-flag">✓</span></div>
+          <div class="cmp-row" data-diff="added"><span class="cmp-key">CAPTION</span><span class="cmp-src-v">— (none)</span><span class="cmp-out-v">caught the sunrise from the rooftop ☀️</span><span class="cmp-flag">+</span></div>
+          <div class="cmp-row" data-diff="added"><span class="cmp-key">CREATOR</span><span class="cmp-src-v">— (none)</span><span class="cmp-out-v">shon@seraphim.mgmt</span><span class="cmp-flag">+</span></div>
+          <div class="cmp-row" data-diff="changed"><span class="cmp-key">FILE FORMAT</span><span class="cmp-src-v">HEIC</span><span class="cmp-out-v">HEIC (sips re-encode + exiftool patch)</span><span class="cmp-flag">⚠</span></div>
+        </div>
+      </div>
+      <div style="margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;font-family:var(--font-mono);font-size:10px;letter-spacing:.06em">
+        <div style="padding:10px;background:var(--surface-2);border:1px solid var(--success);border-left-width:3px"><div style="color:var(--success);text-shadow:0 0 4px var(--success);font-weight:600">✓ UNCHANGED</div><div style="color:var(--text-dim);margin-top:4px">7 fields · preserved</div></div>
+        <div style="padding:10px;background:var(--surface-2);border:1px solid var(--warn);border-left-width:3px"><div style="color:var(--warn);text-shadow:0 0 4px var(--warn);font-weight:600">⚠ MODIFIED</div><div style="color:var(--text-dim);margin-top:4px">4 fields · randomized / replaced</div></div>
+        <div style="padding:10px;background:var(--surface-2);border:1px solid var(--accent);border-left-width:3px"><div style="color:var(--accent);text-shadow:0 0 4px var(--accent);font-weight:600">+ ADDED</div><div style="color:var(--text-dim);margin-top:4px">3 fields · injected on export</div></div>
+      </div>
+    </div>
+
+    <div class="itab-content" data-itab-content="raw" hidden>
+      <div class="inspector-section">
+        <h5>RAW HEX (first 256 bytes)</h5>
+        <pre style="margin:0;font-family:var(--font-mono);font-size:10px;line-height:1.5;color:var(--accent-2);text-shadow:0 0 4px rgba(0,240,255,.5);overflow-x:auto;white-space:pre">00000000  00 00 00 18 66 74 79 70 68 65 69 63 00 00 00 00  ....ftypheic....
+00000010  6d 69 66 31 4d 69 50 72 6d 69 61 66 4d 41 31 42  mif1MiPrmiafMA1B
+00000020  00 00 02 4c 6d 65 74 61 00 00 00 00 00 00 00 21  ...Lmeta.......!
+00000030  68 64 6c 72 00 00 00 00 00 00 00 00 70 69 63 74  hdlr........pict
+00000040  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 0e  ................
+00000050  70 69 74 6d 00 00 00 00 00 01 00 00 00 24 69 6c  pitm.........$il
+00000060  6f 63 04 00 00 00 44 00 00 02 00 01 00 00 00 00  oc....D.........
+00000070  00 02 4c 00 00 00 00 02 80 00 00 00 00 00 00 00  ..L.............
+00000080  00 04 00 00 00 00 00 09 00 00 02 7c 69 69 6e 66  ...........|iinf
+00000090  00 00 00 00 00 0a 00 00 00 00 00 21 69 6e 66 65  ...........!infe</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="panel panel--about">
+    <div class="about-hero">
+      <h2>CYBERPUNK <em>// FOCUSED MOCKUP · DARK + LIGHT · ALL DECORATIONS</em></h2>
+      <p>Sleek neon-noir tooling — frosted dark glass with hot-pink + cyan + yellow accents, clip-path angular cuts on every action surface, holographic rainbow drift across the appbar, animated city skyline + scan beam in the background, HUD radar in the canvas corner. Reads as "the ops room of a future agency".</p>
+    </div>
+
+    <div class="about-cards">
+      <div class="about-card">
+        <h4>★ WHAT'S NEW</h4>
+        <div class="body">
+          <ul id="changelogList"></ul>
+        </div>
+      </div>
+      <div class="about-card">
+        <h4>◐ PALETTE</h4>
+        <div class="body">
+          <div class="swatches" id="aboutSwatches"></div>
+          <p style="margin:8px 0 0;font-size:11px;color:var(--text-faint)">hover to highlight</p>
+        </div>
+      </div>
+      <div class="about-card">
+        <h4>A TYPOGRAPHY</h4>
+        <div class="body">
+          <div style="padding:12px;background:var(--surface-3);display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:'Audiowide',sans-serif;font-size:22px;color:var(--text);text-shadow:0 0 6px var(--accent-glow)">CYBERWARE_DISPLAY</span>
+            <span style="font-family:'Inter',sans-serif;font-size:13px;color:var(--text-dim)">Body — quick brown fox jumps</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent-2);letter-spacing:.06em">> 0xFE3D · 0123456789 · {hello.scs}</span>
+          </div>
+        </div>
+      </div>
+      <div class="about-card">
+        <h4>▶ ANIMATIONS</h4>
+        <div class="body">
+          <ul>
+            <li>Holographic rainbow line scrolls across appbar (5s)</li>
+            <li>City lights flicker on a 3s step animation</li>
+            <li>Vertical scan beam sweeps top→bottom (10s)</li>
+            <li>Diagonal stripes drift continuously (18s)</li>
+            <li>Glitch hover on primary buttons (RGB split + skew)</li>
+            <li>Border pulse on panels (4s breathe)</li>
+            <li>HUD radar sweep on the preview canvas (3s rotation)</li>
+            <li>Status verb cycles in topbar every 3.5s</li>
+          </ul>
+        </div>
+      </div>
+      <div class="about-card">
+        <h4>♪ SOUND CHARACTER</h4>
+        <div class="body">
+          <p>Sawtooth + sine synth pads · sci-fi UI blips · descending arpeggios for errors · holographic chime for success.</p>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+            <button class="btn-ghost" data-snd="click">CLICK</button>
+            <button class="btn-ghost" data-snd="success">SUCCESS</button>
+            <button class="btn-ghost" data-snd="error">ERROR</button>
+            <button class="btn-ghost" data-snd="notify">NOTIFY</button>
+          </div>
+        </div>
+      </div>
+      <div class="about-card">
+        <h4>▢ SHAPE LANGUAGE</h4>
+        <div class="body">
+          <ul>
+            <li>Radius 4px / 2px — angular not rounded</li>
+            <li>Clip-path polygon trapezoidal cuts on logo + buttons + caption + cards</li>
+            <li>Corner brackets on every panel (top-left pink, bottom-right cyan)</li>
+            <li>Hazard tape on modal foots</li>
+            <li>2px borders only at hot-spots; 1px hairlines elsewhere</li>
+          </ul>
+        </div>
+      </div>
+      <div class="about-card">
+        <h4>◉ WHEN TO USE</h4>
+        <div class="body">
+          <p>Sci-fi tooling, gaming-adjacent UI, agency dashboards, anything that wants to feel like 2077 ops. Pairs strongest with content that has dramatic colors / contrast.</p>
+        </div>
+      </div>
+      <div class="about-card" style="grid-column:1/-1;border-color:var(--border-strong)">
+        <h4>📋 PROMPT — copy &amp; paste back to refine</h4>
+        <div class="body">
+          <p style="font-size:11px;color:var(--text-faint);margin:0 0 8px">Live snapshot of cyberpunk theme + mode + active decorations. Edit "Tweaks I want" and paste back to me.</p>
+          <textarea id="aboutPrompt" readonly></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn-primary" id="copyPromptBtn">COPY TO CLIPBOARD</button>
+            <button class="btn-ghost" id="resetDecoBtn">RESET DECORATIONS</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============= SIDEBARS ============= -->
+
+  <!-- EDITOR SIDEBAR -->
+  <aside class="sidebar sidebar--editor">
+    <div class="ctrl-section">
+      <button class="section-head"><h3>CAPTION <span class="badge">1</span></h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <textarea class="input">caught the sunrise from the rooftop ☀️</textarea>
+        <div class="font-grid">
+          <button class="font-card active">SF Pro</button>
+          <button class="font-card">Antonio</button>
+          <button class="font-card">Editorial</button>
+          <button class="font-card">Marker</button>
+        </div>
+      </div>
+    </div>
+    <div class="ctrl-section">
+      <button class="section-head"><h3>TEXT STYLE</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <div class="seg"><button class="seg-btn active">BAR</button><button class="seg-btn">BOX</button><button class="seg-btn">PLAIN</button></div>
+        <label class="slider"><span>SIZE</span><span class="val">36</span><input type="range" min="20" max="80" value="36"></label>
+        <label class="slider"><span>BG OPACITY</span><span class="val">55%</span><input type="range" min="0" max="100" value="55"></label>
+        <label class="slider"><span>POSITION Y</span><span class="val">50%</span><input type="range" min="0" max="100" value="50"></label>
+        <div class="toggle-row"><span>OUTLINE</span><span class="tswitch" data-toggle></span></div>
+        <label class="slider"><span>OUTLINE WIDTH</span><span class="val">0</span><input type="range" min="0" max="20" value="0"></label>
+        <div class="toggle-row"><span>↔ MIRROR FLIP</span><span class="tswitch" data-toggle></span></div>
+      </div>
+    </div>
+    <div class="ctrl-section">
+      <button class="section-head"><h3>FILTERS <span class="badge">2</span></h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <div class="filter-grid">
+          <div class="filter-card active"><div class="thumb" style="background:linear-gradient(135deg,#ff6b6b,#f6b25b)"></div><span class="label">VIVID</span></div>
+          <div class="filter-card active"><div class="thumb" style="background:linear-gradient(135deg,#74c0fc,#9775fa)"></div><span class="label">CLARENDON</span></div>
+          <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#212529,#495057)"></div><span class="label">NOIR</span></div>
+          <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#ffd6a5,#ffadad)"></div><span class="label">RISE</span></div>
+          <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#a0c4ff,#bdb2ff)"></div><span class="label">MOON</span></div>
+          <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#caffbf,#9bf6ff)"></div><span class="label">JUNO</span></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em;margin-top:6px">
+          <span>STACK · DRAG TO REORDER · CLICK ✕ TO REMOVE</span>
+          <button class="btn-ghost" data-modal="filters" style="padding:5px 9px;font-size:9px">VIEW ALL 34</button>
+        </div>
+        <div class="fstack">
+          <div class="fstack-item">
+            <div class="frow">
+              <span class="fnum">1</span>
+              <span class="fname">Vivid</span>
+              <span class="fval">70</span>
+              <span class="frm" data-fstack-rm>×</span>
+            </div>
+            <input type="range" min="0" max="100" value="70">
+          </div>
+          <div class="fstack-item">
+            <div class="frow">
+              <span class="fnum">2</span>
+              <span class="fname">Clarendon</span>
+              <span class="fval">50</span>
+              <span class="frm" data-fstack-rm>×</span>
+            </div>
+            <input type="range" min="0" max="100" value="50">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ctrl-section collapsed">
+      <button class="section-head"><h3>ADJUSTMENTS <span class="badge">3</span></h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <label class="slider"><span>Saturation</span><span class="val">110%</span><input type="range" min="0" max="200" value="110"></label>
+        <label class="slider"><span>Contrast</span><span class="val">105%</span><input type="range" min="50" max="150" value="105"></label>
+        <label class="slider"><span>Brightness</span><span class="val">100%</span><input type="range" min="50" max="150" value="100"></label>
+        <label class="slider"><span>Warmth</span><span class="val">8</span><input type="range" min="-50" max="50" value="8"></label>
+      </div>
+    </div>
+    <div class="ctrl-section collapsed">
+      <button class="section-head"><h3>OUTPUT</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">EXPORT PRESET</div>
+        <div class="seg"><button class="seg-btn active">SOCIAL</button><button class="seg-btn">WEB</button><button class="seg-btn">PRINT</button></div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em;margin-top:6px">RESOLUTION</div>
+        <div class="seg"><button class="seg-btn active">1080P</button><button class="seg-btn">2K</button><button class="seg-btn">4K</button></div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em;margin-top:6px">FPS · src=30</div>
+        <div class="seg" style="grid-template-columns:repeat(5,1fr)"><button class="seg-btn">20</button><button class="seg-btn active">30</button><button class="seg-btn">60</button><button class="seg-btn">120</button><button class="seg-btn">SRC</button></div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em;margin-top:6px">FILENAME TEMPLATE</div>
+        <input class="input" value="snap-{date}-{counter}" style="font-family:var(--font-mono);font-size:11px">
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-faint);letter-spacing:.04em">→ <b style="color:var(--accent-2)">snap-2026-05-07-001.mp4</b></div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em;margin-top:6px">EXPORT ENGINE</div>
+        <div class="seg" style="grid-template-columns:repeat(2,1fr)"><button class="seg-btn">⚡ FAST</button><button class="seg-btn">🛡 RELIABLE</button></div>
+        <div class="seg" style="grid-template-columns:repeat(2,1fr)"><button class="seg-btn">🐢 LEGACY</button><button class="seg-btn active">☁ CLOUD</button></div>
+        <div class="toggle-row"><span>📱 IPHONE 17 PRO MAX</span><span class="tswitch on" data-toggle></span></div>
+        <div class="toggle-row"><span>STRIP METADATA</span><span class="tswitch" data-toggle></span></div>
+        <div class="toggle-row"><span>🔇 MUTE AUDIO</span><span class="tswitch" data-toggle></span></div>
+        <div class="kv" style="margin-top:6px"><dt>RES</dt><dd>1080P</dd><dt>FPS</dt><dd>30</dd><dt>ENGINE</dt><dd>Cloud</dd><dt>FILTERS</dt><dd>2 active · all baked</dd></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CAROUSEL SIDEBAR -->
+  <aside class="sidebar sidebar--carousel">
+    <div class="ctrl-section">
+      <button class="section-head"><h3>RATIO</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <div class="seg"><button class="seg-btn active">9:16</button><button class="seg-btn">1:1</button><button class="seg-btn">4:5</button></div>
+        <div class="toggle-row"><span>LINK FILTERS</span><span class="tswitch on" data-toggle></span></div>
+        <div class="toggle-row"><span>LINK ADJUSTMENTS</span><span class="tswitch on" data-toggle></span></div>
+        <div class="toggle-row"><span>LINK GPS</span><span class="tswitch" data-toggle></span></div>
+      </div>
+    </div>
+    <div class="ctrl-section">
+      <button class="section-head"><h3>FILTERS · LINKED <span class="badge">1</span></h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <div class="filter-grid">
+          <div class="filter-card active"><div class="thumb" style="background:linear-gradient(135deg,#74c0fc,#9775fa)"></div><span class="label">CLARENDON</span></div>
+          <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#ff6b6b,#f6b25b)"></div><span class="label">VIVID</span></div>
+          <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#212529,#495057)"></div><span class="label">NOIR</span></div>
+          <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#caffbf,#9bf6ff)"></div><span class="label">JUNO</span></div>
+          <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#ffd6a5,#ffadad)"></div><span class="label">RISE</span></div>
+          <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#a0c4ff,#bdb2ff)"></div><span class="label">MOON</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="ctrl-section">
+      <button class="section-head"><h3>ADJUSTMENTS · LINKED</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <label class="slider"><span>Saturation</span><span class="val">110%</span><input type="range" min="0" max="200" value="110"></label>
+        <label class="slider"><span>Contrast</span><span class="val">102%</span><input type="range" min="50" max="150" value="102"></label>
+        <label class="slider"><span>Vignette</span><span class="val">12%</span><input type="range" min="0" max="100" value="12"></label>
+      </div>
+    </div>
+    <div class="ctrl-section collapsed">
+      <button class="section-head"><h3>BATCH OUTPUT</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <div class="kv">
+          <dt>FILES</dt><dd>12 / 12 ready</dd>
+          <dt>NAMING</dt><dd>IMG_{counter}.HEIC</dd>
+          <dt>METADATA</dt><dd>iPhone 17 Pro Max EXIF</dd>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- DRIVE SIDEBAR -->
+  <aside class="sidebar sidebar--drive">
+    <div class="ctrl-section">
+      <button class="section-head"><h3>FILTER FILES</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <div class="seg"><button class="seg-btn active">ALL</button><button class="seg-btn">IMG</button><button class="seg-btn">VID</button></div>
+        <label class="slider"><span>MIN SIZE</span><span class="val">0 MB</span><input type="range" min="0" max="100" value="0"></label>
+        <label class="slider"><span>MAX SIZE</span><span class="val">50 MB</span><input type="range" min="0" max="100" value="50"></label>
+        <div class="toggle-row"><span>HIDE ALREADY IMPORTED</span><span class="tswitch on" data-toggle></span></div>
+      </div>
+    </div>
+    <div class="ctrl-section">
+      <button class="section-head"><h3>SORT</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <div class="seg"><button class="seg-btn active">DATE</button><button class="seg-btn">SIZE</button><button class="seg-btn">NAME</button></div>
+        <div class="toggle-row"><span>NEWEST FIRST</span><span class="tswitch on" data-toggle></span></div>
+      </div>
+    </div>
+    <div class="ctrl-section">
+      <button class="section-head"><h3>ACCOUNT</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <div class="kv">
+          <dt>SIGNED IN</dt><dd>shon@seraphim.mgmt</dd>
+          <dt>QUOTA</dt><dd>14.2 GB / 100 GB</dd>
+          <dt>FOLDER</dt><dd>Trial Reels 2026</dd>
+        </div>
+        <button class="btn-ghost" data-modal="drive-connect" style="width:100%">CHANGE ACCOUNT</button>
+      </div>
+    </div>
+    <div class="ctrl-section">
+      <button class="section-head"><h3>QUICK</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <button class="btn-ghost" data-modal="drive-import" style="width:100%">+ IMPORT MODAL</button>
+        <button class="btn-ghost" data-modal="drive-picker" style="width:100%">CHOOSE FOLDER</button>
+        <button class="btn-ghost" data-modal="drive-export" style="width:100%">UPLOAD STATUS</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- INSPECTOR SIDEBAR -->
+  <aside class="sidebar sidebar--inspector">
+    <div class="ctrl-section">
+      <button class="section-head"><h3>ACTIONS</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <button class="btn-ghost" style="width:100%">COPY ALL TO CLIPBOARD</button>
+        <button class="btn-ghost" style="width:100%">EXPORT AS JSON</button>
+        <button class="btn-ghost" style="width:100%">EXPORT AS XMP SIDECAR</button>
+        <button class="btn-ghost" style="width:100%" data-toast="warn">STRIP ALL METADATA</button>
+      </div>
+    </div>
+    <div class="ctrl-section">
+      <button class="section-head"><h3>OVERRIDE METADATA</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <div class="toggle-row"><span>📱 IPHONE 17 PRO MAX</span><span class="tswitch on" data-toggle></span></div>
+        <div class="toggle-row"><span>RANDOMIZE TIMESTAMP</span><span class="tswitch" data-toggle></span></div>
+        <div class="toggle-row"><span>STRIP GPS ON EXPORT</span><span class="tswitch" data-toggle></span></div>
+      </div>
+    </div>
+    <div class="ctrl-section collapsed">
+      <button class="section-head"><h3>EXIF SECTIONS</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <div class="kv">
+          <dt>BASIC</dt><dd>5 fields</dd>
+          <dt>CAMERA</dt><dd>8 fields</dd>
+          <dt>GPS</dt><dd>5 fields</dd>
+          <dt>APPLE</dt><dd>4 fields</dd>
+          <dt>IPTC</dt><dd>0 fields</dd>
+          <dt>XMP</dt><dd>0 fields</dd>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ABOUT SIDEBAR -->
+  <aside class="sidebar sidebar--about">
+    <div class="ctrl-section">
+      <button class="section-head"><h3>QUICK PREVIEW</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <p style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);line-height:1.5;margin:0 0 8px">All 12 modals — open any to confirm theme reskin.</p>
+        <button class="btn-ghost" data-modal="settings" style="width:100%">⚙ SETTINGS</button>
+        <button class="btn-ghost" data-modal="filters" style="width:100%">◐ FILTERS</button>
+        <button class="btn-ghost" data-modal="exporting" style="width:100%">↑ EXPORT</button>
+        <button class="btn-ghost" data-modal="trialreel" style="width:100%">⚄ TRIAL REEL</button>
+        <button class="btn-ghost" data-modal="recovery" style="width:100%">⟲ RECOVERY</button>
+        <button class="btn-ghost" data-modal="gps" style="width:100%">◉ GPS</button>
+        <button class="btn-ghost" data-modal="patchnotes" style="width:100%">★ PATCH NOTES</button>
+        <button class="btn-ghost" data-modal="cheatsheet" style="width:100%">⌘ SHORTCUTS</button>
+      </div>
+    </div>
+    <div class="ctrl-section">
+      <button class="section-head"><h3>DRIVE FLOW</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <button class="btn-ghost" data-modal="drive-connect" style="width:100%">▲ CONNECT</button>
+        <button class="btn-ghost" data-modal="drive-picker" style="width:100%">📁 FOLDER PICKER</button>
+        <button class="btn-ghost" data-modal="drive-import" style="width:100%">⬇ IMPORT IMAGES</button>
+        <button class="btn-ghost" data-modal="drive-export" style="width:100%">⬆ UPLOAD STATUS</button>
+      </div>
+    </div>
+    <div class="ctrl-section">
+      <button class="section-head"><h3>DECORATIONS</h3><span class="chev">›</span></button>
+      <div class="section-body">
+        <p style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);line-height:1.5;margin:0 0 8px">Toggle each layer to see it on/off.</p>
+        <div class="seg" style="grid-template-columns:repeat(2,1fr)"><button class="seg-btn active" data-deco-toggle="bg">🜨 BG</button><button class="seg-btn active" data-deco-toggle="ornaments">✦ ORN</button></div>
+        <div class="seg" style="grid-template-columns:repeat(2,1fr)"><button class="seg-btn active" data-deco-toggle="motifs">⚔ MTF</button><button class="seg-btn active" data-deco-toggle="anim">▶ ANIM</button></div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<!-- ============================================================
+     MODALS
+     ============================================================ -->
+
+<div class="modal-back" data-modal-id="settings">
+  <div class="modal modal--lg" role="dialog">
+    <div class="modal__head"><h3><span class="ico">⚙</span> SETTINGS</h3><button class="modal__close">×</button></div>
+    <div class="modal__body">
+      <div class="tabs-strip">
+        <button class="stab active">GENERAL</button>
+        <button class="stab">CLOUD</button>
+        <button class="stab">DRIVE</button>
+        <button class="stab">AUDIO</button>
+        <button class="stab">SHORTCUTS</button>
+      </div>
+      <div class="kv" style="margin-bottom:14px">
+        <dt>DEFAULT EXPORT ENGINE</dt><dd>☁ Cloud (DigitalOcean)</dd>
+        <dt>DEFAULT RESOLUTION</dt><dd>1080P</dd>
+        <dt>DEFAULT FPS</dt><dd>30</dd>
+        <dt>HARDWARE DECODE</dt><dd>ON</dd>
+        <dt>UI SOUND</dt><dd>ON · soft</dd>
+        <dt>THEME</dt><dd id="settingsTheme">Cyberpunk · Dark</dd>
+      </div>
+      <p style="margin:0 0 6px;font-family:var(--font-mono);font-size:11px;color:var(--text-faint);letter-spacing:.06em">CLOUD STATUS</p>
+      <div class="snapshot">
+        <div><span class="k">URL</span> <b>137.184.47.65:8000</b></div>
+        <div><span class="k">LATENCY</span> 142ms <span style="color:var(--success)">●</span> healthy</div>
+        <div><span class="k">FILTERS</span> 25 css · 9 lut · 34/34 supported</div>
+        <div><span class="k">BUILD</span> v4.2.25 · sfo3</div>
+      </div>
+    </div>
+    <div class="modal__foot"><button class="btn-ghost" data-close>CANCEL</button><button class="btn-primary" data-toast="success" data-toast-msg="Settings saved.">SAVE</button></div>
+  </div>
+</div>
+
+<div class="modal-back" data-modal-id="patchnotes">
+  <div class="modal modal--lg" role="dialog">
+    <div class="modal__head"><h3><span class="ico">★</span> PATCH NOTES</h3><button class="modal__close">×</button></div>
+    <div class="modal__body">
+      <div class="patch-list">
+        <div class="patch">
+          <div class="patch__head"><span class="ver">v4.2.25</span><span class="date">May 7</span></div>
+          <p class="patch__title">iPhone LUT filters bake on cloud — full filter parity</p>
+          <ul class="patch__bullets"><li>9 LUT-method filters render server-side via 33³ .cube files</li><li>Mixed CSS+LUT stacks preserve order</li></ul>
+        </div>
+        <div class="patch">
+          <div class="patch__head"><span class="ver">v4.2.24</span><span class="date">May 6</span></div>
+          <p class="patch__title">Filter chips bake on cloud — Instagram presets</p>
+          <ul class="patch__bullets"><li>25 CSS-method filters → ffmpeg eq/hue/colorchannelmixer</li><li>200× perf fix: pinned color rate to fps</li></ul>
+        </div>
+        <div class="patch">
+          <div class="patch__head"><span class="ver">v4.2.23</span><span class="date">May 6</span></div>
+          <p class="patch__title">Filter chips in the video editor (27 presets)</p>
+          <ul class="patch__bullets"><li>Editor sidebar gets a new FILTERS section</li><li>Per-filter thumbnails on your media</li></ul>
+        </div>
+      </div>
+    </div>
+    <div class="modal__foot"><button class="btn-primary" data-close>GOT IT</button></div>
+  </div>
+</div>
+
+<div class="modal-back" data-modal-id="cheatsheet">
+  <div class="modal" role="dialog">
+    <div class="modal__head"><h3><span class="ico">⌘</span> KEYBOARD SHORTCUTS</h3><button class="modal__close">×</button></div>
+    <div class="modal__body">
+      <div class="cheatlist">
+        <div class="row"><span class="lab">Export</span><span class="ks"><span class="kbd">⌘</span><span class="kbd">E</span></span></div>
+        <div class="row"><span class="lab">Settings</span><span class="ks"><span class="kbd">⌘</span><span class="kbd">,</span></span></div>
+        <div class="row"><span class="lab">Editor tab</span><span class="ks"><span class="kbd">⌘</span><span class="kbd">1</span></span></div>
+        <div class="row"><span class="lab">Carousel tab</span><span class="ks"><span class="kbd">⌘</span><span class="kbd">2</span></span></div>
+        <div class="row"><span class="lab">Drive tab</span><span class="ks"><span class="kbd">⌘</span><span class="kbd">3</span></span></div>
+        <div class="row"><span class="lab">Inspector tab</span><span class="ks"><span class="kbd">⌘</span><span class="kbd">4</span></span></div>
+        <div class="row"><span class="lab">About tab</span><span class="ks"><span class="kbd">A</span></span></div>
+        <div class="row"><span class="lab">Trial Reel</span><span class="ks"><span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">R</span></span></div>
+        <div class="row"><span class="lab">Undo</span><span class="ks"><span class="kbd">⌘</span><span class="kbd">Z</span></span></div>
+        <div class="row"><span class="lab">Redo</span><span class="ks"><span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">Z</span></span></div>
+        <div class="row"><span class="lab">Close modal</span><span class="ks"><span class="kbd">esc</span></span></div>
+        <div class="row"><span class="lab">Light / Dark</span><span class="ks"><span class="kbd">L</span> / <span class="kbd">D</span></span></div>
+      </div>
+    </div>
+    <div class="modal__foot"><button class="btn-primary" data-close>CLOSE</button></div>
+  </div>
+</div>
+
+<div class="modal-back" data-modal-id="filters">
+  <div class="modal modal--lg" role="dialog">
+    <div class="modal__head"><h3><span class="ico">◐</span> FILTER STACK</h3><button class="modal__close">×</button></div>
+    <div class="modal__body">
+      <p style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin:0 0 14px">iPhone presets · LUT-method · 9 filters</p>
+      <div class="filter-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:18px">
+        <div class="filter-card active"><div class="thumb" style="background:linear-gradient(135deg,#ff6b6b,#f6b25b)"></div><span class="label">VIVID</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#ff9966,#ff5e62)"></div><span class="label">VIVID WARM</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#56CCF2,#2F80ED)"></div><span class="label">VIVID COOL</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#4a4a4a,#1a1a1a)"></div><span class="label">DRAMATIC</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#212529,#495057)"></div><span class="label">NOIR</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#bbb,#777)"></div><span class="label">MONO</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#d4a574,#9c7c4d)"></div><span class="label">SILVERTONE</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#cc4422,#992211)"></div><span class="label">DRAMA WARM</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#3399cc,#225588)"></div><span class="label">DRAMA COOL</span></div>
+      </div>
+      <p style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin:0 0 14px">Instagram presets · CSS-method · 25 filters</p>
+      <div class="filter-grid" style="grid-template-columns:repeat(5,1fr)">
+        <div class="filter-card active"><div class="thumb" style="background:linear-gradient(135deg,#74c0fc,#9775fa)"></div><span class="label">CLARENDON</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#fff,#dde)"></div><span class="label">GINGHAM</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#ddd,#888)"></div><span class="label">MOON</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#222,#444)"></div><span class="label">LARK</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#a0c4ff,#bdb2ff)"></div><span class="label">REYES</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#caffbf,#9bf6ff)"></div><span class="label">JUNO</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#7d6918,#a98a3d)"></div><span class="label">SLUMBER</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#d9a566,#a8723e)"></div><span class="label">CREMA</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#7d6918,#5a4818)"></div><span class="label">LUDWIG</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#420a0e,#7a1414)"></div><span class="label">ADEN</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#005b9a,#0091ff)"></div><span class="label">PERPETUA</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#ff9966,#ff5e62)"></div><span class="label">AMARO</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#bda681,#8c7556)"></div><span class="label">MAYFAIR</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#ffd6a5,#ffadad)"></div><span class="label">RISE</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#a6b1ff,#7a85d9)"></div><span class="label">HUDSON</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#3a0339,#1a0119)"></div><span class="label">VALENCIA</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#e0e7b4,#a98a3d)"></div><span class="label">X-PRO II</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#7d6918,#3d3408)"></div><span class="label">SIERRA</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#d4a9af,#8b6f73)"></div><span class="label">WILLOW</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#5a3a1a,#2a1a08)"></div><span class="label">LO-FI</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#1a1a1a,#3a3a3a)"></div><span class="label">INKWELL</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#f7b099,#d97a4f)"></div><span class="label">NASHVILLE</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#f36abc,#a83d8e)"></div><span class="label">1977</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#ff8c28,#a85a18)"></div><span class="label">KELVIN</span></div>
+        <div class="filter-card"><div class="thumb" style="background:linear-gradient(135deg,#b4500f,#7a380a)"></div><span class="label">TOASTER</span></div>
+      </div>
+      <p style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);margin:14px 0 6px;letter-spacing:.06em">FILTERS BAKE WHERE? — local: Fast/Reliable/Legacy · cloud: ALL 34 ✓ · image export: ALL 34 ✓</p>
+    </div>
+    <div class="modal__foot"><button class="btn-ghost" data-close>CLEAR</button><button class="btn-primary" data-toast="success" data-toast-msg="Filter stack applied — 2 active.">APPLY 2</button></div>
+  </div>
+</div>
+
+<div class="modal-back" data-modal-id="gps">
+  <div class="modal modal--lg" role="dialog">
+    <div class="modal__head"><h3><span class="ico">◉</span> GPS LOCATION</h3><button class="modal__close">×</button></div>
+    <div class="modal__body">
+      <input class="input" placeholder="🔍 SEARCH CITY · NEIGHBOURHOOD · COORDINATE…">
+      <div class="map-fake" style="margin-top:14px"><div class="map-pin"></div></div>
+      <div class="kv" style="margin-top:14px">
+        <dt>LAT</dt><dd>40.7128° N</dd>
+        <dt>LNG</dt><dd>74.0060° W</dd>
+        <dt>NEAR</dt><dd>Manhattan, NY · United States</dd>
+        <dt>RECENT</dt><dd style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn-ghost" style="padding:5px 10px">NYC</button>
+          <button class="btn-ghost" style="padding:5px 10px">Miami</button>
+          <button class="btn-ghost" style="padding:5px 10px">LA</button>
+          <button class="btn-ghost" style="padding:5px 10px">Tokyo</button>
+        </dd>
+      </div>
+    </div>
+    <div class="modal__foot"><button class="btn-ghost" data-close>CLEAR</button><button class="btn-primary" data-toast="success" data-toast-msg="GPS set — Manhattan, NY.">SET LOCATION</button></div>
+  </div>
+</div>
+
+<div class="modal-back" data-modal-id="recovery">
+  <div class="modal" role="dialog">
+    <div class="modal__head"><h3><span class="ico">⟲</span> RESTORE PREVIOUS SESSION?</h3><button class="modal__close">×</button></div>
+    <div class="modal__body">
+      <p style="margin:0 0 12px;color:var(--text-dim);font-size:13px;line-height:1.5">It looks like you had editor changes from <b style="color:var(--accent-2)">12 minutes ago</b>. We can restore them now.</p>
+      <div class="snapshot">
+        <div><span class="k">CAPTION</span> "caught the sunrise from the rooftop ☀️"</div>
+        <div><span class="k">ADJUSTMENTS</span> sat 110%, con 105%, bri 100%, warm 8</div>
+        <div><span class="k">FILTERS</span> Vivid, Clarendon</div>
+        <div><span class="k">STYLE</span> bar · outline off · font: SF Pro</div>
+      </div>
+      <p style="margin:14px 0 0;font-size:11px;color:var(--text-faint);font-style:italic">Source media isn't restored — reopen your file to see the restored adjustments applied.</p>
+    </div>
+    <div class="modal__foot"><button class="btn-ghost" data-close>DISMISS</button><button class="btn-primary" data-toast="success" data-toast-msg="Session restored.">RESTORE</button></div>
+  </div>
+</div>
+
+<div class="modal-back" data-modal-id="trialreel">
+  <div class="modal" role="dialog">
+    <div class="modal__head"><h3><span class="ico">⚄</span> TRIAL REEL</h3><button class="modal__close">×</button></div>
+    <div class="modal__body" style="text-align:center">
+      <span class="dice">⚄</span>
+      <p style="margin:12px 0 4px;font-family:var(--font-display);font-size:16px;letter-spacing:.10em">ROLLING RANDOM LOOK…</p>
+      <p style="margin:0;color:var(--text-faint);font-size:12px;font-family:var(--font-mono);letter-spacing:.04em">font · size · color · style · adjustments · 1 random filter</p>
+      <div class="kv" style="margin-top:18px;text-align:left">
+        <dt>FONT</dt><dd>Antonio</dd>
+        <dt>STYLE</dt><dd>BOX</dd>
+        <dt>SAT/CON/BRI</dt><dd>118 / 109 / 102</dd>
+        <dt>FILTER</dt><dd>Hudson @ 48%</dd>
+      </div>
+    </div>
+    <div class="modal__foot"><button class="btn-ghost" data-close>CANCEL</button><button class="btn-primary" data-toast="success" data-toast-msg="Trial roll applied.">APPLY ROLL</button></div>
+  </div>
+</div>
+
+<div class="modal-back" data-modal-id="exporting">
+  <div class="modal" role="dialog">
+    <div class="modal__head"><h3><span class="ico">↑</span> EXPORTING · CLOUD</h3><button class="modal__close">×</button></div>
+    <div class="modal__body">
+      <p style="margin:0 0 12px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim);letter-spacing:.06em">UPLOADING + ENCODING · libx264 @ ~15 Mbps · 12.4s elapsed</p>
+      <div class="steps">
+        <div class="step done">SOURCE</div>
+        <div class="step done">CAPTION</div>
+        <div class="step active">RENDER</div>
+        <div class="step">SAVE</div>
+      </div>
+      <div class="progress"><div class="progress__bar"></div></div>
+      <p style="margin:14px 0 0;font-size:11px;color:var(--text-faint);font-family:var(--font-mono);letter-spacing:.04em">62% · ~7s remaining · output 1.4 MB so far</p>
+    </div>
+    <div class="modal__foot"><button class="btn-ghost" data-close>CANCEL</button></div>
+  </div>
+</div>
+
+<!-- DRIVE MODALS -->
+<div class="modal-back" data-modal-id="drive-connect">
+  <div class="modal" role="dialog">
+    <div class="modal__head"><h3><span class="ico" style="color:#4285F4">▲</span> CONNECT GOOGLE DRIVE</h3><button class="modal__close">×</button></div>
+    <div class="modal__body">
+      <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);margin-bottom:16px">
+        <div style="width:46px;height:46px;background:linear-gradient(135deg,#4285F4 0,#34A853 50%,#FBBC04 75%,#EA4335 100%);display:grid;place-items:center;color:#fff;font-weight:800;font-size:20px;clip-path:polygon(15% 0,100% 0,100% 85%,85% 100%,0 100%,0 15%);font-family:var(--font-display)">▲</div>
+        <div>
+          <p style="margin:0;font-weight:600;font-size:14px">Snap Caption Studio</p>
+          <p style="margin:2px 0 0;font-size:12px;color:var(--text-faint);font-family:var(--font-mono);letter-spacing:.04em">wants to access your Google Drive</p>
+        </div>
+      </div>
+      <p style="margin:0 0 8px;font-family:var(--font-mono);font-size:11px;color:var(--text-faint);letter-spacing:.06em">PERMISSIONS REQUESTED</p>
+      <div class="snapshot">
+        <div><span class="k">📁</span> See, create, and modify files in your selected folders</div>
+        <div><span class="k">⬆</span> Upload exported videos and images directly</div>
+        <div><span class="k">⬇</span> Download / import files from your Drive into the app</div>
+        <div><span class="k">🗂</span> Create new folders for batch carousel exports</div>
+        <div><span class="k">🔍</span> Search folders by name or browse from My Drive</div>
+      </div>
+      <p style="margin:14px 0 0;font-size:11px;color:var(--text-faint);font-style:italic">Revoke access anytime at <span style="color:var(--accent-2)">myaccount.google.com → Security → Third-party apps</span></p>
+    </div>
+    <div class="modal__foot"><button class="btn-ghost" data-close>CANCEL</button><button class="btn-primary" data-toast="success" data-toast-msg="Connected — shon@seraphim.mgmt">CONNECT</button></div>
+  </div>
+</div>
+
+<div class="modal-back" data-modal-id="drive-picker">
+  <div class="modal modal--lg" role="dialog">
+    <div class="modal__head"><h3><span class="ico" style="color:#4285F4">📁</span> CHOOSE DRIVE FOLDER</h3><button class="modal__close">×</button></div>
+    <div class="modal__body">
+      <div style="display:flex;gap:8px;align-items:center;font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin-bottom:14px;letter-spacing:.04em;flex-wrap:wrap">
+        <span style="color:var(--accent)">▲</span><span style="color:var(--text-dim)">My Drive</span><span>›</span><span style="color:var(--text-dim)">Snap Caption</span><span>›</span><span style="color:var(--accent-2);font-weight:600">Trial Reels 2026</span>
+      </div>
+      <input class="input" placeholder="🔍 SEARCH FOLDERS OR PASTE A DRIVE FOLDER URL…">
+      <div style="margin-top:14px;background:var(--surface-2);border:1px solid var(--border);overflow:hidden">
+        <div style="display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer">
+          <span style="display:flex;gap:10px;font-size:13px">📁 <b>My Drive</b></span><span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">/ root</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:10px 14px 10px 34px;border-bottom:1px solid var(--border);cursor:pointer">
+          <span style="display:flex;gap:10px;font-size:13px">📁 Snap Caption</span><span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">12 items</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:10px 14px 10px 54px;border-bottom:1px solid var(--border);cursor:pointer;background:var(--accent-soft);color:var(--accent-2);text-shadow:0 0 4px var(--accent-2)">
+          <span style="display:flex;gap:10px;font-size:13px">📁 <b>Trial Reels 2026</b></span><span style="font-family:var(--font-mono);font-size:10px">● SELECTED · 47 items</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:10px 14px 10px 54px;border-bottom:1px solid var(--border);cursor:pointer">
+          <span style="display:flex;gap:10px;font-size:13px">📁 Reels — February</span><span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">23 items</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:10px 14px 10px 54px;border-bottom:1px solid var(--border);cursor:pointer">
+          <span style="display:flex;gap:10px;font-size:13px">📁 Reels — March</span><span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">31 items</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:10px 14px 10px 34px;cursor:pointer">
+          <span style="display:flex;gap:10px;font-size:13px">📁 Archive</span><span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">156 items</span>
+        </div>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;align-items:center;font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">
+        <span style="color:var(--text-faint)">QUICK PICKS:</span>
+        <button class="btn-ghost" style="padding:5px 10px">RECENTS</button>
+        <button class="btn-ghost" style="padding:5px 10px">STARRED</button>
+        <button class="btn-ghost" style="padding:5px 10px">SHARED</button>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn-ghost" data-close>CANCEL</button>
+      <button class="btn-ghost" data-toast="notify" data-toast-msg="New folder created.">+ NEW FOLDER</button>
+      <button class="btn-primary" data-toast="success" data-toast-msg="Folder selected — Trial Reels 2026">SELECT FOLDER</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" data-modal-id="drive-import">
+  <div class="modal modal--xl" role="dialog">
+    <div class="modal__head"><h3><span class="ico" style="color:#34A853">⬇</span> IMPORT IMAGES FROM DRIVE</h3><button class="modal__close">×</button></div>
+    <div class="modal__body">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="display:flex;gap:8px;align-items:center;font-family:var(--font-mono);font-size:11px;color:var(--text-faint);letter-spacing:.04em">
+          <span style="color:var(--accent)">▲</span><span style="color:var(--text-dim)">My Drive</span><span>›</span><span style="color:var(--text-dim)">Snap Caption</span><span>›</span><span style="color:var(--accent-2);font-weight:600">Trial Reels 2026</span>
+        </div>
+        <div class="seg" style="grid-template-columns:repeat(3,auto)">
+          <button class="seg-btn active">ALL</button>
+          <button class="seg-btn">IMAGES</button>
+          <button class="seg-btn">VIDEOS</button>
+        </div>
+      </div>
+      <input class="input" placeholder="🔍 SEARCH FILES IN THIS FOLDER…" style="margin-bottom:14px">
+      <div class="drive-grid drive-grid--modal">
+        <div class="drive-file selected" data-drive-file><div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#ff6b6b,#f6b25b)">📷<span class="badge-type">HEIC</span></div><div class="drive-info"><div class="name">IMG_0421.HEIC</div><div class="meta">2.4 MB</div></div></div>
+        <div class="drive-file selected" data-drive-file><div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#74c0fc,#9775fa)">▶<span class="badge-type">MP4</span><span class="badge-dur">0:12</span></div><div class="drive-info"><div class="name">IMG_0422.MP4</div><div class="meta">8.1 MB</div></div></div>
+        <div class="drive-file selected" data-drive-file><div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#A1C4FD,#C2E9FB)">📷<span class="badge-type">HEIC</span></div><div class="drive-info"><div class="name">IMG_0423.HEIC</div><div class="meta">3.2 MB</div></div></div>
+        <div class="drive-file" data-drive-file><div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#84FAB0,#8FD3F4)">📷<span class="badge-type">HEIC</span></div><div class="drive-info"><div class="name">IMG_0424.HEIC</div><div class="meta">2.7 MB</div></div></div>
+        <div class="drive-file" data-drive-file><div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#FCB69F,#FFECD2)">▶<span class="badge-type">MP4</span><span class="badge-dur">0:08</span></div><div class="drive-info"><div class="name">IMG_0425.MP4</div><div class="meta">5.4 MB</div></div></div>
+        <div class="drive-file" data-drive-file><div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#D299C2,#FEF9D7)">📷<span class="badge-type">JPG</span></div><div class="drive-info"><div class="name">trial_001.JPG</div><div class="meta">1.8 MB</div></div></div>
+        <div class="drive-file" data-drive-file><div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#FBC2EB,#A6C1EE)">📷<span class="badge-type">HEIC</span></div><div class="drive-info"><div class="name">IMG_0426.HEIC</div><div class="meta">2.9 MB</div></div></div>
+        <div class="drive-file" data-drive-file><div class="drive-thumb" style="--dthumb:linear-gradient(135deg,#3a0339,#FF6A88)">▶<span class="badge-type">MP4</span><span class="badge-dur">0:15</span></div><div class="drive-info"><div class="name">night_walk.MP4</div><div class="meta">12.6 MB</div></div></div>
+      </div>
+      <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-family:var(--font-mono);font-size:11px">
+        <div style="color:var(--text-faint)">
+          <span><b style="color:var(--accent-2)">3</b> selected</span> · <span><b>13.7 MB</b> total</span> · <span>~4s import time</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="color:var(--text-faint)">DESTINATION:</span>
+          <span class="seg" style="grid-template-columns:repeat(2,auto);padding:2px">
+            <button class="seg-btn active" style="font-size:9px;padding:5px 10px">EDITOR</button>
+            <button class="seg-btn" style="font-size:9px;padding:5px 10px">CAROUSEL</button>
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn-ghost" data-close>CANCEL</button>
+      <button class="btn-ghost" id="importSelectAll">SELECT ALL</button>
+      <button class="btn-primary" data-toast="success" data-toast-msg="3 files imported to Editor.">IMPORT 3 FILES</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" data-modal-id="drive-export">
+  <div class="modal" role="dialog">
+    <div class="modal__head"><h3><span class="ico" style="color:#34A853">⬆</span> UPLOADING TO DRIVE</h3><button class="modal__close">×</button></div>
+    <div class="modal__body">
+      <p style="margin:0 0 12px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim);letter-spacing:.06em">RENDERING + UPLOADING · 1.4 MB / 4.2 MB · 18.2s elapsed</p>
+      <div class="steps">
+        <div class="step done">RENDER</div>
+        <div class="step done">CAPTION</div>
+        <div class="step active">UPLOAD</div>
+        <div class="step">DONE</div>
+      </div>
+      <div class="progress"><div class="progress__bar"></div></div>
+      <p style="margin:14px 0 6px;font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">DESTINATION</p>
+      <div class="snapshot">
+        <div><span class="k">📁</span> My Drive › Snap Caption › <b>Trial Reels 2026</b></div>
+        <div><span class="k">📄</span> filename: <b>IMG_0421.mp4</b></div>
+        <div><span class="k">🪪</span> iPhone 17 Pro Max EXIF · GPS: Manhattan, NY</div>
+        <div><span class="k">⚡</span> resumable upload · 33% complete</div>
+        <div><span class="k">🔁</span> auto-resume on connection drop</div>
+      </div>
+      <p style="margin:14px 0 0;font-size:11px;color:var(--text-faint);font-family:var(--font-mono)">~12s remaining · network ↑ 1.2 MB/s</p>
+    </div>
+    <div class="modal__foot"><button class="btn-ghost" data-toast="warn" data-toast-msg="Upload paused — partial file kept on Drive.">PAUSE</button><button class="btn-ghost" data-close>CANCEL</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg">Saved.</span></div>
+
+<script>
+const html = document.documentElement;
+function $(id){return document.getElementById(id)}
+
+/* ============= MODE / TAB / DECO ============= */
+function setMode(m){html.setAttribute('data-mode',m);document.querySelectorAll('[data-mode-pick]').forEach(b=>b.classList.toggle('active',b.dataset.modePick===m));refreshAbout();}
+function setTab(t){
+  html.setAttribute('data-tab',t);
+  document.querySelectorAll('[data-tab-pick]').forEach(b=>b.classList.toggle('active',b.dataset.tabPick===t));
+  const m={editor:'v4.2.25 · EDITOR · VIDEO · 1080×1920 · 5.0S',carousel:'v4.2.25 · CAROUSEL · 12 IMAGES · 9:16',drive:'v4.2.25 · DRIVE · MY DRIVE / SNAP CAPTION / TRIAL REELS 2026',inspector:'v4.2.25 · INSPECTOR · IMG_0421.HEIC',about:'v4.2.25 · ABOUT · CYBERPUNK FOCUSED'};
+  $('appbarMeta').textContent = m[t] || '';
+  if(t==='about') refreshAbout();
+}
+function setCarouselView(v){html.setAttribute('data-carousel-view',v);document.querySelectorAll('[data-carousel-pick]').forEach(b=>b.classList.toggle('active',b.dataset.carouselPick===v));playSound('click');}
+function setDeco(k,v){html.setAttribute('data-deco-'+k,v);document.querySelectorAll(`[data-deco-toggle="${k}"]`).forEach(b=>b.classList.toggle('active',v==='on'));refreshAbout();playSound('click');}
+function toggleDeco(k){setDeco(k,html.getAttribute('data-deco-'+k)==='on'?'off':'on')}
+
+document.querySelectorAll('[data-mode-pick]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.modePick)));
+document.querySelectorAll('[data-tab-pick]').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tabPick)));
+document.querySelectorAll('[data-carousel-pick]').forEach(b=>b.addEventListener('click',()=>setCarouselView(b.dataset.carouselPick)));
+document.querySelectorAll('[data-deco-toggle]').forEach(b=>b.addEventListener('click',()=>toggleDeco(b.dataset.decoToggle)));
+
+const resetBtn = $('resetDecoBtn');
+if(resetBtn) resetBtn.addEventListener('click',()=>{['bg','ornaments','motifs','anim'].forEach(k=>setDeco(k,'on'));showToast('All decorations restored.','success')});
+
+/* ============= MODALS ============= */
+function openModal(id){const b=document.querySelector(`.modal-back[data-modal-id="${id}"]`);if(b){b.classList.add('show');document.body.style.overflow='hidden';playSound('open');}}
+function closeModal(){document.querySelectorAll('.modal-back.show').forEach(m=>m.classList.remove('show'));document.body.style.overflow='';playSound('click');}
+document.querySelectorAll('[data-modal]').forEach(b=>b.addEventListener('click',()=>openModal(b.dataset.modal)));
+document.querySelectorAll('.modal__close,[data-close]').forEach(b=>b.addEventListener('click',closeModal));
+document.querySelectorAll('.modal-back').forEach(back=>back.addEventListener('click',e=>{if(e.target===back) closeModal();}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape') closeModal();});
+
+/* ============= TOAST ============= */
+const toast=$('toast'),toastMsg=$('toastMsg');let toastT;
+function showToast(m,k='success'){toastMsg.textContent=m;toast.classList.remove('error','warn','success');if(k==='error')toast.classList.add('error');else if(k==='warn')toast.classList.add('warn');toast.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>toast.classList.remove('show'),2200);playSound(k==='error'?'error':k==='warn'?'notify':'success');}
+document.querySelectorAll('[data-toast]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.toast,m={success:'Look applied.',error:'Cloud render failed.',warn:'Output overwrites existing file.',notify:'Snapshot saved.'};showToast(b.dataset.toastMsg||m[k]||'Done.',k);}));
+
+/* ============= SECTIONS / SEG / FONT / FILTER / SLIDER / TOGGLE ============= */
+document.querySelectorAll('.section-head').forEach(h=>h.addEventListener('click',()=>{h.closest('.ctrl-section').classList.toggle('collapsed');playSound('click');}));
+document.querySelectorAll('.seg').forEach(seg=>seg.querySelectorAll('.seg-btn').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.carouselPick||btn.dataset.decoToggle) return;seg.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');playSound('click');})));
+document.querySelectorAll('.font-grid').forEach(grid=>grid.querySelectorAll('.font-card').forEach(c=>c.addEventListener('click',()=>{grid.querySelectorAll('.font-card').forEach(x=>x.classList.remove('active'));c.classList.add('active');playSound('click');})));
+document.querySelectorAll('.filter-card').forEach(c=>c.addEventListener('click',()=>{c.classList.toggle('active');playSound(c.classList.contains('active')?'success':'click');}));
+document.querySelectorAll('input[type=range]').forEach(r=>{
+  const v=r.closest('.slider')?.querySelector('.val');
+  if(v) r.addEventListener('input',()=>{v.textContent=v.textContent.endsWith('%')?r.value+'%':v.textContent.endsWith('MB')?r.value+' MB':r.value;});
+  /* filter stack strength sliders */
+  const fv=r.closest('.fstack-item')?.querySelector('.fval');
+  if(fv) r.addEventListener('input',()=>{fv.textContent=r.value;});
+});
+/* filter stack remove */
+document.querySelectorAll('[data-fstack-rm]').forEach(rm=>rm.addEventListener('click',e=>{
+  e.stopPropagation();
+  const item=rm.closest('.fstack-item');
+  if(!item) return;
+  item.style.transition='opacity .2s, transform .2s';
+  item.style.opacity='0';item.style.transform='translateX(20px)';
+  setTimeout(()=>item.remove(),200);
+  playSound('click');
+}));
+document.querySelectorAll('[data-toggle]').forEach(t=>t.addEventListener('click',()=>{t.classList.toggle('on');playSound('click');}));
+document.querySelectorAll('.tabs-strip').forEach(s=>s.querySelectorAll('.stab').forEach(b=>b.addEventListener('click',()=>{s.querySelectorAll('.stab').forEach(x=>x.classList.remove('active'));b.classList.add('active');playSound('click');})));
+/* Inspector tabs — actually swap content */
+document.querySelectorAll('.inspector-tabs button').forEach(b=>b.addEventListener('click',()=>{
+  b.parentNode.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  const t=b.dataset.itabPick;
+  document.querySelectorAll('[data-itab-content]').forEach(c=>c.hidden = c.dataset.itabContent !== t);
+  playSound('click');
+}));
+
+/* DRIVE FILES — multi-select */
+document.querySelectorAll('[data-drive-file]').forEach(f=>f.addEventListener('click',()=>{f.classList.toggle('selected');playSound(f.classList.contains('selected')?'success':'click');updateDriveStats();}));
+function updateDriveStats(){const el=document.querySelector('.drive-stats');if(!el) return;const sel=document.querySelectorAll('.panel--drive [data-drive-file].selected').length;const total=document.querySelectorAll('.panel--drive [data-drive-file]').length;let mb=0;document.querySelectorAll('.panel--drive [data-drive-file].selected .meta').forEach(m=>{const t=m.textContent;const match=t.match(/([\d.]+)\s*MB/);if(match) mb+=parseFloat(match[1])});el.innerHTML=`<b>${sel}</b> selected · <b>${mb.toFixed(1)} MB</b> total · ${total} files in folder`}
+const driveSelectAll=$('driveSelectAll');
+if(driveSelectAll) driveSelectAll.addEventListener('click',()=>{document.querySelectorAll('.panel--drive [data-drive-file]').forEach(f=>f.classList.add('selected'));updateDriveStats();playSound('success');});
+
+/* CAROUSEL — card selection */
+const ccards=document.querySelectorAll('.ccard'),cdots=document.querySelectorAll('.cdot');
+ccards.forEach((c,i)=>c.addEventListener('click',()=>{ccards.forEach(x=>x.classList.remove('active'));cdots.forEach(x=>x.classList.remove('active'));c.classList.add('active');cdots[i]?.classList.add('active');playSound('click');}));
+
+/* PLAY HEAD */
+const playBtn=$('playBtn'),fill=document.querySelector('.scrub-fill'),head=document.querySelector('.scrub-head'),tlbl=$('timeLabel');
+let playing=false,pos=42,raf;
+function tick(){pos=(pos+0.6)%100;fill.style.width=pos+'%';head.style.left=pos+'%';tlbl.textContent=`00:0${Math.floor((pos/100)*5)} / 00:05`;if(playing) raf=requestAnimationFrame(tick);}
+playBtn.addEventListener('click',()=>{playing=!playing;playBtn.textContent=playing?'❚❚':'▶';playSound('click');if(playing)tick();else cancelAnimationFrame(raf);});
+$('mirrorBtn').addEventListener('click',()=>{const m=document.querySelector('.canvas-media');m.style.transform=m.style.transform==='scaleX(-1)'?'':'scaleX(-1)';playSound('click');});
+
+/* STATUS VERB CYCLE in topbar */
+const verbs=['DECRYPTING','SCANNING','SYNCING','RENDERING','IDLE'];
+const sysVerbs=['SYSTEM // CYBERWARE_ONLINE','NETWORK // ENCRYPTED','RENDER_NODE // SFO3_ALIVE','PIPELINE // STREAMING','CACHE // WARM'];
+let vi=0;
+setInterval(()=>{vi=(vi+1)%verbs.length;const sv=$('statusVerb'),sy=$('systemVerb');if(sv) sv.textContent=verbs[vi];if(sy) sy.textContent=sysVerbs[vi];},3500);
+
+/* ============= SOUND ============= */
+let actx=null;function ctx(){if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();return actx;}
+function tone({freq=440,dur=.1,type='sine',vol=.06,attack=.005,release=.06,freqEnd=null,when=0}){const ac=ctx();const t=ac.currentTime+when;const o=ac.createOscillator();o.type=type;o.frequency.setValueAtTime(freq,t);if(freqEnd!=null)o.frequency.exponentialRampToValueAtTime(Math.max(.001,freqEnd),t+dur);const g=ac.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+attack);g.gain.exponentialRampToValueAtTime(.0001,t+dur+release);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+dur+release+.02);}
+function noise({dur=.05,vol=.08,filterFreq=2000,Q=2,when=0}){const ac=ctx();const t=ac.currentTime+when;const buf=ac.createBuffer(1,ac.sampleRate*dur,ac.sampleRate);const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(1-i/d.length);const s=ac.createBufferSource();s.buffer=buf;const f=ac.createBiquadFilter();f.type='bandpass';f.frequency.value=filterFreq;f.Q.value=Q;const g=ac.createGain();g.gain.value=vol;s.connect(f);f.connect(g);g.connect(ac.destination);s.start(t);s.stop(t+dur);}
+const PACK={
+  click:()=>{tone({freq:1800,dur:.04,type:'sawtooth',vol:.05,freqEnd:1000});tone({freq:2400,dur:.03,type:'sine',vol:.03,when:.02});},
+  open:()=>{tone({freq:200,dur:.18,type:'sawtooth',vol:.05,freqEnd:1600});tone({freq:1800,dur:.12,type:'sine',vol:.04,when:.06});},
+  success:()=>{tone({freq:1320,dur:.08,type:'sawtooth',vol:.06});tone({freq:880,dur:.06,type:'sine',vol:.05,when:.04});tone({freq:1760,dur:.18,type:'sawtooth',vol:.06,when:.10});},
+  error:()=>{tone({freq:300,dur:.06,type:'sawtooth',vol:.07,freqEnd:120});tone({freq:240,dur:.12,type:'square',vol:.06,when:.06});tone({freq:180,dur:.18,type:'square',vol:.05,when:.14});},
+  notify:()=>{tone({freq:1700,dur:.04,type:'sawtooth',vol:.05});tone({freq:2200,dur:.06,type:'sine',vol:.04,when:.04});},
+};
+function playSound(k){try{(PACK[k]||PACK.click)()}catch(e){}}
+document.querySelectorAll('[data-snd]').forEach(b=>b.addEventListener('click',()=>playSound(b.dataset.snd)));
+document.addEventListener('click',function p(){ctx();document.removeEventListener('click',p);},{once:true});
+
+/* ============= ABOUT (changelog + swatches + prompt) ============= */
+const CHANGELOG=[
+  '🜨 Background — animated city skyline at the bottom with flickering window lights, cyan perspective grid floor, vertical scan beam (10s sweep), CRT corner vignette, side data streams, diagonal stripe drift',
+  '✦ Ornaments — Persona-5 corner brackets on every panel (top-left pink, bottom-right cyan), holographic rainbow line scrolling across appbar, hazard tape on modal foots, "// 01" Audiowide section index counter, vertical CYBERWARE.SCS ID badge alongside preview, ">>" blinking prefix on headers',
+  '⚔ Motifs — ⚡ before EXPORT, ▲ warning glyph on active filter chips',
+  '▶ Animations — glitch hover (RGB split + skew), border pulse on panels, holographic rainbow drift, city lights flicker, scan beam sweep, HUD radar sweep on canvas, status verb cycle in topbar',
+  '📐 Tabs — EDITOR · CAROUSEL (rail+grid sub-toggle) · DRIVE (file gallery) · INSPECTOR (EXIF/IPTC/XMP) · ABOUT',
+  '☁ 12 modals — Settings · Patch Notes · Cheatsheet · Filters · GPS · Recovery · Trial Reel · Exporting · DRIVE-CONNECT · DRIVE-PICKER · DRIVE-IMPORT · DRIVE-EXPORT',
+];
+function refreshAbout(){
+  const cl=$('changelogList');if(cl) cl.innerHTML=CHANGELOG.map(c=>`<li>${c}</li>`).join('');
+  const sw=$('aboutSwatches');if(sw){const cs=getComputedStyle(html);const roles=['--bg','--surface','--surface-2','--text','--text-dim','--accent','--accent-2','--accent-3','--success','--danger'];sw.innerHTML=roles.map(v=>`<span class="swatch" style="--swatch-color:${cs.getPropertyValue(v)};color:${cs.getPropertyValue(v)}" title="${v}"></span>`).join('');}
+  refreshPrompt();
+}
+function buildPrompt(){
+  const mode=html.getAttribute('data-mode');
+  const f={bg:html.getAttribute('data-deco-bg'),or:html.getAttribute('data-deco-ornaments'),mt:html.getAttribute('data-deco-motifs'),an:html.getAttribute('data-deco-anim')};
+  const m=k=>f[k]==='on'?'✓':'✗';
+  return [
+    `Apply theme: CYBERPUNK (${mode} mode)`,
+    '',
+    'Core character:',
+    '  Sleek neon-noir tooling — frosted dark glass with hot-pink + cyan + yellow accents,',
+    '  clip-path angular cuts on every action surface, holographic rainbow drift on the appbar,',
+    '  animated city skyline + scan beam in the background, HUD radar in the canvas corner.',
+    '  Palette: hot pink #FF2E88 · cyan #00F0FF · yellow #FFE600 · navy #06060F',
+    '  Fonts:   Audiowide (display) · Inter (body) · JetBrains Mono · Orbitron',
+    '  Shape:   4px / 2px radius · clip-path trapezoidal cuts · 1px hairlines · 2px hot borders',
+    '',
+    'Decorations:',
+    `  ${m('bg')} Background — city skyline + lights, cyan grid floor, scan beam, side data streams, diagonal stripes, CRT vignette`,
+    `  ${m('or')} Ornaments — corner brackets, holographic rainbow line, hazard tape, // 01 counter, vertical ID badge, >> blink prefix`,
+    `  ${m('mt')} Motifs     — ⚡ before EXPORT, ▲ warning on active filter chips`,
+    `  ${m('an')} Animations — glitch hover, border pulse, rainbow drift, city flicker, scan sweep, radar rotation, status verb cycle`,
+    '',
+    'Sound character: sawtooth synth pads · sci-fi UI blips · descending arpeggios · holographic chime',
+    '',
+    'Modals (12): Settings, Patch Notes, Cheatsheet, Filters, GPS, Recovery, Trial Reel, Exporting, ',
+    '             Drive Connect, Drive Folder Picker, Drive Import Images, Drive Upload Status',
+    '',
+    'Views (5): Editor · Carousel (rail+grid) · Drive · Inspector · About',
+    '',
+    'Use case (edit me):',
+    '  Sci-fi tooling · agency dashboards · gaming-adjacent UI · 2077 ops energy',
+    '',
+    'Tweaks I want (edit me):',
+    '  • ',
+    '  • ',
+    '  • ',
+  ].join('\n');
+}
+function refreshPrompt(){const ta=$('aboutPrompt');if(ta) ta.value=buildPrompt();}
+const cb=$('copyPromptBtn');
+if(cb) cb.addEventListener('click',()=>{const ta=$('aboutPrompt');ta.select();try{navigator.clipboard.writeText(ta.value);showToast('Prompt copied to clipboard.','success');}catch(e){document.execCommand('copy');showToast('Prompt copied.','success');}});
+
+/* ============= KEYS ============= */
+document.addEventListener('keydown',e=>{
+  if(e.target.matches('input,textarea')) return;
+  if(e.key==='l'||e.key==='L') setMode('light');
+  else if(e.key==='d'||e.key==='D') setMode('dark');
+  else if(e.key==='1') setTab('editor');
+  else if(e.key==='2') setTab('carousel');
+  else if(e.key==='3') setTab('drive');
+  else if(e.key==='4') setTab('inspector');
+  else if(e.key==='a'||e.key==='A') setTab('about');
+});
+
+/* boot */
+refreshAbout();
+</script>
+</body>
+</html>
