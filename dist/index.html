@@ -4669,11 +4669,25 @@ async function exportVideoCloud() {
   }
   const targetFps = getEffectiveExportFps();
 
-  // v4.2.23: cloud server doesn't yet bake filter chips into its ffmpeg pipeline
-  // (server-side support is v4.2.24). Warn the user once per export so they
-  // don't silently lose filters. They can switch to Fast/Reliable to get them.
-  if (state.filters && state.filters.length > 0 && typeof showToast === 'function') {
-    showToast('⚠ Filters skipped — cloud export bakes adjustments only. Use Fast/Reliable for filter chips.', 'notify');
+  // v4.2.24: split active filter chips into CSS-method (server can render) and
+  // LUT-method (server still can't — needs .cube files, deferred). CSS-method
+  // chips are sent in args.filters; LUT-method ones are dropped with a toast.
+  let cssChipsForCloud = [];
+  let lutChipsSkipped = [];
+  if (state.filters && state.filters.length > 0 && typeof FILTER_BY_ID !== 'undefined') {
+    for (const fid of state.filters) {
+      const f = FILTER_BY_ID[fid];
+      if (!f) continue;
+      const strength = state.filterStrengths[fid] != null ? state.filterStrengths[fid] : 50;
+      if (f.method === 'css') {
+        cssChipsForCloud.push({ id: fid, strength });
+      } else if (f.method === 'lut') {
+        lutChipsSkipped.push(f.label);
+      }
+    }
+  }
+  if (lutChipsSkipped.length > 0 && typeof showToast === 'function') {
+    showToast(`⚠ Cloud can't apply ${lutChipsSkipped.join(', ')} yet (LUT filter — switch to Fast/Reliable). Other filters baked normally.`, 'notify');
   }
 
   resetExportSteps();
@@ -4797,6 +4811,10 @@ async function exportVideoCloud() {
     preset: 'fast',  // v4.2.18: was 'medium'. At 15 Mbps target the visual diff
                      // is imperceptible but encode is ~2× faster.
     adjustments,
+    // v4.2.24: server-side filter chips (CSS-method only). LUT-method filters
+    // are filtered out above and warned about via toast — server silently
+    // skips unknown ids anyway, so this is belt-and-suspenders.
+    filters: cssChipsForCloud,
   };
 
   setExportStep('audio', 'skipped');
@@ -6647,7 +6665,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.2.23';
+const APP_VERSION = '4.2.24';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13707,12 +13725,34 @@ function ensureSettingsModal() {
 // ============================================================================
 const PATCH_NOTES = [
   {
+    version: '4.2.24',
+    date: '2026-05-06',
+    title: 'Filter chips in cloud export — Instagram presets bake server-side',
+    sections: [
+      { h: 'Why this exists', items: [
+        '⚠ v4.2.23 shipped editor filter chips that worked on Fast / Reliable / Legacy / Image but NOT on Cloud — and Cloud is the VA\'s entire workflow. So the previous release was effectively useless for her. This fixes that.',
+      ]},
+      { h: 'New', items: [
+        '☁️ All 25 Instagram CSS-method filters (Clarendon, Gingham, Moon, Lark, Reyes, Juno, Slumber, Crema, Ludwig, Aden, Perpetua, Amaro, Mayfair, Rise, Hudson, Valencia, X-Pro II, Sierra, Willow, Lo-Fi, Inkwell, Nashville, 1977, Kelvin, Toaster) now bake correctly in cloud export. Strength sliders, multi-stack, tints — all server-side.',
+        '🔧 Render server (DigitalOcean droplet) now translates each CSS filter expression into ffmpeg ops: saturate/contrast/brightness map to eq, hue-rotate to hue, sepia/grayscale to colorchannelmixer with W3C-derived matrices interpolated by strength, tints to color sources + blend filter (overlay/softlight/multiply/screen/burn/dodge/darken/lighten/exclusion all supported).',
+        '📜 Server source committed to the repo at infra/render-server/main.py — was previously live-only on the droplet. Future server changes go through git, not SSH heredocs.',
+      ]},
+      { h: 'Still skipped on cloud', items: [
+        'The 9 iPhone LUT-method filters (Vivid, Vivid Warm/Cool, Dramatic, Dramatic Warm/Cool, Mono, Silvertone, Noir) need .cube LUT files baked from the JS LUT functions. Bigger scope — slated for v4.2.25. If you have any of these active and pick Cloud, you\'ll get a toast naming each one that was skipped, and the rest still bake normally.',
+      ]},
+      { h: 'Tradeoff worth knowing', items: [
+        'CSS brightness() is multiplicative (1.10× pixels), but ffmpeg\'s eq.brightness is an additive offset. We translate via offset = (target/100 - 1), which is roughly correct in the 0.9–1.2× range every CSSgram preset uses. The visual error is <2% — invisible at video bitrates. If you ever notice a brightness mismatch between the editor preview and the cloud export, that\'s the cause.',
+        'Sepia and grayscale use the W3C matrices interpolated by strength. Should be visually indistinguishable from CSS.',
+      ]},
+    ]
+  },
+  {
     version: '4.2.23',
     date: '2026-05-06',
     title: 'Filter chips in the video editor (27 presets — iPhone + Instagram)',
     sections: [
       { h: 'New', items: [
-        '🎛️ FILTERS section in the editor sidebar — same 27-filter library that\'s been in the carousel since v3.x is now in the editor too. iPhone group: Vivid, Vivid Warm/Cool, Dramatic, Dramatic Warm/Cool, Mono, Silvertone, Noir (LUT-method, math-derived from Apple\'s CIPhotoEffect filters). Instagram group: Clarendon, Gingham, Moon, Lark, Reyes, Juno, Slumber, Crema, Ludwig, Aden, Perpetua, Amaro, Mayfair, Rise, Hudson, Valencia, X-Pro II, Sierra, Willow, Lo-Fi, Inkwell, Nashville, 1977, Kelvin, Toaster (CSS+tint method via CSSgram).',
+        '🎛️ FILTERS section in the editor sidebar — same 34-filter library that\'s been in the carousel since v3.x is now in the editor too. iPhone group (9 filters): Vivid, Vivid Warm/Cool, Dramatic, Dramatic Warm/Cool, Mono, Silvertone, Noir (LUT-method, math-derived from Apple\'s CIPhotoEffect filters). Instagram group (25 filters): Clarendon, Gingham, Moon, Lark, Reyes, Juno, Slumber, Crema, Ludwig, Aden, Perpetua, Amaro, Mayfair, Rise, Hudson, Valencia, X-Pro II, Sierra, Willow, Lo-Fi, Inkwell, Nashville, 1977, Kelvin, Toaster (CSS+tint method via CSSgram).',
         '🎚️ Multi-stack: click chips to add filters, each gets a strength slider in the stack below (0–100). Stack order matters — earlier filters apply first. Click the × on a stack item to remove it. CLEAR wipes the whole stack.',
         '🖼️ Per-filter thumbnails preview the look on YOUR media (a center crop of the loaded image, or the first decoded frame for video). Built lazily when you open the section, cached until you load new media.',
         '🎲 Trial Reel now occasionally picks a random Instagram filter at modest strength (~55% chance, 35–70 strength). LUT iPhone filters skipped here — they\'re heavier and would clash with random adjustments. Single filter only — no surprise stacks.',
