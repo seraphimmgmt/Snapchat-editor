@@ -6838,7 +6838,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.4.2';
+const APP_VERSION = '4.4.3';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -11145,12 +11145,29 @@ async function renderCarouselOutputs(onProgress) {
           console.warn('EXIF injection failed for', item.name, e);
           exifFailed = true;
         }
-        try {
-          blob = await blobReplaceIccWithApple(blob);
-        } catch (e) {
-          console.warn('ICC swap failed for', item.name, e);
-          iccFailed = true;
-        }
+        // v4.4.3 — ICC profile swap DISABLED.
+        //
+        // What this used to do: replace Chrome's default sRGB ICC profile in
+        // the canvas-rendered JPEG with Apple's Display P3 ICC profile, so
+        // forensic tools couldn't tell the file was canvas-re-encoded.
+        //
+        // Why it's broken: the swap only changes the embedded ICC *tag* — it
+        // does NOT remap the pixel values from sRGB → P3. So a viewer (Preview,
+        // Safari, modern macOS apps) sees pixel values that were rendered in
+        // sRGB but is told they're Display P3, and stretches them across the
+        // wider P3 gamut. Result: visible over-saturation + hue shift toward
+        // magenta/pink. User reported it as "filter is being added on export."
+        //
+        // Real fix (v4.5 candidate): render the canvas in display-p3 colorspace
+        // via canvas.getContext('2d', { colorSpace: 'display-p3' }) so the
+        // pixels actually match the P3 ICC tag. Until then, leave Chrome's
+        // sRGB profile in — image fidelity beats forensic camouflage.
+        //
+        // iPhone authenticity is still preserved via the EXIF + MakerNote
+        // injection above (piexif.dump + ExifTool enrichment), which is what
+        // matters for the "this came from an iPhone" signal anyway.
+        //
+        // blob = await blobReplaceIccWithApple(blob);
       } catch (e) {
         console.warn('iPhone meta block failed for', item.name, e);
       }
@@ -14730,6 +14747,27 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.4.3',
+    date: '2026-05-07',
+    title: 'Carousel export — color cast / pink shift fix',
+    sections: [
+      { h: 'The bug', items: [
+        '🎨 <b>Carousel exports with iPhone Metadata on were coming out noticeably more saturated + pinker than the source</b>, even with no filter chips and default adjustments. User reported it as "a filter is being added on export." Side-by-side: skin tones shifted warmer, hair more orange-red, overall saturation +20-30%.',
+      ]},
+      { h: 'Root cause', items: [
+        '🔬 Textbook color-management mismatch. Carousel export pipeline (v4.2.x onwards) did this when iPhone Meta was on: render canvas → toBlob() produces JPEG with Chrome\'s default <b>sRGB ICC profile</b> → then <code>blobReplaceIccWithApple()</code> swaps the embedded profile to Apple\'s <b>Display P3</b> ICC profile.',
+        'The swap only changes the *tag*, not the pixel values. So sRGB-encoded pixels (narrow gamut) end up tagged as P3 (wide gamut). When macOS Preview / Safari / Photos open the file, they assume the pixel values are P3, stretching them across the wider gamut → visible oversaturation + hue shift toward magenta/pink. Exactly what was showing up.',
+      ]},
+      { h: 'Fix', items: [
+        '🩹 ICC profile swap is DISABLED for now (commented out at the carousel render step). Chrome\'s default sRGB ICC stays embedded. Carousel exports are now color-accurate. Visible difference between input and output is ZERO (up to JPEG compression noise).',
+        '🍎 iPhone authenticity is still preserved via the EXIF + MakerNote injection (piexif.dump + bundled ExifTool enrichment). Forensic tools that look for camera signatures will still read "iPhone" — the ICC swap was just a forensic-camouflage bonus that wasn\'t worth the color damage.',
+      ]},
+      { h: 'What\'s next', items: [
+        '⏳ Proper P3 support is a v4.5 candidate: render the canvas in <code>display-p3</code> colorspace via <code>canvas.getContext(\'2d\', { colorSpace: \'display-p3\' })</code> so the pixel values match the Apple P3 ICC tag end-to-end. Then we can re-enable the ICC swap and get correct wide-gamut output. Needs careful testing because the LUT pass + filter chips also operate on canvas pixels and assume sRGB.',
+      ]},
+    ]
+  },
   {
     version: '4.4.2',
     date: '2026-05-07',
