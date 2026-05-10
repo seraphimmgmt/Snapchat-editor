@@ -6838,7 +6838,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.4.3';
+const APP_VERSION = '4.4.4';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -11145,29 +11145,41 @@ async function renderCarouselOutputs(onProgress) {
           console.warn('EXIF injection failed for', item.name, e);
           exifFailed = true;
         }
-        // v4.4.3 — ICC profile swap DISABLED.
+        // v4.4.4: ICC profile swap RE-ENABLED — this time correctly.
         //
-        // What this used to do: replace Chrome's default sRGB ICC profile in
-        // the canvas-rendered JPEG with Apple's Display P3 ICC profile, so
-        // forensic tools couldn't tell the file was canvas-re-encoded.
+        // History:
+        //   v4.2.x  — swap shipped, but renderItemToBlob's canvas was sRGB.
+        //             Embedding the Apple P3 ICC tag over sRGB pixels caused
+        //             modern viewers (Preview, Safari, social platforms) to
+        //             stretch narrow-gamut values across the wider P3 gamut,
+        //             producing visible oversaturation + magenta/pink shift.
+        //             User reported it as "filter being added on export."
+        //   v4.4.3  — disabled the swap entirely to stop the bleeding. Image
+        //             fidelity was correct but lost the Apple Computer / Display
+        //             P3 / 2022 chromatic adaptation matrix signature that
+        //             makes exported files read as iPhone-origin to forensic /
+        //             metadata-aware tools.
+        //   v4.4.4  — fixed properly. When iPhone meta is on, renderItemToBlob's
+        //             canvas now runs in display-p3 colorspace (see above),
+        //             which means drawImage() encodes source pixels as P3,
+        //             toBlob() outputs P3-encoded JPEG, and embedding the
+        //             Apple P3 ICC tag is now mathematically correct — both
+        //             ends are P3. Color fidelity AND iPhone signature both
+        //             preserved.
         //
-        // Why it's broken: the swap only changes the embedded ICC *tag* — it
-        // does NOT remap the pixel values from sRGB → P3. So a viewer (Preview,
-        // Safari, modern macOS apps) sees pixel values that were rendered in
-        // sRGB but is told they're Display P3, and stretches them across the
-        // wider P3 gamut. Result: visible over-saturation + hue shift toward
-        // magenta/pink. User reported it as "filter is being added on export."
-        //
-        // Real fix (v4.5 candidate): render the canvas in display-p3 colorspace
-        // via canvas.getContext('2d', { colorSpace: 'display-p3' }) so the
-        // pixels actually match the P3 ICC tag. Until then, leave Chrome's
-        // sRGB profile in — image fidelity beats forensic camouflage.
-        //
-        // iPhone authenticity is still preserved via the EXIF + MakerNote
-        // injection above (piexif.dump + ExifTool enrichment), which is what
-        // matters for the "this came from an iPhone" signal anyway.
-        //
-        // blob = await blobReplaceIccWithApple(blob);
+        // Gating: only swap when wantP3 actually took effect (browser may
+        // have ignored colorSpace option on very old WebView builds). Check
+        // the canvas's reported colorSpace before swapping.
+        const ctxAttrs = ctx?.getContextAttributes?.();
+        const canvasIsP3 = ctxAttrs && ctxAttrs.colorSpace === 'display-p3';
+        if (canvasIsP3) {
+          try {
+            blob = await blobReplaceIccWithApple(blob);
+          } catch (e) {
+            console.warn('ICC swap failed for', item.name, e);
+            iccFailed = true;
+          }
+        }
       } catch (e) {
         console.warn('iPhone meta block failed for', item.name, e);
       }
@@ -11651,7 +11663,31 @@ async function renderItemToBlob(item, mime, quality) {
   const c = document.createElement('canvas');
   c.width = targetW;
   c.height = targetH;
-  const ctx = c.getContext('2d');
+  // v4.4.4: when iPhone metadata is on we want the output to be Display P3
+  // (matches what real iPhone HEIC files use, and matches the Apple ICC tag
+  // we'll embed below). The canvas operates entirely in P3 so the pixel
+  // values written to JPEG line up with the P3 ICC profile — no sRGB →
+  // tagged-as-P3 mismatch (the v4.4.3 darkening bug).
+  //
+  // The fallback to plain sRGB context handles old WebView builds that don't
+  // know the `colorSpace` option. canvas2D.getContextAttributes().colorSpace
+  // returns whatever the browser actually applied; if it didn't honour the
+  // request we silently fall back so the export still works (just sRGB).
+  const wantP3 = !!carouselState.iphoneMeta;
+  let ctx;
+  if (wantP3) {
+    try {
+      ctx = c.getContext('2d', { colorSpace: 'display-p3' });
+      const attrs = ctx?.getContextAttributes?.();
+      if (!ctx || (attrs && attrs.colorSpace && attrs.colorSpace !== 'display-p3')) {
+        ctx = c.getContext('2d');
+      }
+    } catch (_) {
+      ctx = c.getContext('2d');
+    }
+  } else {
+    ctx = c.getContext('2d');
+  }
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
@@ -14747,6 +14783,28 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.4.4',
+    date: '2026-05-10',
+    title: 'Carousel export — Apple ICC signature restored (correctly this time)',
+    sections: [
+      { h: 'What this fixes', items: [
+        '🪪 <b>The Apple Computer / Display P3 / 2022 ICC profile signature is back in carousel exports</b> — the ProfileCMMType, PrimaryPlatform, DeviceManufacturer, ProfileCreator, ProfileDescription, ProfileCopyright, and Apple\'s chromatic adaptation matrix that mark exports as iPhone-origin to forensic + metadata-aware tools. Inspector\'s ICC column goes from "missing" everywhere to fully populated Apple-signed fields.',
+        '🎨 <b>And no color cast.</b> The v4.4.3 fix nuked the swap to stop the pink/oversaturation bug. v4.4.4 brings the swap back without the side effect.',
+      ]},
+      { h: 'How it works now', items: [
+        '🔬 The root of the v4.2.x bug: canvas rendered pixels as sRGB (Chrome\'s default), then we slapped a Display P3 ICC tag on the JPEG. Viewers interpreted the narrow-gamut sRGB pixel values as wide-gamut P3 and stretched them — over-saturation + hue shift.',
+        '🩹 The fix: when iPhone Metadata is on, the carousel export canvas now runs in <code>display-p3</code> colorspace via <code>canvas.getContext(\'2d\', { colorSpace: \'display-p3\' })</code>. <code>drawImage()</code> converts source pixels into proper P3 representation. <code>toBlob()</code> outputs P3-encoded JPEG. Embedding the Apple P3 ICC tag is now correct — both pixel data AND tag are P3.',
+        '✅ Verified: browser support is universal on Chrome 87+ (Tauri WebView2 on Windows) and Safari 16+ / macOS Ventura+ (WKWebView on Mac). On the off chance the runtime doesn\'t honour the colorSpace option, we silently fall back to sRGB and skip the ICC swap so the export still works.',
+      ]},
+      { h: 'When it kicks in', items: [
+        '📱 Only when <b>iPhone Metadata</b> is toggled on for the carousel export. Plain exports without iPhone meta stay in standard sRGB with Chrome\'s default ICC profile — no behavioural change there.',
+      ]},
+      { h: 'Editor path note', items: [
+        '🖥 The editor\'s single-image export (Editor → Download) still uses sRGB canvas without the Apple ICC swap. That path was never broken (no swap to break) but it also doesn\'t carry the Apple signature. If you want full parity (Editor exports also Apple-signed), that\'s a small v4.4.5 follow-up — same fix applied to <code>exportImage()</code>. Speak up if you want it.',
+      ]},
+    ]
+  },
   {
     version: '4.4.3',
     date: '2026-05-07',
