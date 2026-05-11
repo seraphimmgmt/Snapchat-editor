@@ -15,29 +15,29 @@
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
-  /* v4.3.0 — Cyberpunk skin. Hot-pink + cyan + yellow accents on near-black,
-     clip-path angular cuts on action surfaces, holographic rainbow strip on
-     header, optional animated bg-deco (city skyline + grid floor + scan beam).
-     Decoration layers are gated by data-deco-{bg|ornaments|motifs|anim} on
-     <html> — toggleable in Settings → Theme. The keyframe still ships under
-     `auroraShimmer` to keep the existing references compatible. */
+  /* v4.5.0 — VOID theme. Near-pure-black canvas, single violet focal glow,
+     vertical column dividers, stark white type, minimal negative-space
+     aesthetic. Replaces the cyberpunk skin while preserving all existing
+     functionality + the data-deco-{bg|ornaments|motifs|anim} toggle hooks.
+     The auroraShimmer keyframe + --shimmer gradient stay named for
+     compatibility; values changed to monochrome violet/magenta/white. */
   :root{
-    --bg:#06060F;
-    --surface:#0F0F1A;
-    --surface-2:#1A1A2E;
-    --surface-3:#252540;
-    --border:#2A2A4A;
-    --border-strong:rgba(255,46,136,.40);
-    --text:#F2F2FF;
-    --text-dim:#82DDFF;
-    --text-faint:#5A4677;
-    --accent:#FF2E88;             /* hot pink — primary cyberpunk */
-    --accent-2:#00F0FF;            /* cyan — secondary */
-    --accent-3:#FFE600;            /* alarm yellow — tertiary */
-    --accent-dim:#A81F5C;
-    --accent-glow:rgba(255,46,136,.45);
-    --accent-2-glow:rgba(0,240,255,.40);
-    --shimmer:linear-gradient(110deg,#FF2E88 0%,#FFE600 50%,#00F0FF 100%);
+    --bg:#050507;
+    --surface:#0A0A12;
+    --surface-2:#12121C;
+    --surface-3:#1C1C2A;
+    --border:rgba(255,255,255,.08);
+    --border-strong:rgba(255,255,255,.22);
+    --text:#FFFFFF;
+    --text-dim:#A8A8B8;
+    --text-faint:#5A5A6E;
+    --accent:#7B2CBF;             /* violet — primary VOID */
+    --accent-2:#C300FF;            /* magenta — focal accent */
+    --accent-3:#FFFFFF;            /* white — tertiary (replaces alarm yellow) */
+    --accent-dim:#5A1F8F;
+    --accent-glow:rgba(123,44,191,.50);
+    --accent-2-glow:rgba(195,0,255,.35);
+    --shimmer:linear-gradient(110deg,#7B2CBF 0%,#C300FF 50%,#FFFFFF 100%);
     --green:#00FF88;
     --red:#FF3B5C;
   }
@@ -2577,29 +2577,34 @@ const SFX = (() => {
     osc.stop(t0 + dur + 0.05);
   }
   return {
-    // BUBBLE — round downward pop, friendly UI click
+    // v4.5.0 VOID sound pack — replaces the cyberpunk synth pops with
+    // deeper mystical tones. Still throttled + still controlled by the
+    // same PREFS.sounds.{click,success,error,notify} toggles.
+    //
+    // TAP — deep grounded click, no harmonics
     click: () => {
       if (!isOn('click')) return;
       const now = performance.now();
       if (now - _lastClick < 50) return; // throttle rapid clicks
       _lastClick = now;
-      tone({ type: 'sine', freq: 600, freqEnd: 320, dur: 0.1, vol: 0.22 });
+      tone({ type: 'sine', freq: 200, dur: 0.04, vol: 0.20 });
     },
-    // COIN — quick double-ding for success / completion
+    // DESCENDING SWEEP — calm completion, descends from clear to soft
     success: () => {
       if (!isOn('success')) return;
-      tone({ freq: 880, dur: 0.08, vol: 0.2 });
-      tone({ freq: 1175, dur: 0.18, vol: 0.2, when: 0.07 });
+      tone({ type: 'sine', freq: 880, freqEnd: 440, dur: 0.22, vol: 0.18 });
     },
-    // DROP — falling pitch, polite "no"
+    // LOW THUD — muted dissonant pair, ominous but not harsh
     error: () => {
       if (!isOn('error')) return;
-      tone({ freq: 600, freqEnd: 200, dur: 0.18, vol: 0.22 });
+      tone({ type: 'sine', freq: 110, dur: 0.25, vol: 0.22 });
+      tone({ type: 'sine', freq: 165, dur: 0.22, vol: 0.16, when: 0.03 });
     },
-    // BLOOP — soft midrange, neutral "fyi"
+    // OM HUM — slow ethereal pad, 220Hz + 440Hz harmonic, long attack
     notify: () => {
       if (!isOn('notify')) return;
-      tone({ freq: 600, freqEnd: 500, dur: 0.1, vol: 0.18 });
+      tone({ type: 'sine', freq: 220, dur: 0.6, vol: 0.15, attack: 0.10 });
+      tone({ type: 'sine', freq: 440, dur: 0.6, vol: 0.10, attack: 0.10, when: 0.02 });
     },
   };
 })();
@@ -6838,7 +6843,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.4.4';
+const APP_VERSION = '4.5.0';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -14492,33 +14497,33 @@ function ensureSettingsModal() {
           <div id="prefCloudStatus" style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-faint);min-height:16px;"></div>
         </div>
         <div class="settings-group" data-cat="theme">
-          <div class="settings-label">CYBERPUNK SKIN — DECORATION LAYERS</div>
-          <p class="settings-note" style="margin:0 0 14px;text-align:left;font-size:10px;line-height:1.5;color:var(--text-faint);">Each layer toggles independently. Default ON for the full vibe. If the editor feels sluggish (especially on slower laptops), turn off ANIMATIONS first — that disables the city flicker, scan beam drift, and rainbow line. Keep BG/ORN/MTF for static visual flavor with zero perf cost.</p>
+          <div class="settings-label">VOID THEME — DECORATION LAYERS</div>
+          <p class="settings-note" style="margin:0 0 14px;text-align:left;font-size:10px;line-height:1.5;color:var(--text-faint);">Each layer toggles independently. Default ON. If the editor feels sluggish, turn off ANIMATIONS first — that disables the violet glow breathe, light-beam pulse, and cosmic-dust drift. Keep BG/ORN/MTF for static visual flavor with zero perf cost.</p>
           <div class="theme-deco-row">
             <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
-              <span class="lbl">🜨 BG · BACKGROUND ATMOSPHERE</span>
-              <span class="desc">City skyline silhouette, cyan grid floor, side data streams, CRT vignette, radial atmosphere</span>
+              <span class="lbl">◯ BG · BACKGROUND ATMOSPHERE</span>
+              <span class="desc">Single violet focal glow at center, 5 vertical column dividers, cosmic dust particles, distant magenta star, horizontal hairline, vignette edges</span>
             </span>
             <span class="theme-deco-toggle on" data-deco-pref="bg" data-no-sfx></span>
           </div>
           <div class="theme-deco-row">
             <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
-              <span class="lbl">✦ ORN · ORNAMENTS</span>
-              <span class="desc">Persona-5 corner brackets on panels, holographic rainbow on header, &gt;&gt; blink prefix on section headers, clip-path angular cuts on logo + buttons</span>
+              <span class="lbl">┃ ORN · ORNAMENTS</span>
+              <span class="desc">Header hairline, sidebar column-edge accents, modal violet drop-line, single hairline at modal foots, • bullet prefix on section headers</span>
             </span>
             <span class="theme-deco-toggle on" data-deco-pref="ornaments" data-no-sfx></span>
           </div>
           <div class="theme-deco-row">
             <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
-              <span class="lbl">⚔ MTF · MOTIFS</span>
-              <span class="desc">⚡ before EXPORT button, ▲ glyph on active filter chips, vertical CYBERWARE.SCS ID badge alongside the canvas</span>
+              <span class="lbl">• MTF · MOTIFS</span>
+              <span class="desc">Violet dot before EXPORT button, • glyph on active filter chips, pill-shaped buttons throughout</span>
             </span>
             <span class="theme-deco-toggle on" data-deco-pref="motifs" data-no-sfx></span>
           </div>
           <div class="theme-deco-row">
             <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
               <span class="lbl">▶ ANIM · ANIMATIONS</span>
-              <span class="desc">City lights flicker, scan beam sweep, holographic rainbow drift, side data stream scroll, glitch hover, border pulse. Turn OFF first if the editor feels slow.</span>
+              <span class="desc">Violet focal-glow breathe, cosmic-dust drift, column-light beam pulse, sidebar inner-glow breath, hover lift on EXPORT. Turn OFF first if the editor feels slow.</span>
             </span>
             <span class="theme-deco-toggle on" data-deco-pref="anim" data-no-sfx></span>
           </div>
@@ -14783,6 +14788,45 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.5.0',
+    date: '2026-05-11',
+    title: 'VOID THEME — neon-noir cyberpunk skin retired',
+    sections: [
+      { h: 'New visual language', items: [
+        '🕯 Full theme swap from CYBERPUNK to <b>VOID</b>. Near-pure-black canvas (#050507), single violet focal glow at center as the only ambient light, deep magenta (#C300FF) as the focal accent, stark white type. Heavy negative space + mystical-runway aesthetic.',
+        '┃ Vertical column dividers at 16% / 33% / 50% / 67% / 84% of the viewport are now the signature decoration motif — replacing cyberpunk\'s Persona-5 corner brackets.',
+        '✦ Cosmic-dust particle drift (20 white + magenta specks, very subtle 45s upward float), single off-center magenta star glow top-right, soft column-light beam that pulses at the center vertical, one horizontal hairline at 60% screen height, vignette at top + bottom edges.',
+        '◯ Violet focal-glow at center slowly breathes (20s loop). Replaces cyberpunk\'s city skyline, scan beam, grid floor, side data streams.',
+      ]},
+      { h: 'Typography', items: [
+        '<b>Orbitron</b> takes over display headers — weight 900 for the SERAPHIM wordmark at 0.30em letter-spacing (matches the VOID mockup\'s runway-fashion energy), weight 700 for upload-zone + patch notes, weight 500 for sidebar section headers.',
+        'Inter for body text, JetBrains Mono for labels/monospace details. Audiowide retired (cyberpunk-specific feel).',
+      ]},
+      { h: 'Shape language', items: [
+        '🪪 <b>Pill-shaped buttons</b> (border-radius: 999px) replace the clip-path angular cuts on EXPORT, NONE-toggle, resolution selector. VOID prefers rounded geometry over cyberpunk hex.',
+        '📋 Card corners stay subtle (4-6px) — softer than cyberpunk\'s sharp 2px.',
+        '• Bullet dot (•) replaces the >> blinking prefix on section headers. Violet dot before EXPORT button replaces ⚡. • on active filter chips replaces ▲.',
+      ]},
+      { h: 'Sound bank', items: [
+        '🔔 Replaced cyberpunk\'s sawtooth synth blips with mystical tones from the VOID mockup:',
+        '  • <b>click</b> — 200Hz sine, 40ms (deep grounded tap, no harmonics)',
+        '  • <b>success</b> — 880→440Hz descending sweep, 220ms (calm completion)',
+        '  • <b>error</b> — 110Hz + 165Hz low dissonant pair, 250ms (muted thud)',
+        '  • <b>notify</b> — 220Hz + 440Hz harmonic with slow attack, 600ms (ethereal om-hum)',
+      ]},
+      { h: 'Settings → Theme', items: [
+        '⚙ The Theme tab now shows "VOID THEME — DECORATION LAYERS" with updated descriptions for each toggle. BG / ORN / MTF / ANIM all preserved as independent layer switches — the LITE / FULL VIBE / OFF presets still work. If perf is tight, ANIM-off first kills all motion.',
+      ]},
+      { h: 'Things that stayed', items: [
+        '✅ Everything functional. Drive tab, carousel, editor, inspector, settings, all 12+ modals, the Apple ICC fix from v4.4.4, the cloud darkening fix from v4.4.2, the sluggish detector — all preserved. Only the visual skin + sound pack swapped.',
+        '✅ Bundle identifier <code>com.seraphimmgmt.snapcaptionstudio</code> unchanged. Your existing prefs + auto-update path keep working.',
+      ]},
+      { h: 'Icon note', items: [
+        '🪞 The current Holographic Halo icon (yellow S in iridescent rainbow ring) is now somewhat off-brand against VOID\'s monochrome aesthetic. Replacing it with a VOID-native design is a v4.5.1 candidate — pure black square with single violet focal point + stark white S. Speak up if you want that prioritized.',
+      ]},
+    ]
+  },
   {
     version: '4.4.4',
     date: '2026-05-10',
@@ -16500,263 +16544,202 @@ if (window.__TAURI__ && window.__TAURI__.core) {
   .pn-section li::before{content:'›';position:absolute;left:4px;top:0;color:var(--accent);font-weight:700;}
 
   /* ============================================================
-     v4.3.0 — CYBERPUNK SKIN (decorations + clip-path + bg-deco)
-     All layered on top of existing styles. Gated per-layer by
-     data-deco-bg / -ornaments / -motifs / -anim on <html> for
-     individual toggling. Default = ON.
+     v4.5.0 — VOID THEME (decorations + minimalism + bg-deco)
+     Near-pure-black canvas, single violet focal glow, vertical
+     column dividers, cosmic dust, stark white type. Replaces the
+     cyberpunk skin. Gated per-layer by data-deco-bg / -ornaments /
+     -motifs / -anim on <html> for individual toggling. Default = ON.
      ============================================================ */
 
   /* BG-DECO layer — fixed full-screen behind everything */
   .bg-deco{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
   [data-deco-bg="off"] .bg-deco{display:none}
-  .bg-deco .bg-l{position:absolute;inset:0;pointer-events:none;will-change:opacity,transform}
+  .bg-deco .bg-l{position:absolute;inset:0;pointer-events:none;will-change:opacity,transform;contain:strict}
 
-  /* L1 — radial atmosphere (always-on baseline) */
+  /* L1 — single violet focal glow at center (the only ambient light) */
   .bg-l1{
-    background:
-      radial-gradient(900px 700px at 80% -10%,rgba(0,240,255,.16),transparent 55%),
-      radial-gradient(900px 700px at 0% 110%,rgba(255,46,136,.20),transparent 55%),
-      radial-gradient(circle at 50% 50%,rgba(120,40,200,.10),transparent 60%);
-    animation:cybBreathe 14s ease-in-out infinite alternate;
+    background:radial-gradient(circle at 50% 50%,rgba(123,44,191,.18),transparent 60%);
+    animation:voidBreathe 20s ease-in-out infinite alternate;
   }
   [data-deco-anim="off"] .bg-l1{animation:none}
-  @keyframes cybBreathe{0%{opacity:.7}100%{opacity:1;transform:scale(1.04)}}
+  @keyframes voidBreathe{0%{opacity:.7;transform:scale(1)}100%{opacity:1;transform:scale(1.06)}}
 
-  /* L2 — cyan perspective grid floor at bottom */
+  /* L2 — 5 vertical column dividers at 16/33/50/67/84% (signature VOID motif) */
   .bg-l2{
     background-image:
-      linear-gradient(to top,transparent 60%,rgba(0,240,255,.5) 100%),
-      repeating-linear-gradient(to right,transparent 0 calc(8% - 1px),rgba(0,240,255,.45) calc(8% - 1px),rgba(0,240,255,.45) 8%),
-      repeating-linear-gradient(to bottom,transparent 0 60%,rgba(0,240,255,.4) 60%,transparent 60.4%,transparent 65%,rgba(0,240,255,.4) 65%,transparent 65.4%,transparent 71%,rgba(0,240,255,.5) 71%,transparent 71.5%,transparent 79%,rgba(0,240,255,.6) 79%,transparent 79.6%,transparent 89%,rgba(0,240,255,.7) 89%,transparent 89.7%);
-    -webkit-mask-image:linear-gradient(to bottom,transparent 50%,black 70%);
-    mask-image:linear-gradient(to bottom,transparent 50%,black 70%);
-    opacity:.30;
+      linear-gradient(90deg,transparent calc(16% - 0.5px),rgba(255,255,255,.08) calc(16% - 0.5px) calc(16% + 0.5px),transparent calc(16% + 0.5px)),
+      linear-gradient(90deg,transparent calc(33% - 0.5px),rgba(255,255,255,.06) calc(33% - 0.5px) calc(33% + 0.5px),transparent calc(33% + 0.5px)),
+      linear-gradient(90deg,transparent calc(50% - 0.5px),rgba(255,255,255,.10) calc(50% - 0.5px) calc(50% + 0.5px),transparent calc(50% + 0.5px)),
+      linear-gradient(90deg,transparent calc(67% - 0.5px),rgba(255,255,255,.06) calc(67% - 0.5px) calc(67% + 0.5px),transparent calc(67% + 0.5px)),
+      linear-gradient(90deg,transparent calc(84% - 0.5px),rgba(255,255,255,.08) calc(84% - 0.5px) calc(84% + 0.5px),transparent calc(84% + 0.5px));
   }
 
-  /* L3 — city skyline silhouette with flickering window lights */
+  /* L3 — cosmic dust drift (30 fixed white particles, slow upward float) */
   .bg-l3{
-    background:
-      linear-gradient(180deg,transparent 0,transparent 60%,rgba(6,6,20,.85) 60%,rgba(6,6,20,.95) 100%),
-      repeating-linear-gradient(90deg,
-        transparent 0 2.5%,rgba(8,8,24,.96) 2.5% 4.5%,
-        transparent 4.5% 7%,rgba(8,8,24,.96) 7% 9%,
-        transparent 9% 12%,rgba(10,10,28,.96) 12% 16%,
-        transparent 16% 20%,rgba(8,8,24,.96) 20% 23%,
-        transparent 23% 26%,rgba(10,10,28,.96) 26% 31%,
-        transparent 31% 34%,rgba(8,8,24,.96) 34% 36.5%,
-        transparent 36.5% 40%,rgba(10,10,28,.96) 40% 44%,
-        transparent 44% 48%,rgba(8,8,24,.96) 48% 51%,
-        transparent 51% 54%,rgba(10,10,28,.96) 54% 59%);
-    background-size:auto auto, 100% 38%;
-    background-position:0 0, 0 100%;
-    background-repeat:no-repeat, no-repeat;
-  }
-  .bg-l3::after{
-    content:'';position:absolute;inset:auto 0 0 0;height:38%;
     background-image:
-      radial-gradient(circle at 5% 70%,#FF2E88 0,#FF2E88 1.5px,transparent 2px),
-      radial-gradient(circle at 14% 60%,#00F0FF 0,#00F0FF 1.5px,transparent 2px),
-      radial-gradient(circle at 22% 80%,#FFE600 0,#FFE600 1px,transparent 1.5px),
-      radial-gradient(circle at 33% 65%,#00F0FF 0,#00F0FF 1px,transparent 1.5px),
-      radial-gradient(circle at 41% 75%,#FF2E88 0,#FF2E88 1.5px,transparent 2px),
-      radial-gradient(circle at 53% 55%,#00FF88 0,#00FF88 1px,transparent 1.5px),
-      radial-gradient(circle at 62% 70%,#FF2E88 0,#FF2E88 1.5px,transparent 2px),
-      radial-gradient(circle at 73% 60%,#FFE600 0,#FFE600 1px,transparent 1.5px),
-      radial-gradient(circle at 84% 75%,#00F0FF 0,#00F0FF 1.5px,transparent 2px),
-      radial-gradient(circle at 92% 65%,#FF2E88 0,#FF2E88 1px,transparent 1.5px);
-    animation:cybCityLights 3s steps(6) infinite;
+      radial-gradient(1px 1px at 4% 12%,rgba(255,255,255,.85),transparent 50%),
+      radial-gradient(1px 1px at 9% 78%,rgba(255,255,255,.65),transparent 50%),
+      radial-gradient(1px 1px at 13% 34%,rgba(255,255,255,.80),transparent 50%),
+      radial-gradient(1px 1px at 18% 91%,rgba(255,255,255,.50),transparent 50%),
+      radial-gradient(1.2px 1.2px at 23% 22%,rgba(195,0,255,.70),transparent 50%),
+      radial-gradient(1px 1px at 28% 66%,rgba(255,255,255,.70),transparent 50%),
+      radial-gradient(1px 1px at 34% 8%,rgba(255,255,255,.90),transparent 50%),
+      radial-gradient(1px 1px at 39% 48%,rgba(255,255,255,.55),transparent 50%),
+      radial-gradient(1px 1px at 44% 84%,rgba(255,255,255,.65),transparent 50%),
+      radial-gradient(1.2px 1.2px at 49% 18%,rgba(255,255,255,.95),transparent 50%),
+      radial-gradient(1px 1px at 54% 56%,rgba(255,255,255,.60),transparent 50%),
+      radial-gradient(1px 1px at 59% 28%,rgba(255,255,255,.75),transparent 50%),
+      radial-gradient(1px 1px at 64% 72%,rgba(195,0,255,.55),transparent 50%),
+      radial-gradient(1px 1px at 69% 6%,rgba(255,255,255,.85),transparent 50%),
+      radial-gradient(1px 1px at 74% 44%,rgba(255,255,255,.50),transparent 50%),
+      radial-gradient(1px 1px at 79% 82%,rgba(255,255,255,.65),transparent 50%),
+      radial-gradient(1px 1px at 83% 26%,rgba(255,255,255,.75),transparent 50%),
+      radial-gradient(1.2px 1.2px at 88% 58%,rgba(255,255,255,.90),transparent 50%),
+      radial-gradient(1px 1px at 92% 14%,rgba(255,255,255,.55),transparent 50%),
+      radial-gradient(1px 1px at 96% 76%,rgba(195,0,255,.65),transparent 50%);
+    animation:voidDust 45s linear infinite;
     opacity:.85;
   }
-  [data-deco-anim="off"] .bg-l3::after{animation:none;opacity:.6}
-  @keyframes cybCityLights{0%,33%{opacity:.85}50%,66%{opacity:.55}}
+  [data-deco-anim="off"] .bg-l3{animation:none}
+  @keyframes voidDust{from{transform:translateY(0)}to{transform:translateY(-3vh)}}
 
-  /* L4 — diagonal stripe drift */
+  /* L4 — off-center magenta star glow (top-right, distant light source) */
   .bg-l4{
-    background:
-      repeating-linear-gradient(135deg,transparent 0 60px,rgba(0,240,255,.025) 60px 62px),
-      repeating-linear-gradient(45deg,transparent 0 60px,rgba(255,46,136,.025) 60px 62px);
-    animation:cybDrift 18s linear infinite;
+    background:radial-gradient(ellipse 600px 400px at 78% 22%,rgba(195,0,255,.08),transparent 65%);
   }
-  [data-deco-anim="off"] .bg-l4{animation:none}
-  @keyframes cybDrift{from{background-position:0 0,0 0}to{background-position:60px 60px,-60px 60px}}
 
-  /* L5 — vertical scan beam */
+  /* L5 — subtle vertical light beam at 50% column (pulses on/off) */
   .bg-l5{
-    background:linear-gradient(to bottom,transparent 0%,rgba(0,240,255,.35) 49%,rgba(0,240,255,.65) 50%,rgba(0,240,255,.35) 51%,transparent 100%);
-    background-size:100% 8vh;background-repeat:no-repeat;
-    animation:cybScan 10s ease-in-out infinite;
-    mix-blend-mode:screen;opacity:.5;
+    background:linear-gradient(180deg,transparent 0%,rgba(123,44,191,.06) 30%,rgba(123,44,191,.10) 50%,rgba(123,44,191,.06) 70%,transparent 100%);
+    background-size:120px 100%;
+    background-position:calc(50% - 60px) 0;
+    background-repeat:no-repeat;
+    animation:voidBeam 7s ease-in-out infinite;
   }
-  [data-deco-anim="off"] .bg-l5{display:none}
-  @keyframes cybScan{0%{background-position:0 -10vh}90%,100%{background-position:0 110vh}}
+  [data-deco-anim="off"] .bg-l5{animation:none;opacity:.4}
+  @keyframes voidBeam{0%,100%{opacity:.35}50%{opacity:.85}}
 
-  /* L6 — side data streams */
+  /* L6 — single horizontal hairline at 60% screen height */
   .bg-l6{
-    background-image:
-      linear-gradient(rgba(0,240,255,0),rgba(0,240,255,.5) 50%,rgba(0,240,255,0)),
-      linear-gradient(rgba(255,46,136,0),rgba(255,46,136,.5) 50%,rgba(255,46,136,0));
-    background-size:1px 50vh, 1px 50vh;
-    background-position:14px 0, calc(100% - 14px) 0;
-    background-repeat:repeat-y, repeat-y;
-    animation:cybStream 8s linear infinite;opacity:.55;
+    background:linear-gradient(180deg,transparent calc(60% - 0.5px),rgba(255,255,255,.06) calc(60% - 0.5px) calc(60% + 0.5px),transparent calc(60% + 0.5px));
   }
-  [data-deco-anim="off"] .bg-l6{animation:none;opacity:.30}
-  @keyframes cybStream{from{background-position:14px 0, calc(100% - 14px) 50vh}to{background-position:14px 50vh, calc(100% - 14px) 100vh}}
 
-  /* L7 — CRT corner vignette */
-  .bg-l7{background:radial-gradient(ellipse 100% 100% at 50% 50%,transparent 50%,rgba(0,0,0,.35) 100%)}
+  /* L7 — heavy vignette top + bottom (no center vignette — keep glow visible) */
+  .bg-l7{
+    background:
+      linear-gradient(180deg,rgba(0,0,0,.65) 0%,transparent 18%,transparent 82%,rgba(0,0,0,.65) 100%);
+  }
 
   /* App container needs to sit above bg-deco */
   .app{position:relative;z-index:2}
   body::before{z-index:1}
 
   /* ============================================================
-     ORNAMENTS — Persona-5 corner brackets, holographic strip,
-     >> blinking section prefix, hazard tape on modals
+     ORNAMENTS — Vertical column dividers carry through the chrome,
+     subtle hairline accents, no corner brackets, no rainbow strip.
      ============================================================ */
-  /* Holographic rainbow line on top of the header
-     v4.4.2: removed `overflow:hidden` from the header — it was clipping the
-     #recentsDropdown, the patch-notes popover, and any other absolute-positioned
-     child that extends below the header bottom (user reported the recents
-     dropdown going "behind the background"). The rainbow line at top:0 height:2px
-     is already constrained vertically and doesn't need overflow:hidden. */
-  [data-deco-ornaments="on"] header{position:relative;overflow:visible}
+  /* Header — single hairline at the bottom (no animated rainbow).
+     Kept overflow:visible from v4.4.2 so dropdown popovers don't get
+     clipped. */
+  [data-deco-ornaments="on"] header{position:relative;overflow:visible;border-bottom:1px solid rgba(255,255,255,.08)}
   [data-deco-ornaments="on"] header > *{position:relative;z-index:1}
-  [data-deco-ornaments="on"] header::before{
-    content:'';position:absolute;top:0;left:0;right:0;height:2px;
-    background:linear-gradient(90deg,transparent,#FF2E88 25%,#FFE600 50%,#00F0FF 75%,transparent);
-    background-size:300% 100%;animation:cybRainbow 5s linear infinite;z-index:0;
-  }
-  [data-deco-anim="off"] header::before{animation:none}
-  @keyframes cybRainbow{from{background-position:0% 0}to{background-position:300% 0}}
 
-  /* Corner brackets on the controls sidebar + workspace + main panels.
-     v4.4.1: workspace bracket moved to box-shadow so it doesn't conflict
-     with the dot-grid ::before override below. Sidebar/picker-modal
-     brackets stay on ::before (no conflict there). */
-  [data-deco-ornaments="on"] .controls,
-  [data-deco-ornaments="on"] .workspace,
-  [data-deco-ornaments="on"] .picker-modal{position:relative}
-  [data-deco-ornaments="on"] .controls::before,
+  /* Controls sidebar + picker-modal — left edge hairline + faint top inner glow.
+     No more cyberpunk corner brackets. */
+  [data-deco-ornaments="on"] .controls{position:relative;border-left:1px solid rgba(255,255,255,.10)}
+  [data-deco-ornaments="on"] .picker-modal{position:relative;border:1px solid rgba(255,255,255,.12)}
   [data-deco-ornaments="on"] .picker-modal::before{
-    content:'';position:absolute;top:0;left:0;width:14px;height:14px;
-    border-top:2px solid #FF2E88;border-left:2px solid #FF2E88;
-    pointer-events:none;z-index:5;
-  }
-  [data-deco-ornaments="on"] .controls::after,
-  [data-deco-ornaments="on"] .picker-modal::after{
-    content:'';position:absolute;bottom:0;right:0;width:14px;height:14px;
-    border-bottom:2px solid #00F0FF;border-right:2px solid #00F0FF;
-    pointer-events:none;z-index:5;
-  }
-  /* Workspace gets the brackets via box-shadow so the dot-grid ::before
-     rule below can claim the pseudo-element exclusively. */
-  [data-deco-ornaments="on"] .workspace{
-    box-shadow:
-      inset 14px 0 0 -12px #FF2E88, inset 0 14px 0 -12px #FF2E88,
-      inset -14px 0 0 -12px #00F0FF, inset 0 -14px 0 -12px #00F0FF;
-  }
-  /* Workspace ::before — dot grid (no longer fighting with the bracket rule) */
-  [data-deco-ornaments="on"] .workspace::before{
-    background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);
-    background-size:32px 32px;
-    inset:0;width:auto;height:auto;border:none;
-  }
-  /* Re-add corner brackets on workspace via outline trick */
-  [data-deco-ornaments="on"] .workspace{
-    box-shadow:
-      inset 14px 0 0 -12px #FF2E88, inset 0 14px 0 -12px #FF2E88,
-      inset -14px 0 0 -12px #00F0FF, inset 0 -14px 0 -12px #00F0FF;
+    content:'';position:absolute;top:0;left:50%;width:1px;height:30%;
+    background:linear-gradient(180deg,rgba(123,44,191,.5),transparent);
+    transform:translateX(-50%);pointer-events:none;z-index:5;
   }
 
-  /* >> blinking prefix on control-section headers (existing structure)
-     v4.4.1: opt OUT of the parent h3's gradient transparent fill — without
-     this, `-webkit-text-fill-color:transparent` cascades to the ::before and
-     the ">>" text vanishes, leaving only the cyan glow halo (looks like a
-     blurry blob in screenshots / on screen). Force the fill back to cyan
-     and clear the inherited gradient background. */
+  /* Workspace — keep the subtle dot grid, no corner brackets */
+  [data-deco-ornaments="on"] .workspace{position:relative}
+  [data-deco-ornaments="on"] .workspace::before{
+    content:'';position:absolute;inset:0;pointer-events:none;
+    background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
+    background-size:32px 32px;
+  }
+
+  /* Replace cyberpunk >> blinking prefix with a clean violet bullet dot.
+     Still opts out of the parent gradient transparent fill so the dot
+     actually renders (same trick as v4.4.1). */
   [data-deco-ornaments="on"] .section-header h3::before{
-    content:'>> ';
-    color:#00F0FF !important;
-    -webkit-text-fill-color:#00F0FF !important;
+    content:'• ';
+    color:#C300FF !important;
+    -webkit-text-fill-color:#C300FF !important;
     background:none !important;
     -webkit-background-clip:initial !important;background-clip:initial !important;
-    font-family:'Audiowide',sans-serif;
-    text-shadow:0 0 4px rgba(0,240,255,.55);
-    animation:cybBlink 1.4s steps(2) infinite;
-    margin-right:2px;
+    font-family:'Inter',sans-serif;font-weight:700;
+    text-shadow:0 0 6px rgba(195,0,255,.65);
+    margin-right:6px;
   }
-  [data-deco-anim="off"] .section-header h3::before{animation:none;opacity:.85}
-  @keyframes cybBlink{50%{opacity:.45}}
 
-  /* Same fix for the section change-counter badges — they're nested inside h3
-     and the gradient transparent fill was hiding the digit, leaving solid
-     pink dots with no number visible. */
+  /* Section change-counter badges — same opt-out so digits render */
   .section-header h3 .section-badge{
-    -webkit-text-fill-color:#06060F !important;
+    -webkit-text-fill-color:#FFFFFF !important;
     background:var(--accent) !important;
-    color:#06060F !important;
+    color:#FFFFFF !important;
     background-clip:initial !important;-webkit-background-clip:initial !important;
     animation:none !important;
   }
 
-  /* Hazard tape stripe at the top of picker-modal foot (existing modal pattern) */
+  /* Modal foot — single hairline at top (replaces hazard tape stripe) */
   [data-deco-ornaments="on"] .picker-foot{position:relative}
   [data-deco-ornaments="on"] .picker-foot::before{
-    content:'';position:absolute;top:0;left:0;right:0;height:4px;
-    background:repeating-linear-gradient(45deg,#FFE600 0 10px,transparent 10px 14px,#FF2E88 14px 24px,transparent 24px 28px);
-    opacity:.55;
+    content:'';position:absolute;top:0;left:0;right:0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.18) 50%,transparent);
+    opacity:.85;
   }
 
   /* ============================================================
-     CLIP-PATH ANGULAR CUTS on action surfaces
+     SHAPE LANGUAGE — pill buttons, no clip-path angular cuts.
+     VOID prefers rounded pill geometry over cyberpunk's hex cuts.
      ============================================================ */
-  [data-deco-ornaments="on"] .logo-mark{
-    clip-path:polygon(15% 0,100% 0,100% 85%,85% 100%,0 100%,0 15%);
-    border-radius:0;
-  }
+  [data-deco-ornaments="on"] .logo-mark{border-radius:50%}
   [data-deco-ornaments="on"] .export-btn,
   [data-deco-ornaments="on"] .none-toggle.active,
-  [data-deco-ornaments="on"] .res-btn.active{
-    clip-path:polygon(4% 0,100% 0,96% 100%,0 100%);
-    border-radius:0;
-  }
+  [data-deco-ornaments="on"] .res-btn.active{border-radius:999px}
 
   /* ============================================================
-     MOTIFS — ⚡ before EXPORT, ▲ on active filter chips, ID badges
+     MOTIFS — single violet dot before EXPORT, • on active filter chips
      ============================================================ */
   [data-deco-motifs="on"] .export-btn::before{
-    content:'⚡ ';color:#FFE600;text-shadow:0 0 6px rgba(255,230,0,.7);
-    font-family:'Audiowide',sans-serif;
+    content:'• ';color:#FFFFFF;text-shadow:0 0 8px rgba(195,0,255,.85);
+    font-weight:900;
   }
   [data-deco-motifs="on"] .filter-card.active::before{
-    content:'▲';position:absolute;top:4px;right:4px;
-    color:#FFE600;font-size:9px;text-shadow:0 0 6px rgba(255,230,0,.7);
+    content:'•';position:absolute;top:4px;right:6px;
+    color:#C300FF;font-size:14px;font-weight:900;
+    text-shadow:0 0 6px rgba(195,0,255,.85);
     z-index:3;pointer-events:none;
   }
   [data-deco-motifs="on"] .filter-card{position:relative}
 
   /* ============================================================
-     ANIM — glitch hover, border breathing
+     ANIM — subtle hover lift + faint sidebar glow breath
      ============================================================ */
-  [data-deco-anim="on"] .export-btn:hover{animation:cybGlitch .18s steps(3) 1}
-  @keyframes cybGlitch{
-    0%{transform:translate(0,0)}
-    33%{transform:translate(-2px,1px);filter:hue-rotate(60deg)}
-    66%{transform:translate(2px,-1px);filter:hue-rotate(-30deg)}
-  }
-  [data-deco-anim="on"] .controls{animation:cybPulse 4s ease-in-out infinite}
-  @keyframes cybPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 14px rgba(255,46,136,.10)}}
+  [data-deco-anim="on"] .export-btn:hover{transform:translateY(-1px);transition:transform .15s ease,box-shadow .15s ease;box-shadow:0 0 18px var(--accent-glow),0 0 32px var(--accent-2-glow)}
+  [data-deco-anim="on"] .controls{animation:voidPulse 6s ease-in-out infinite}
+  @keyframes voidPulse{0%,100%{box-shadow:none}50%{box-shadow:inset 1px 0 0 rgba(123,44,191,.20)}}
 
   /* ============================================================
-     TYPOGRAPHY — Audiowide on display headers (logo, h2, h3)
+     TYPOGRAPHY — Orbitron for display headers, Inter for body.
+     Audiowide is retired (cyberpunk-specific feel doesn't fit VOID).
      ============================================================ */
-  [data-deco-ornaments="on"] .logo h1,
+  [data-deco-ornaments="on"] .logo h1{
+    font-family:'Orbitron','Inter',sans-serif;
+    font-weight:900;letter-spacing:.30em;
+  }
   [data-deco-ornaments="on"] .upload-zone h2,
-  [data-deco-ornaments="on"] .pn-version-num,
+  [data-deco-ornaments="on"] .pn-version-num{
+    font-family:'Orbitron','Inter',sans-serif;
+    font-weight:700;letter-spacing:.18em;
+  }
   [data-deco-ornaments="on"] .control-section h3{
-    font-family:'Audiowide','Antonio',sans-serif;
-    letter-spacing:.10em;
+    font-family:'Orbitron','Inter',sans-serif;
+    font-weight:500;letter-spacing:.14em;
   }
 
   /* ============================================================
@@ -16786,20 +16769,20 @@ if (window.__TAURI__ && window.__TAURI__.core) {
      ============================================================ */
   .perf-modal{
     position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(120%);
-    z-index:9999;background:var(--surface);border:2px solid #FFE600;
-    box-shadow:0 0 30px rgba(255,230,0,.35),0 12px 40px rgba(0,0,0,.5);
+    z-index:9999;background:var(--surface);border:1px solid rgba(195,0,255,.45);
+    box-shadow:0 0 30px rgba(195,0,255,.30),0 12px 40px rgba(0,0,0,.6);
     padding:14px 18px;width:min(440px,calc(100vw - 32px));
     transition:transform .35s cubic-bezier(.34,1.56,.64,1),opacity .3s;
-    opacity:0;clip-path:polygon(2% 0,100% 0,98% 100%,0 100%);
+    opacity:0;border-radius:6px;
   }
   .perf-modal.show{transform:translateX(-50%) translateY(0);opacity:1}
-  .perf-modal h4{font-family:'Audiowide',sans-serif;font-size:11px;letter-spacing:.16em;color:#FFE600;margin:0 0 6px;text-shadow:0 0 6px rgba(255,230,0,.5)}
+  .perf-modal h4{font-family:'Orbitron','Inter',sans-serif;font-weight:700;font-size:11px;letter-spacing:.16em;color:#C300FF;margin:0 0 6px;text-shadow:0 0 6px rgba(195,0,255,.55)}
   .perf-modal p{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);line-height:1.5;margin:0 0 10px}
   .perf-modal .perf-btns{display:flex;gap:8px}
-  .perf-modal button{padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--text);cursor:pointer;transition:all .2s}
-  .perf-modal button:hover{border-color:#FFE600;color:#FFE600}
-  .perf-modal button.primary{background:#FFE600;color:var(--bg);border-color:#FFE600;font-weight:700}
-  .perf-modal button.primary:hover{filter:brightness(1.15)}
+  .perf-modal button{padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;border:1px solid rgba(255,255,255,.18);background:transparent;color:var(--text);cursor:pointer;transition:all .2s;border-radius:999px}
+  .perf-modal button:hover{border-color:#C300FF;color:#C300FF;box-shadow:0 0 10px rgba(195,0,255,.35)}
+  .perf-modal button.primary{background:#FFFFFF;color:var(--bg);border-color:#FFFFFF;font-weight:700}
+  .perf-modal button.primary:hover{background:#C300FF;color:#FFFFFF;border-color:#C300FF}
 
   /* ====================================================================
      DRIVE TAB (v4.4.0) — full Google Drive browser inside the app.
@@ -16831,11 +16814,11 @@ if (window.__TAURI__ && window.__TAURI__.core) {
   .drivex-icon-btn.spinning{animation:drivexSpin 0.7s linear infinite}
   @keyframes drivexSpin{to{transform:rotate(360deg)}}
 
-  .drivex-batch-btn{padding:8px 14px;font-family:'Audiowide','Antonio',sans-serif;font-size:11px;letter-spacing:.16em;background:transparent;border:1px solid var(--accent-2);color:var(--accent-2);cursor:pointer;transition:all .2s ease;clip-path:polygon(6% 0,100% 0,94% 100%,0 100%)}
-  .drivex-batch-btn:hover{background:var(--accent-2);color:var(--bg);box-shadow:0 0 16px var(--accent-2-glow)}
+  .drivex-batch-btn{padding:8px 16px;font-family:'Orbitron','Inter',sans-serif;font-weight:600;font-size:11px;letter-spacing:.16em;background:transparent;border:1px solid var(--accent-2);color:var(--accent-2);cursor:pointer;transition:all .2s ease;border-radius:999px}
+  .drivex-batch-btn:hover{background:var(--accent-2);color:#FFFFFF;box-shadow:0 0 16px var(--accent-2-glow)}
 
-  .drivex-import-btn{padding:8px 16px;font-family:'Audiowide','Antonio',sans-serif;font-size:11px;letter-spacing:.16em;background:var(--accent);color:var(--bg);border:1px solid var(--accent);cursor:pointer;transition:all .2s ease;clip-path:polygon(6% 0,100% 0,94% 100%,0 100%);font-weight:700}
-  .drivex-import-btn:hover:not(:disabled){box-shadow:0 0 18px var(--accent-glow);filter:brightness(1.1)}
+  .drivex-import-btn{padding:8px 18px;font-family:'Orbitron','Inter',sans-serif;font-weight:700;font-size:11px;letter-spacing:.16em;background:#FFFFFF;color:var(--bg);border:1px solid #FFFFFF;cursor:pointer;transition:all .2s ease;border-radius:999px}
+  .drivex-import-btn:hover:not(:disabled){background:var(--accent-2);color:#FFFFFF;border-color:var(--accent-2);box-shadow:0 0 18px var(--accent-2-glow)}
   .drivex-import-btn:disabled{opacity:.35;cursor:not-allowed;filter:grayscale(.6)}
 
   /* Content area — scroll, OS-drop overlay anchor */
@@ -16844,8 +16827,8 @@ if (window.__TAURI__ && window.__TAURI__.core) {
   .drivex-state[data-active]{display:block}
   .drivex-state-default[data-active]{display:block}
 
-  .drivex-section-h{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-family:'Audiowide','Antonio',sans-serif;font-weight:400;font-size:11px;letter-spacing:.18em;color:var(--text-dim);text-transform:uppercase}
-  .drivex-section-h::before{content:'>> ';color:var(--accent-2);text-shadow:0 0 4px var(--accent-2)}
+  .drivex-section-h{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-family:'Orbitron','Inter',sans-serif;font-weight:500;font-size:11px;letter-spacing:.18em;color:var(--text-dim);text-transform:uppercase}
+  .drivex-section-h::before{content:'• ';color:var(--accent-2);text-shadow:0 0 4px var(--accent-2);font-weight:700}
   .drivex-section-h .count{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);letter-spacing:.06em;text-transform:none}
   .drivex-section-h .hint{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.04em;text-transform:none;margin-left:auto}
   .drivex-section-h::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
@@ -16856,7 +16839,7 @@ if (window.__TAURI__ && window.__TAURI__.core) {
   .drivex-folder:hover{border-color:var(--accent);box-shadow:0 0 14px var(--accent-glow);transform:translateY(-2px)}
   .drivex-folder.dragging{opacity:.4;cursor:grabbing}
   .drivex-folder.drop-target{border-color:var(--accent-3);background:rgba(255,230,0,.08);box-shadow:0 0 0 2px var(--accent-3),0 0 20px rgba(255,230,0,.4);transform:scale(1.04)}
-  .drivex-folder.drop-target::after{content:'DROP TO MOVE';position:absolute;inset:0;display:grid;place-items:center;font-family:'Audiowide','Antonio',sans-serif;font-size:10px;letter-spacing:.18em;color:var(--accent-3);background:rgba(0,0,0,.55);text-shadow:0 0 8px var(--accent-3);pointer-events:none}
+  .drivex-folder.drop-target::after{content:'DROP TO MOVE';position:absolute;inset:0;display:grid;place-items:center;font-family:'Orbitron','Inter',sans-serif;font-weight:600;font-size:10px;letter-spacing:.18em;color:var(--accent-3);background:rgba(0,0,0,.55);text-shadow:0 0 8px var(--accent-3);pointer-events:none}
   .drivex-folder .ic{font-size:38px;color:#A1C4FD;filter:drop-shadow(0 0 8px rgba(161,196,253,.5))}
   .drivex-folder .nm{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);letter-spacing:.04em;text-align:center;overflow:hidden;text-overflow:ellipsis;max-width:100%;white-space:nowrap}
   .drivex-folder .mt{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.04em}
@@ -16889,16 +16872,16 @@ if (window.__TAURI__ && window.__TAURI__.core) {
 
   /* OS drop-target ring on folders during external drag */
   .drivex-folder.os-drop-target{border-color:var(--accent-2);background:rgba(0,240,255,.08);box-shadow:0 0 0 2px var(--accent-2),0 0 22px var(--accent-2-glow);transform:scale(1.04)}
-  .drivex-folder.os-drop-target::after{content:'DROP HERE TO UPLOAD';position:absolute;inset:0;display:grid;place-items:center;font-family:'Audiowide','Antonio',sans-serif;font-size:9px;letter-spacing:.18em;color:var(--accent-2);background:rgba(0,0,0,.55);text-shadow:0 0 8px var(--accent-2);pointer-events:none}
+  .drivex-folder.os-drop-target::after{content:'DROP HERE TO UPLOAD';position:absolute;inset:0;display:grid;place-items:center;font-family:'Orbitron','Inter',sans-serif;font-weight:600;font-size:9px;letter-spacing:.18em;color:var(--accent-2);background:rgba(0,0,0,.55);text-shadow:0 0 8px var(--accent-2);pointer-events:none}
 
   /* OS DROP OVERLAY — full content overlay */
   .drivex-os-drop{position:absolute;inset:64px 0 0 0;z-index:30;background:rgba(0,240,255,.06);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);border:3px dashed var(--accent-2);display:none;place-items:center;pointer-events:none;animation:drivexDropPulse 1.2s ease-in-out infinite}
   .drivex-os-drop.show{display:grid}
   @keyframes drivexDropPulse{0%,100%{box-shadow:inset 0 0 60px rgba(0,240,255,.15),0 0 30px rgba(0,240,255,.3)}50%{box-shadow:inset 0 0 100px rgba(0,240,255,.30),0 0 50px rgba(0,240,255,.5)}}
-  .drivex-os-card{text-align:center;padding:28px 44px;background:rgba(15,15,26,.92);border:2px solid var(--accent-2);clip-path:polygon(3% 0,100% 0,97% 100%,0 100%);box-shadow:0 0 40px var(--accent-2-glow)}
+  .drivex-os-card{text-align:center;padding:28px 44px;background:rgba(15,15,26,.92);border:2px solid var(--accent-2);border-radius:6px;box-shadow:0 0 40px var(--accent-2-glow)}
   .drivex-os-card .ico{font-size:48px;color:var(--accent-2);text-shadow:0 0 18px var(--accent-2);margin-bottom:6px;animation:drivexBob 1.5s ease-in-out infinite}
   @keyframes drivexBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-  .drivex-os-card h3{font-family:'Audiowide','Antonio',sans-serif;font-size:18px;letter-spacing:.16em;color:var(--accent-2);margin:0 0 6px;text-shadow:0 0 12px var(--accent-2)}
+  .drivex-os-card h3{font-family:'Orbitron','Inter',sans-serif;font-weight:600;font-size:18px;letter-spacing:.16em;color:var(--accent-2);margin:0 0 6px;text-shadow:0 0 12px var(--accent-2)}
   .drivex-os-card p{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:.06em;margin:0}
   .drivex-os-card .target-line{margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent-3);letter-spacing:.08em;text-shadow:0 0 6px var(--accent-3)}
 
@@ -16906,7 +16889,7 @@ if (window.__TAURI__ && window.__TAURI__.core) {
   .drivex-state-empty,.drivex-state-signin,.drivex-state-error{text-align:center;padding:60px 24px;display:none}
   .drivex-state-empty[data-active],.drivex-state-signin[data-active],.drivex-state-error[data-active]{display:block}
   .drivex-empty-icon{font-size:60px;color:var(--text-faint);margin-bottom:14px;filter:drop-shadow(0 0 10px var(--accent-glow))}
-  .drivex-state-empty h2,.drivex-state-signin h2,.drivex-state-error h2{font-family:'Audiowide','Antonio',sans-serif;font-size:22px;letter-spacing:.14em;color:var(--text);margin:0 0 8px}
+  .drivex-state-empty h2,.drivex-state-signin h2,.drivex-state-error h2{font-family:'Orbitron','Inter',sans-serif;font-weight:600;font-size:22px;letter-spacing:.14em;color:var(--text);margin:0 0 8px}
   .drivex-state-empty p,.drivex-state-signin p,.drivex-state-error p{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);max-width:520px;margin:0 auto 16px;line-height:1.6}
   .drivex-empty-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
   .drivex-ghost-btn{padding:9px 16px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;background:transparent;border:1px solid var(--border-strong);color:var(--text);cursor:pointer;text-transform:uppercase;transition:all .2s ease}
@@ -16914,16 +16897,16 @@ if (window.__TAURI__ && window.__TAURI__.core) {
   .drivex-ghost-btn.drivex-danger{color:var(--red);border-color:var(--red)}
   .drivex-ghost-btn.drivex-danger:hover{background:var(--red);color:var(--bg);box-shadow:0 0 12px rgba(255,59,92,.5)}
 
-  .drivex-signin-card{max-width:520px;margin:0 auto;padding:36px 32px;background:var(--surface);border:1px solid var(--border);clip-path:polygon(2% 0,100% 0,98% 100%,0 100%)}
+  .drivex-signin-card{max-width:520px;margin:0 auto;padding:36px 32px;background:var(--surface);border:1px solid var(--border);border-radius:6px}
   .drivex-glogo{font-size:48px;color:var(--accent);margin-bottom:8px;text-shadow:0 0 16px var(--accent-glow)}
   .drivex-perms{list-style:none;padding:0;margin:14px 0;display:flex;flex-direction:column;gap:8px;text-align:left}
   .drivex-perms li{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface-2);border:1px solid var(--border)}
   .drivex-perms .k{color:var(--accent-2);width:22px;text-align:center;font-size:14px}
-  .drivex-primary-btn{width:100%;padding:13px 20px;font-family:'Audiowide','Antonio',sans-serif;font-size:13px;letter-spacing:.16em;background:var(--accent);color:var(--bg);border:none;cursor:pointer;font-weight:700;text-transform:uppercase;transition:all .2s ease;clip-path:polygon(3% 0,100% 0,97% 100%,0 100%);margin-top:6px}
+  .drivex-primary-btn{width:100%;padding:13px 20px;font-family:'Orbitron','Inter',sans-serif;font-weight:600;font-size:13px;letter-spacing:.16em;background:var(--accent);color:var(--bg);border:none;cursor:pointer;font-weight:700;text-transform:uppercase;transition:all .2s ease;border-radius:6px;margin-top:6px}
   .drivex-primary-btn:hover{box-shadow:0 0 18px var(--accent-glow);filter:brightness(1.1)}
   .drivex-revoke-hint{font-size:10px;color:var(--text-faint);font-style:italic;margin:14px 0 0}
 
-  .drivex-error-card{max-width:540px;margin:0 auto;padding:24px;background:var(--surface);border:1px solid var(--red);clip-path:polygon(2% 0,100% 0,98% 100%,0 100%)}
+  .drivex-error-card{max-width:540px;margin:0 auto;padding:24px;background:var(--surface);border:1px solid var(--red);border-radius:6px}
   .drivex-err-detail{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);background:var(--surface-2);padding:10px 12px;text-align:left;white-space:pre-wrap;max-height:140px;overflow-y:auto;border:1px solid var(--border);margin:0 0 16px}
 
   /* LOADING skeleton */
@@ -16933,14 +16916,14 @@ if (window.__TAURI__ && window.__TAURI__.core) {
   .drivex-loading-msg{text-align:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent-2);letter-spacing:.10em;text-shadow:0 0 6px var(--accent-2)}
 
   /* CONTEXT MENU */
-  .drivex-ctxmenu{position:fixed;z-index:99999;display:none;background:var(--surface);border:1px solid var(--accent);box-shadow:0 0 30px var(--accent-glow),0 14px 44px rgba(0,0,0,.6);min-width:220px;padding:6px 0;clip-path:polygon(0 0,100% 0,100% 96%,96% 100%,0 100%)}
+  .drivex-ctxmenu{position:fixed;z-index:99999;display:none;background:var(--surface);border:1px solid var(--accent);box-shadow:0 0 30px var(--accent-glow),0 14px 44px rgba(0,0,0,.6);min-width:220px;padding:6px 0;border-radius:6px}
   .drivex-ctxmenu.show{display:block}
   .drivex-ctx-item{display:flex;align-items:center;gap:10px;padding:9px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);letter-spacing:.04em;cursor:pointer;transition:all .12s ease}
   .drivex-ctx-item:hover{background:rgba(255,46,136,.10);color:var(--accent);text-shadow:0 0 4px var(--accent)}
   .drivex-ctx-item.drivex-danger:hover{background:rgba(255,59,92,.12);color:var(--red);text-shadow:0 0 4px var(--red)}
   .drivex-ctx-item .k{color:var(--accent-2);width:16px;text-align:center}
   .drivex-ctx-sep{height:1px;background:var(--border);margin:5px 0}
-  .drivex-ctx-sub{padding:6px 14px 4px;font-family:'Audiowide','Antonio',sans-serif;font-size:9px;letter-spacing:.16em;color:var(--text-faint)}
+  .drivex-ctx-sub{padding:6px 14px 4px;font-family:'Orbitron','Inter',sans-serif;font-weight:600;font-size:9px;letter-spacing:.16em;color:var(--text-faint)}
 </style>
 <div class="picker-overlay hidden" id="drivePickerOverlay">
 <div class="picker-modal" id="drivePickerModal">
