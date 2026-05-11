@@ -6843,7 +6843,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.5.0';
+const APP_VERSION = '4.5.1';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -14788,6 +14788,25 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.5.1',
+    date: '2026-05-11',
+    title: 'VOID GRADIENT icon — Holographic Halo retired',
+    sections: [
+      { h: 'New app icon', items: [
+        '🖤 New icon: <b>VOID GRADIENT</b> (option 09 from the mockups). Off-center deep-purple → black radial gradient (#3D1466 → #1A0833 → #050507), stark white Orbitron 900 "S" with a soft violet glow halo and subtle magenta highlight. Matches the v4.5.0 VOID theme — no more iridescent rainbow ring.',
+        '🪞 Replaces the v4.3.2 Holographic Halo (yellow S, pink → cyan → mint → yellow iridescent ring) which read as too colorful + cyberpunk-era against the new monochrome aesthetic.',
+      ]},
+      { h: 'What ships', items: [
+        'All platform icon sizes regenerated via <code>cargo tauri icon</code> — Windows .ico, macOS .icns, Linux PNGs at 32/64/128/128@2x/256, plus iOS AppIcon set (20-512) and Android mipmap-launcher PNGs (hdpi → xxxhdpi).',
+        'In-app header logo (<code>dist/logo.png</code>) refreshed to the same design.',
+        'Source SVG with embedded Orbitron 900 font lives at <code>src-tauri/icons/seraphim-void.svg</code> — single-source for any future regeneration.',
+      ]},
+      { h: 'Dock cache note', items: [
+        '🍎 If your dock icon still shows the old Holographic Halo after install, macOS aggressively caches dock icons by bundle identifier. Quit + reopen the app, or run <code>killall Dock</code> in Terminal to force a refresh.',
+      ]},
+    ]
+  },
   {
     version: '4.5.0',
     date: '2026-05-11',
