@@ -204,21 +204,37 @@
   textarea#captionText:focus{border-color:var(--accent);}
   .caption-row{display:flex;gap:8px;margin-top:10px;}
 
-  /* v4.6 — Multi-text overlay layer list */
-  .text-layers-list{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;}
+  /* v4.6.1 — Multi-text overlay layer cards */
+  .text-layers-list{display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
   .text-layer-row{
-    display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;
-    padding:6px 8px;border:1px solid var(--border);background:var(--surface-2);
+    display:flex;flex-direction:column;gap:6px;
+    padding:8px;border:1px solid var(--border);background:var(--surface-2);
     border-radius:2px;font-family:'JetBrains Mono',monospace;font-size:11px;
     color:var(--text-dim);cursor:pointer;transition:all .12s ease;user-select:none;
   }
   .text-layer-row:hover{border-color:var(--border-strong);color:var(--text);}
   .text-layer-row.active{border-color:var(--accent);color:var(--text);background:var(--surface-3,var(--surface-2));box-shadow:0 0 0 1px var(--accent) inset;}
+  .text-layer-row .layer-row-head{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;}
   .text-layer-row .layer-num{font-size:9px;color:var(--text-faint);letter-spacing:.10em;font-weight:600;min-width:14px;}
   .text-layer-row.active .layer-num{color:var(--accent);}
-  .text-layer-row .layer-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;}
-  .text-layer-row .layer-text:empty::before{content:'(empty)';color:var(--text-faint);font-style:italic;}
-  .text-layer-row .layer-style{font-size:8px;letter-spacing:.12em;color:var(--text-faint);background:rgba(0,0,0,.20);padding:2px 5px;border-radius:2px;text-transform:uppercase;}
+  .text-layer-row .layer-textarea{
+    width:100%;background:var(--bg,#0a0a14);border:1px solid var(--border);
+    color:var(--text);padding:6px 8px;font-family:'Manrope',-apple-system,sans-serif;
+    font-size:13px;line-height:1.4;resize:vertical;min-height:36px;
+    border-radius:2px;outline:none;transition:border-color .15s;
+  }
+  .text-layer-row .layer-textarea:focus{border-color:var(--accent);}
+  .text-layer-row .layer-textarea:placeholder-shown{color:var(--text-faint);font-style:italic;}
+  .text-layer-row .layer-style-mini{
+    display:inline-flex;gap:0;border:1px solid var(--border);border-radius:2px;overflow:hidden;background:var(--bg,#0a0a14);
+  }
+  .text-layer-row .layer-style-mini button{
+    background:transparent;border:none;color:var(--text-faint);
+    padding:3px 7px;font-family:'JetBrains Mono',monospace;font-size:8px;
+    letter-spacing:.10em;cursor:pointer;transition:all .12s;
+  }
+  .text-layer-row .layer-style-mini button:hover{color:var(--text);}
+  .text-layer-row .layer-style-mini button.active{background:var(--accent);color:var(--bg);font-weight:700;}
   .text-layer-row .layer-del{background:transparent;border:none;color:var(--text-faint);font-size:14px;line-height:1;padding:2px 5px;cursor:pointer;transition:color .12s;border-radius:2px;}
   .text-layer-row .layer-del:hover{color:var(--red,#ff3b5c);background:rgba(255,59,92,.10);}
   .add-text-btn{
@@ -228,6 +244,11 @@
     cursor:pointer;border-radius:2px;text-transform:uppercase;transition:all .15s;
   }
   .add-text-btn:hover{border-color:var(--accent);background:rgba(123,44,191,.06);color:var(--accent);}
+
+  /* When the layer list is showing inline textareas, hide the giant legacy
+     #captionText to avoid double-input confusion. The emoji picker writes
+     into whichever textarea is focused so we don't lose functionality. */
+  .text-layers-list:not(:empty) + #addTextOverlayBtn + textarea#captionText{display:none;}
   .caption-row button{flex:1;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);border-radius:2px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;transition:all .15s;}
   .caption-row button:hover{border-color:var(--border-strong);color:var(--text);}
   .emoji-picker{margin-top:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:2px;overflow:hidden;}
@@ -961,12 +982,24 @@
 <div class="control-section" data-section-id="caption">
 <button class="section-header"><h3>CAPTION <span class="section-badge hidden">0</span></h3><span class="section-chevron">›</span></button>
 <div class="section-content">
-<!-- v4.6: multi-text overlay layer list. Each row = one overlay. Click to
-     select (binds the controls below). The "+ ADD TEXT" button at the bottom
-     creates a new free-positioned BOX-style text. -->
+<!-- v4.6.1: templates moved to TOP of section per user feedback. Saves the
+     full multi-overlay array now (all texts + positions + styles + colors). -->
+<div style="margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:14px;">
+<div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--text-dim);margin-bottom:6px;">CAPTION TEMPLATES</div>
+<p class="output-note" style="margin:0 0 8px;">Saves all text overlays + positions + styles + colors + outline + bg as a reusable preset.</p>
+<div id="captionTemplateList" class="template-list"></div>
+<div style="display:flex;gap:6px;margin-top:8px;">
+<input type="text" id="captionTemplateName" placeholder="Template name" style="flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;min-width:0;">
+<button class="none-toggle" id="captionSaveTemplate" style="flex-shrink:0;">SAVE</button>
+</div>
+</div>
+<!-- v4.6.1: layers list — each row is now a full editable card with its OWN
+     inline textbox, style picker, and delete. ADD TEXT below the list. The
+     legacy big <textarea id="captionText"> stays as the editor for the
+     ACTIVE overlay (bound via proxy) — that's where the emoji picker writes. -->
 <div id="textLayersList" class="text-layers-list"></div>
 <button id="addTextOverlayBtn" class="add-text-btn" type="button" data-no-sfx>+ ADD TEXT</button>
-<textarea id="captionText" placeholder="You better be good to me this year"></textarea>
+<textarea id="captionText" placeholder="Active layer text"></textarea>
 <div class="caption-row">
 <button id="emojiBtn">+ EMOJI</button>
 <button id="clearCaptionBtn">CLEAR</button>
@@ -976,15 +1009,6 @@
 <input type="text" class="emoji-search" id="emojiSearch" placeholder="Search emojis..." autocomplete="off">
 <div class="emoji-content" id="emojiContent"></div>
 </div>
-<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
-<div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--text-dim);margin-bottom:6px;">CAPTION TEMPLATES</div>
-<p class="output-note" style="margin:0 0 8px;">Saves caption text + font + size + colors + outline + bg opacity as a reusable preset.</p>
-<div id="captionTemplateList" class="template-list"></div>
-<div style="display:flex;gap:6px;margin-top:8px;">
-<input type="text" id="captionTemplateName" placeholder="Template name" style="flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;min-width:0;">
-<button class="none-toggle" id="captionSaveTemplate" style="flex-shrink:0;">SAVE</button>
-</div>
-</div>
 </div>
 </div>
 <div class="control-section" data-section-id="text-style">
@@ -992,10 +1016,15 @@
 <div class="section-content">
 <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button id="resetTextStyle" class="none-toggle" style="font-size:10px;padding:4px 10px;letter-spacing:.12em;">CLEAR</button></div>
 <div class="caption-options">
-<div class="seg-control" id="captionStyleSeg" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px;">
+<!-- v4.6.1: style picker + LINK toggle. Link makes style changes apply to
+     ALL overlays (like the carousel's filter-link / adj-link toggles). -->
+<div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-bottom:8px;align-items:center;">
+<div class="seg-control" id="captionStyleSeg" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
 <button class="seg-btn active" data-cap-style="bar" type="button" data-no-sfx title="Snapchat — full-width bar (default)">BAR</button>
 <button class="seg-btn" data-cap-style="box" type="button" data-no-sfx title="Reels — rounded pill around text">BOX</button>
 <button class="seg-btn" data-cap-style="plain" type="button" data-no-sfx title="No background, just text + outline">PLAIN</button>
+</div>
+<button id="textStyleLinkBtn" class="none-toggle" type="button" data-no-sfx title="Link style across all text overlays — changing one changes them all" style="padding:4px 10px;font-size:9px;letter-spacing:.10em;">🔗 LINK</button>
 </div>
 <label><span>FONT</span><select id="fontSelect"></select></label>
 <label><span>SIZE</span><input type="range" id="captionSize" min="20" max="80" value="36"></label>
@@ -1945,41 +1974,90 @@ _defProxy('captionBounds',  'bounds',         null);
 state._texts.push(createTextOverlay({ style: 'bar' }));
 state._activeId = state._texts[0].id;
 
-// Render the layers list in the sidebar. Called from syncUIToState() and
-// after ADD/DELETE actions. Each row: order index, text preview, style badge,
-// delete button. Clicking the row sets it active.
+// v4.6.1: each layer row is now a full editable card with its OWN inline
+// textarea + style picker + delete button. The main #captionText below the
+// list is still bound to the active overlay (for the emoji picker), but
+// users can edit any layer's text without changing focus first.
 function renderTextLayers() {
   const wrap = document.getElementById('textLayersList');
   if (!wrap) return;
-  // Hide the list entirely when there's only one overlay — keeps the sidebar
-  // clean for users who never touch multi-text. Becomes visible the moment
-  // they hit ADD TEXT.
-  if (state._texts.length <= 1) { wrap.innerHTML = ''; wrap.style.display = 'none'; return; }
   wrap.style.display = '';
+  // Even with one overlay we now show the inline card (per user feedback —
+  // each text has its own visible textbox). Hide the legacy giant textarea
+  // when there are multiple to avoid double-input confusion.
   wrap.innerHTML = state._texts.map((t, i) => {
     const isActive = t.id === state._activeId;
-    const preview = (t.text || '').slice(0, 24).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+    const txt = (t.text || '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
     return `<div class="text-layer-row${isActive ? ' active' : ''}" data-layer-id="${t.id}">
-      <span class="layer-num">${String(i+1).padStart(2,'0')}</span>
-      <span class="layer-text">${preview}</span>
-      <span class="layer-style">${t.style}</span>
-      <button class="layer-del" data-del-id="${t.id}" title="Delete layer">×</button>
+      <div class="layer-row-head">
+        <span class="layer-num">${String(i+1).padStart(2,'0')}</span>
+        <div class="layer-style-mini" data-style-mini="${t.id}">
+          <button data-mini-style="bar"   class="${t.style==='bar'?'active':''}"   title="Snapchat-style full-width bar">BAR</button>
+          <button data-mini-style="box"   class="${t.style==='box'?'active':''}"   title="Reels-style rounded pill">BOX</button>
+          <button data-mini-style="plain" class="${t.style==='plain'?'active':''}" title="Text only, no background">PLAIN</button>
+        </div>
+        <button class="layer-del" data-del-id="${t.id}" title="Delete layer">×</button>
+      </div>
+      <textarea class="layer-textarea" data-layer-text-id="${t.id}" rows="2" placeholder="Layer text…">${txt}</textarea>
     </div>`;
   }).join('');
+
+  // Wire focus/click → activate this layer
   wrap.querySelectorAll('.text-layer-row').forEach(row => {
     row.addEventListener('click', (e) => {
-      // Don't fire if the delete button was the target
-      if (e.target.closest('.layer-del')) return;
+      if (e.target.closest('.layer-del') || e.target.closest('.layer-textarea') || e.target.closest('[data-mini-style]')) return;
       setActiveText(row.dataset.layerId);
     });
   });
+
+  // Per-overlay textarea — typing updates that specific overlay's text + activates it
+  wrap.querySelectorAll('.layer-textarea').forEach(ta => {
+    ta.addEventListener('focus', () => setActiveText(ta.dataset.layerTextId));
+    ta.addEventListener('input', (e) => {
+      const id = ta.dataset.layerTextId;
+      const t = state._texts.find(x => x.id === id);
+      if (!t) return;
+      t.text = e.target.value;
+      // Keep the legacy main textarea in sync if this is the active overlay
+      if (id === state._activeId) {
+        const main = document.getElementById('captionText');
+        if (main && main.value !== e.target.value) main.value = e.target.value;
+      }
+      schedulePreviewRender();
+      if (typeof updateBadges === 'function') updateBadges();
+    });
+  });
+
+  // Per-overlay style mini-picker (BAR/BOX/PLAIN per layer)
+  wrap.querySelectorAll('[data-mini-style]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const newStyle = btn.dataset.miniStyle;
+      const row = btn.closest('.text-layer-row');
+      const id = row?.dataset.layerId;
+      const t = state._texts.find(x => x.id === id);
+      if (!t) return;
+      if (state._textStyleLinked) {
+        for (const x of state._texts) x.style = newStyle;
+      } else {
+        t.style = newStyle;
+      }
+      // If this is the active overlay, sync the main style picker too
+      if (id === state._activeId) {
+        document.querySelectorAll('#captionStyleSeg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.capStyle === newStyle));
+      }
+      renderTextLayers();
+      schedulePreviewRender();
+    });
+  });
+
+  // Delete buttons
   wrap.querySelectorAll('.layer-del').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const id = btn.dataset.delId;
-      // Don't allow deleting the last remaining overlay — keep at least one
       if (state._texts.length <= 1) {
-        // Instead clear its text and reset to bar style
+        // Last overlay — just clear it instead of removing
         const t = state._texts[0];
         t.text = ''; t.style = 'bar'; t.x = 0.5; t.y = 0.5;
         if (typeof syncUIToState === 'function') syncUIToState();
@@ -2274,8 +2352,28 @@ function wrapSegments(measured, maxWidth, targetCtx) {
       const parts = seg.value.split(/(\s+)/);
       for (const part of parts) {
         if (part.length === 0) continue;
+        const isSpace = /^\s+$/.test(part);
         const m = targetCtx.measureText(part);
-        tokens.push({ type: 'text', value: part, width: m.width, isSpace: /^\s+$/.test(part) });
+        // v4.6.1: if a single non-space token is wider than maxWidth (long
+        // URL, hashtag, joined word), split it character-by-character so it
+        // wraps to multiple lines instead of overflowing the canvas. Each
+        // sub-token is its own break-point. Spaces stay intact.
+        if (!isSpace && m.width > maxWidth && part.length > 1) {
+          let buf = '';
+          let bufW = 0;
+          for (const ch of part) {
+            const cw = targetCtx.measureText(ch).width;
+            if (bufW + cw > maxWidth && buf.length > 0) {
+              tokens.push({ type: 'text', value: buf, width: bufW, isSpace: false });
+              buf = ch; bufW = cw;
+            } else {
+              buf += ch; bufW += cw;
+            }
+          }
+          if (buf) tokens.push({ type: 'text', value: buf, width: bufW, isSpace: false });
+        } else {
+          tokens.push({ type: 'text', value: part, width: m.width, isSpace });
+        }
       }
     } else {
       tokens.push(seg);
@@ -6669,13 +6767,30 @@ function renderEmojiContent() {
 }
 
 function insertEmoji(emoji) {
-  const ta = document.getElementById('captionText');
+  // v4.6.1: prefer whichever caption textarea is currently focused (could be
+  // the legacy giant #captionText OR an inline layer textarea). Falls back to
+  // the active overlay's inline textarea, then the legacy one.
+  let ta = document.activeElement;
+  if (!ta || ta.tagName !== 'TEXTAREA' || (!ta.id?.startsWith('captionText') && !ta.classList.contains('layer-textarea'))) {
+    ta = document.querySelector(`.layer-textarea[data-layer-text-id="${state._activeId}"]`)
+      || document.getElementById('captionText');
+  }
+  if (!ta) return;
   const start = ta.selectionStart;
   const end = ta.selectionEnd;
   ta.value = ta.value.substring(0, start) + emoji + ta.value.substring(end);
   ta.focus();
   ta.selectionStart = ta.selectionEnd = start + emoji.length;
-  state.caption = ta.value;
+  // Route the write to the right overlay
+  if (ta.classList.contains('layer-textarea')) {
+    const id = ta.dataset.layerTextId;
+    const t = state._texts.find(x => x.id === id);
+    if (t) t.text = ta.value;
+  } else {
+    state.caption = ta.value;
+  }
+  // Re-render the layers list to keep the previews in sync
+  if (typeof renderTextLayers === 'function') renderTextLayers();
   schedulePreviewRender();
 }
 
@@ -7137,7 +7252,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.6.0';
+const APP_VERSION = '4.6.1';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -14062,28 +14177,41 @@ function saveCaptionTemplates(list) {
   try { localStorage.setItem(CAPTION_TEMPLATE_KEY, JSON.stringify(list)); } catch (e) {}
 }
 function snapshotCaptionState() {
+  // v4.6.1: full multi-overlay snapshot (deep-clone so future edits don't
+  // mutate the stored template). Old templates with legacy single-caption
+  // shape still load via the migration branch in applyCaptionTemplate.
   return {
-    caption:        state.caption,
-    fontIndex:      state.fontIndex,
-    captionSize:    state.captionSize,
-    bgOpacity:      state.bgOpacity,
-    captionStyle:   state.captionStyle,
-    textColor:      state.textColor,
-    outlineColor:   state.outlineColor,
-    outlineWidth:   state.outlineWidth,
-    outlineEnabled: state.outlineEnabled,
+    _texts: state._texts.map(t => ({ ...t, bounds: null })),  // strip transient bounds
+    _activeId: state._activeId,
   };
 }
 function applyCaptionTemplate(tpl) {
-  if (tpl.caption !== undefined)        state.caption = tpl.caption;
-  if (tpl.fontIndex !== undefined)      state.fontIndex = tpl.fontIndex;
-  if (tpl.captionSize !== undefined)    state.captionSize = tpl.captionSize;
-  if (tpl.bgOpacity !== undefined)      state.bgOpacity = tpl.bgOpacity;
-  if (tpl.captionStyle !== undefined)   state.captionStyle = tpl.captionStyle;
-  if (tpl.textColor !== undefined)      state.textColor = tpl.textColor;
-  if (tpl.outlineColor !== undefined)   state.outlineColor = tpl.outlineColor;
-  if (tpl.outlineWidth !== undefined)   state.outlineWidth = tpl.outlineWidth;
-  if (tpl.outlineEnabled !== undefined) state.outlineEnabled = tpl.outlineEnabled;
+  if (Array.isArray(tpl._texts)) {
+    // v4.6.1 template — replace all overlays
+    state._texts = tpl._texts.map(t => ({ ...t, id: t.id || ('tx_' + Math.random().toString(36).slice(2, 10)) }));
+    state._activeId = tpl._activeId || (state._texts[0]?.id || null);
+    // Ensure we have at least one overlay so the textarea has a write target
+    if (state._texts.length === 0) {
+      const o = createTextOverlay({ style: 'bar' });
+      state._texts.push(o);
+      state._activeId = o.id;
+    }
+  } else {
+    // Legacy template (pre-v4.6.1) — rehydrate into a single overlay
+    const o = createTextOverlay({
+      text:           tpl.caption          ?? '',
+      fontIndex:      tpl.fontIndex        ?? 0,
+      size:           tpl.captionSize      ?? 36,
+      bgOpacity:      tpl.bgOpacity        ?? 55,
+      style:          tpl.captionStyle     ?? 'bar',
+      color:          tpl.textColor        ?? '#ffffff',
+      outlineColor:   tpl.outlineColor     ?? '#000000',
+      outlineWidth:   tpl.outlineWidth     ?? 0,
+      outlineEnabled: tpl.outlineEnabled   ?? false,
+    });
+    state._texts = [o];
+    state._activeId = o.id;
+  }
   syncUIToState();
   schedulePreviewRender();
 }
@@ -14265,10 +14393,16 @@ function bindEvents() {
   });
 
   // Caption style segmented control: bar (Snapchat) / box (Reels) / plain
+  // v4.6.1: when textStyleLinked is on, the change applies to ALL overlays.
   document.querySelectorAll('#captionStyleSeg .seg-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const newStyle = btn.dataset.capStyle;
-      state.captionStyle = newStyle;
+      if (state._textStyleLinked) {
+        // Apply to every overlay
+        for (const t of state._texts) t.style = newStyle;
+      } else {
+        state.captionStyle = newStyle;
+      }
       document.querySelectorAll('#captionStyleSeg .seg-btn').forEach(b => b.classList.toggle('active', b === btn));
       // When switching to 'plain' (no background), text needs an outline to
       // stay readable on bright video. Auto-enable outline if it's currently
@@ -14285,10 +14419,31 @@ function bindEvents() {
         }
       }
       if (typeof renderScheduled !== 'undefined') renderScheduled = false;
+      if (typeof renderTextLayers === 'function') renderTextLayers();
       schedulePreviewRender();
       if (typeof updateBadges === 'function') updateBadges();
     });
   });
+
+  // v4.6.1: LINK toggle for text style — when on, style changes apply to all overlays
+  const styleLinkBtn = document.getElementById('textStyleLinkBtn');
+  if (styleLinkBtn) {
+    // Persisted preference (sticky across sessions like adjLinked in carousel)
+    state._textStyleLinked = (localStorage.getItem('snapcap_text_style_linked') === '1');
+    styleLinkBtn.classList.toggle('active', state._textStyleLinked);
+    styleLinkBtn.addEventListener('click', () => {
+      state._textStyleLinked = !state._textStyleLinked;
+      styleLinkBtn.classList.toggle('active', state._textStyleLinked);
+      try { localStorage.setItem('snapcap_text_style_linked', state._textStyleLinked ? '1' : '0'); } catch (e) {}
+      // When turning link ON, immediately conform all overlays to the active style
+      if (state._textStyleLinked) {
+        const styleNow = state.captionStyle;
+        for (const t of state._texts) t.style = styleNow;
+        if (typeof renderTextLayers === 'function') renderTextLayers();
+        schedulePreviewRender();
+      }
+    });
+  }
 
   document.getElementById('textColor').addEventListener('input', (e) => {
     state.textColor = e.target.value;
@@ -15113,6 +15268,27 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.6.1',
+    date: '2026-05-18',
+    title: 'Multi-text polish — link styles · per-layer textbox · wrap long text · templates fixed',
+    sections: [
+      { h: 'Per-layer inline textboxes', items: [
+        '✍ <b>Each text layer now has its own editable textbox + mini style picker right in the layer card</b> — no more clicking-to-focus-then-editing-in-the-big-textarea dance. Type into any layer\'s text input to update just that overlay. Click the inline BAR / BOX / PLAIN buttons inside each card to change just that overlay\'s style.',
+        'The legacy giant <code>#captionText</code> textarea hides automatically once there are inline cards — keeps the sidebar clean. Emoji picker now writes into whichever textarea is focused (any layer\'s) and updates only that overlay.',
+      ]},
+      { h: 'Link text style across layers', items: [
+        '🔗 New <b>LINK</b> toggle next to the BAR / BOX / PLAIN picker. When on, changing the style on ANY overlay changes it for ALL overlays at once. Pattern mirrors the carousel\'s filter-link / adj-link toggles. Persisted to localStorage so it sticks across sessions.',
+      ]},
+      { h: 'Long text now wraps to multi-line', items: [
+        '📐 If a single long token (URL, hashtag, joined word, or a really long word) was wider than the canvas, it used to overflow horizontally off the video. v4.6.1 force-breaks long tokens at the character level so they wrap to the next line instead of leaking out. Spaces still wrap on word boundaries first (so normal text reads naturally); character-level break only kicks in when a token alone exceeds the maxWidth.',
+      ]},
+      { h: 'Templates rebuilt for multi-text', items: [
+        '💾 <b>Caption templates now save and restore ALL overlays</b> — text + position + font + size + style + colors + outline + bg — not just the active one. Old (pre-v4.6) templates still load correctly via a migration shim that rehydrates a single-caption template into one overlay.',
+        '⬆ <b>Templates UI moved to the TOP of the CAPTION section</b>, above the layer list. Save/load is the first thing you see, no scrolling.',
+      ]},
+    ]
+  },
   {
     version: '4.6.0',
     date: '2026-05-11',
