@@ -5180,16 +5180,21 @@ async function bootstrapCloudPrefs() {
 // Render the caption layer onto a fresh transparent canvas at output resolution.
 // Returns a Blob (PNG) or null if there's no caption to render.
 async function renderCaptionOverlayToPng(w, h) {
-  if (!state.caption || !state.caption.trim()) return null;
+  // v4.6.3: check ALL overlays, not just the active one. The state.caption
+  // proxy returns only the focused overlay's text — if the active overlay is
+  // empty but other overlays have text, the old check returned null and the
+  // cloud render got NO text at all (textless export). Now: skip only when
+  // every single overlay is empty.
+  const hasAnyText = state._texts && state._texts.some(t => t.text && t.text.trim());
+  if (!hasAnyText) return null;
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const cx = c.getContext('2d');
   // Transparent background — only the caption + its bar should be drawn
   cx.clearRect(0, 0, w, h);
-  // renderCaption writes the bar fill (rgba(0,0,0,opacity)) and the text on top.
-  // For an overlay PNG we want the bar visible (so the user gets the same look)
-  // but everything OUTSIDE the bar to be transparent. The clearRect above
-  // already gives us that — renderCaption only paints inside the bar region.
+  // renderCaption iterates state._texts and paints each overlay independently
+  // at its own (x, y) position. The transparent canvas + only-paint-inside-bar
+  // behavior means everything outside the overlays stays alpha=0.
   await renderCaption(cx, w, h);
   return await new Promise(r => c.toBlob(r, 'image/png'));
 }
@@ -6984,7 +6989,9 @@ function setBadge(sectionId, count) {
 }
 
 function updateBadges() {
-  const captionCount = state.caption.length > 0 ? 1 : 0;
+  // v4.6.3: count ALL overlays with text, not just the active one. Otherwise
+  // the badge says "0" when overlay 1 has text and overlay 2 (active) is empty.
+  const captionCount = (state._texts || []).filter(t => t.text && t.text.trim()).length;
 
   const styleCount = [
     state.fontIndex !== 0,
@@ -7273,7 +7280,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.6.2';
+const APP_VERSION = '4.6.3';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -15328,6 +15335,24 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.6.3',
+    date: '2026-05-18',
+    title: 'Cloud export with multi-text — overlay PNG checks all layers',
+    sections: [
+      { h: 'The bug', items: [
+        '☁ <b>Cloud exports could come back without any text overlay</b> if the focused layer happened to be empty while other layers had text. The overlay-PNG builder was checking only <code>state.caption</code> (= active overlay\'s text via proxy). If active was empty, it returned null and skipped the overlay entirely → cloud rendered the source video clean with no captions baked on top.',
+        'Same root cause flavor as the v4.4.3 / v4.4.4 ICC saga: <code>state.caption</code> looks like a string but is now a multi-text proxy, and old single-caption code patterns no longer cover the full picture.',
+      ]},
+      { h: 'Fix', items: [
+        '🩹 <code>renderCaptionOverlayToPng()</code> now checks <code>state._texts.some(t => t.text)</code>. As long as ANY overlay has text, the PNG gets built. The renderer already iterates all overlays correctly (since v4.6.0) — only the early-exit guard was wrong.',
+        '🔢 <code>updateBadges()</code> for the CAPTION section badge also fixed — was counting only the active overlay (0 or 1), now counts every overlay with text. Multi-text projects show the correct layer count on the section header.',
+      ]},
+      { h: 'Cloud server (unchanged)', items: [
+        'No server-side changes needed. The cloud render pipeline (ffmpeg overlay filter) was already alpha-aware and handles whatever transparent PNG the client uploads. End-to-end test confirmed: multi-overlay PNG → cloud server → correctly composited on source video.',
+      ]},
+    ]
+  },
   {
     version: '4.6.2',
     date: '2026-05-18',
