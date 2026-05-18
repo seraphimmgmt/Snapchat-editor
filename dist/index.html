@@ -1024,7 +1024,7 @@
 <button class="seg-btn" data-cap-style="box" type="button" data-no-sfx title="Reels — rounded pill around text">BOX</button>
 <button class="seg-btn" data-cap-style="plain" type="button" data-no-sfx title="No background, just text + outline">PLAIN</button>
 </div>
-<button id="textStyleLinkBtn" class="none-toggle" type="button" data-no-sfx title="Link style across all text overlays — changing one changes them all" style="padding:4px 10px;font-size:9px;letter-spacing:.10em;">🔗 LINK</button>
+<button id="textStyleLinkBtn" class="none-toggle" type="button" data-no-sfx title="Link style + font + size + color + outline + bg across all text overlays — changing any of them changes them all (positions stay independent)" style="padding:4px 10px;font-size:9px;letter-spacing:.10em;">🔗 LINK</button>
 </div>
 <label><span>FONT</span><select id="fontSelect"></select></label>
 <label><span>SIZE</span><input type="range" id="captionSize" min="20" max="80" value="36"></label>
@@ -1929,11 +1929,26 @@ function removeTextOverlay(id) {
 }
 
 function setActiveText(id) {
-  if (state._texts.find(t => t.id === id)) {
-    state._activeId = id;
-    if (typeof syncUIToState === 'function') syncUIToState();
-    if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
-  }
+  if (!state._texts.find(t => t.id === id)) return;
+  if (state._activeId === id) return;  // no-op if already active
+  state._activeId = id;
+  // v4.6.2: surgical update. Don't call renderTextLayers (which would
+  // innerHTML-wipe the list and kill the textarea focus the user just
+  // clicked into). Just flip the .active class on existing rows and sync
+  // the TEXT STYLE / FILTERS / etc. sidebar controls.
+  document.querySelectorAll('#textLayersList .text-layer-row').forEach(r => {
+    r.classList.toggle('active', r.dataset.layerId === id);
+  });
+  if (typeof syncUIToState === 'function') syncUIToState();
+  if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
+}
+
+// v4.6.2: propagate a text-property change across ALL overlays when LINK is on.
+// Used by font / size / color / outline / bg-opacity handlers below so that
+// LINK affects more than just style.
+function applyToAllIfLinked(prop, value) {
+  if (!state._textStyleLinked) return;
+  for (const t of state._texts) t[prop] = value;
 }
 
 // === Legacy proxies — read/write the ACTIVE overlay's props ===
@@ -2060,11 +2075,13 @@ function renderTextLayers() {
         // Last overlay — just clear it instead of removing
         const t = state._texts[0];
         t.text = ''; t.style = 'bar'; t.x = 0.5; t.y = 0.5;
+        renderTextLayers();  // v4.6.2: explicit re-render (content changed)
         if (typeof syncUIToState === 'function') syncUIToState();
         if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
         return;
       }
       removeTextOverlay(id);
+      renderTextLayers();  // v4.6.2: explicit re-render (structure changed)
       if (typeof syncUIToState === 'function') syncUIToState();
       if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
     });
@@ -2561,6 +2578,8 @@ function applyEditorSnapshot(snap) {
   }
   if (snap.filters) state.filters = [...snap.filters];
   if (snap.filterStrengths) state.filterStrengths = { ...snap.filterStrengths };
+  // v4.6.2: snapshot restore changed overlay structure — explicit re-render
+  if (typeof renderTextLayers === 'function') renderTextLayers();
   if (typeof syncUIToState === 'function') syncUIToState();
   if (typeof renderEditorFilterChips === 'function') renderEditorFilterChips();
   schedulePreviewRender();
@@ -7124,8 +7143,10 @@ function syncUIToState() {
   if (xSlider) xSlider.value = Math.round((state.captionX ?? 0.5) * 100);
   if (ySlider) ySlider.value = Math.round((state.captionY ?? 0.5) * 100);
   if (xLabel) xLabel.style.display = (capStyleVal === 'bar') ? 'none' : '';
-  // v4.6: redraw the layer list to reflect any added/removed/renamed overlays
-  if (typeof renderTextLayers === 'function') renderTextLayers();
+  // v4.6.2: renderTextLayers REMOVED from here — it was destroying inline
+  // textarea focus mid-type. The layer list is only re-rendered when
+  // structure changes (add/remove/template apply/snapshot restore), not
+  // on every sync. Active-row highlight is handled inline in setActiveText.
 
   document.getElementById('saturation').value = state.saturation;
   document.getElementById('contrast').value = state.contrast;
@@ -7252,7 +7273,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.6.1';
+const APP_VERSION = '4.6.2';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -14212,6 +14233,8 @@ function applyCaptionTemplate(tpl) {
     state._texts = [o];
     state._activeId = o.id;
   }
+  // v4.6.2: template replaced overlay structure — explicit re-render needed
+  if (typeof renderTextLayers === 'function') renderTextLayers();
   syncUIToState();
   schedulePreviewRender();
 }
@@ -14320,13 +14343,21 @@ function bindEvents() {
   const captionTa = document.getElementById('captionText');
   captionTa.addEventListener('input', (e) => {
     state.caption = e.target.value;
-    if (typeof renderTextLayers === 'function') renderTextLayers();
+    // v4.6.2: surgical sync — update just the matching inline textarea's
+    // value (don't re-render whole list, that'd kill focus). The inline
+    // one is hidden when there are multi layers, so this only matters
+    // when the user has 1 overlay and the main textarea is visible.
+    const inline = document.querySelector(`.layer-textarea[data-layer-text-id="${state._activeId}"]`);
+    if (inline && inline !== document.activeElement && inline.value !== e.target.value) {
+      inline.value = e.target.value;
+    }
     schedulePreviewRender();
   });
   document.getElementById('clearCaptionBtn').addEventListener('click', () => {
     captionTa.value = '';
     state.caption = '';
-    if (typeof renderTextLayers === 'function') renderTextLayers();
+    const inline = document.querySelector(`.layer-textarea[data-layer-text-id="${state._activeId}"]`);
+    if (inline) inline.value = '';
     schedulePreviewRender();
   });
 
@@ -14341,10 +14372,17 @@ function bindEvents() {
       y: 0.5,
       bgOpacity: 70,
     });
+    // v4.6.2: renderTextLayers no longer auto-fires from syncUIToState, so
+    // call it explicitly here when the overlay STRUCTURE changes.
+    renderTextLayers();
     syncUIToState();
     schedulePreviewRender();
-    captionTa.focus();
-    captionTa.select();
+    // Focus the new layer's inline textarea (not the legacy main one — which
+    // is now hidden once we have 2+ layers). Select-all so the placeholder
+    // "Text N" is easy to overtype.
+    const newInline = document.querySelector(`.layer-textarea[data-layer-text-id="${state._activeId}"]`);
+    if (newInline) { newInline.focus(); newInline.select(); }
+    else { captionTa.focus(); captionTa.select(); }
   });
 
   // v4.6: free-position sliders
@@ -14373,21 +14411,19 @@ function bindEvents() {
 
   document.getElementById('fontSelect').addEventListener('change', (e) => {
     state.fontIndex = parseInt(e.target.value) || 0;
+    applyToAllIfLinked('fontIndex', state.fontIndex);  // v4.6.2: LINK
     schedulePreviewRender();
   });
 
   document.getElementById('captionSize').addEventListener('input', (e) => {
     state.captionSize = parseInt(e.target.value);
+    applyToAllIfLinked('size', state.captionSize);  // v4.6.2: LINK
     schedulePreviewRender();
   });
 
   document.getElementById('bgOpacity').addEventListener('input', (e) => {
     state.bgOpacity = parseInt(e.target.value);
-    // Force-clear the schedule debounce flag in case a previous render is
-    // mid-flight — without this, sliding bgOpacity sometimes left the preview
-    // showing stale bar opacity even though the export rendered correctly.
-    // The renderScheduled guard was protecting against duplicate rafs, but the
-    // side effect was that quick consecutive slider inputs got coalesced wrong.
+    applyToAllIfLinked('bgOpacity', state.bgOpacity);  // v4.6.2: LINK
     if (typeof renderScheduled !== 'undefined') renderScheduled = false;
     schedulePreviewRender();
   });
@@ -14435,10 +14471,24 @@ function bindEvents() {
       state._textStyleLinked = !state._textStyleLinked;
       styleLinkBtn.classList.toggle('active', state._textStyleLinked);
       try { localStorage.setItem('snapcap_text_style_linked', state._textStyleLinked ? '1' : '0'); } catch (e) {}
-      // When turning link ON, immediately conform all overlays to the active style
+      // v4.6.2: when turning link ON, immediately conform ALL overlays to the
+      // active overlay's full style (style + font + size + color + outline +
+      // bg). Positions (x, y) + text content stay independent.
       if (state._textStyleLinked) {
-        const styleNow = state.captionStyle;
-        for (const t of state._texts) t.style = styleNow;
+        const a = currentText();
+        if (a) {
+          for (const t of state._texts) {
+            if (t.id === a.id) continue;
+            t.style          = a.style;
+            t.fontIndex      = a.fontIndex;
+            t.size           = a.size;
+            t.color          = a.color;
+            t.outlineEnabled = a.outlineEnabled;
+            t.outlineWidth   = a.outlineWidth;
+            t.outlineColor   = a.outlineColor;
+            t.bgOpacity      = a.bgOpacity;
+          }
+        }
         if (typeof renderTextLayers === 'function') renderTextLayers();
         schedulePreviewRender();
       }
@@ -14447,12 +14497,15 @@ function bindEvents() {
 
   document.getElementById('textColor').addEventListener('input', (e) => {
     state.textColor = e.target.value;
+    applyToAllIfLinked('color', state.textColor);  // v4.6.2: LINK
     schedulePreviewRender();
   });
 
   document.getElementById('outlineColor').addEventListener('input', (e) => {
     state.outlineColor = e.target.value;
     if (state.outlineWidth > 0) state.outlineEnabled = true;
+    applyToAllIfLinked('outlineColor', state.outlineColor);  // v4.6.2: LINK
+    applyToAllIfLinked('outlineEnabled', state.outlineEnabled);
     document.getElementById('outlineToggle').classList.toggle('active', state.outlineEnabled);
     document.getElementById('outlineToggle').textContent = state.outlineEnabled ? 'ON' : 'NONE';
     schedulePreviewRender();
@@ -14460,6 +14513,8 @@ function bindEvents() {
   document.getElementById('outlineWidth').addEventListener('input', (e) => {
     state.outlineWidth = parseInt(e.target.value);
     state.outlineEnabled = state.outlineWidth > 0;
+    applyToAllIfLinked('outlineWidth', state.outlineWidth);  // v4.6.2: LINK
+    applyToAllIfLinked('outlineEnabled', state.outlineEnabled);
     document.getElementById('outlineToggle').classList.toggle('active', state.outlineEnabled);
     document.getElementById('outlineToggle').textContent = state.outlineEnabled ? 'ON' : 'NONE';
     schedulePreviewRender();
@@ -14470,6 +14525,8 @@ function bindEvents() {
       state.outlineWidth = 4;
       document.getElementById('outlineWidth').value = 4;
     }
+    applyToAllIfLinked('outlineEnabled', state.outlineEnabled);  // v4.6.2: LINK
+    applyToAllIfLinked('outlineWidth', state.outlineWidth);
     document.getElementById('outlineToggle').classList.toggle('active', state.outlineEnabled);
     document.getElementById('outlineToggle').textContent = state.outlineEnabled ? 'ON' : 'NONE';
     schedulePreviewRender();
@@ -14762,6 +14819,9 @@ async function init() {
   bindCarouselEvents();
   bindDriveEvents();
   bindCaptionTemplateEvents();
+  // v4.6.2: explicit first paint of the layer list now that syncUIToState
+  // no longer auto-fires it (that was destroying textarea focus mid-type).
+  if (typeof renderTextLayers === 'function') renderTextLayers();
   updateBadges();
   updateDestUI();
   updateHeaderMeta();
@@ -15268,6 +15328,22 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.6.2',
+    date: '2026-05-18',
+    title: 'Multi-text hotfix — typing in layer textboxes + LINK now covers all style props',
+    sections: [
+      { h: 'Typing fixed', items: [
+        '⌨ <b>You can now actually type in the per-layer textboxes.</b> v4.6.1 bug: focusing a layer textarea fired <code>setActiveText</code> → <code>syncUIToState</code> → <code>renderTextLayers</code>, which innerHTML-wiped the textarea you just focused, killing your cursor before the keystroke could land. Net effect: typing was impossible.',
+        '🩹 Fix: <code>renderTextLayers</code> only runs when overlay STRUCTURE changes (add / remove / template apply / snapshot restore). Focus changes just toggle the <code>.active</code> class on existing rows without rebuilding the DOM. Same-element keeps focus, cursor stays where you typed.',
+      ]},
+      { h: 'LINK now actually links everything', items: [
+        '🔗 v4.6.1 LINK only synced the BAR/BOX/PLAIN style across overlays. v4.6.2 LINK also syncs <b>font · size · color · outline (toggle + width + color) · bg opacity</b> — basically every visual property. Positions (x, y) and text content stay independent so multi-text remains meaningful.',
+        'When you turn LINK on, all overlays immediately conform to the focused overlay\'s style. Subsequent edits to any property propagate to all of them.',
+        'Updated tooltip: "Link style + font + size + color + outline + bg across all text overlays — changing any of them changes them all (positions stay independent)".',
+      ]},
+    ]
+  },
   {
     version: '4.6.1',
     date: '2026-05-18',
