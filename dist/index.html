@@ -203,6 +203,31 @@
   textarea#captionText{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:2px;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;resize:none;min-height:70px;transition:border-color .15s;outline:none;}
   textarea#captionText:focus{border-color:var(--accent);}
   .caption-row{display:flex;gap:8px;margin-top:10px;}
+
+  /* v4.6 — Multi-text overlay layer list */
+  .text-layers-list{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;}
+  .text-layer-row{
+    display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;
+    padding:6px 8px;border:1px solid var(--border);background:var(--surface-2);
+    border-radius:2px;font-family:'JetBrains Mono',monospace;font-size:11px;
+    color:var(--text-dim);cursor:pointer;transition:all .12s ease;user-select:none;
+  }
+  .text-layer-row:hover{border-color:var(--border-strong);color:var(--text);}
+  .text-layer-row.active{border-color:var(--accent);color:var(--text);background:var(--surface-3,var(--surface-2));box-shadow:0 0 0 1px var(--accent) inset;}
+  .text-layer-row .layer-num{font-size:9px;color:var(--text-faint);letter-spacing:.10em;font-weight:600;min-width:14px;}
+  .text-layer-row.active .layer-num{color:var(--accent);}
+  .text-layer-row .layer-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;}
+  .text-layer-row .layer-text:empty::before{content:'(empty)';color:var(--text-faint);font-style:italic;}
+  .text-layer-row .layer-style{font-size:8px;letter-spacing:.12em;color:var(--text-faint);background:rgba(0,0,0,.20);padding:2px 5px;border-radius:2px;text-transform:uppercase;}
+  .text-layer-row .layer-del{background:transparent;border:none;color:var(--text-faint);font-size:14px;line-height:1;padding:2px 5px;cursor:pointer;transition:color .12s;border-radius:2px;}
+  .text-layer-row .layer-del:hover{color:var(--red,#ff3b5c);background:rgba(255,59,92,.10);}
+  .add-text-btn{
+    width:100%;padding:8px 12px;margin-bottom:10px;
+    background:transparent;border:1px dashed var(--border-strong);color:var(--accent);
+    font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.10em;
+    cursor:pointer;border-radius:2px;text-transform:uppercase;transition:all .15s;
+  }
+  .add-text-btn:hover{border-color:var(--accent);background:rgba(123,44,191,.06);color:var(--accent);}
   .caption-row button{flex:1;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);border-radius:2px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;transition:all .15s;}
   .caption-row button:hover{border-color:var(--border-strong);color:var(--text);}
   .emoji-picker{margin-top:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:2px;overflow:hidden;}
@@ -936,6 +961,11 @@
 <div class="control-section" data-section-id="caption">
 <button class="section-header"><h3>CAPTION <span class="section-badge hidden">0</span></h3><span class="section-chevron">›</span></button>
 <div class="section-content">
+<!-- v4.6: multi-text overlay layer list. Each row = one overlay. Click to
+     select (binds the controls below). The "+ ADD TEXT" button at the bottom
+     creates a new free-positioned BOX-style text. -->
+<div id="textLayersList" class="text-layers-list"></div>
+<button id="addTextOverlayBtn" class="add-text-btn" type="button" data-no-sfx>+ ADD TEXT</button>
 <textarea id="captionText" placeholder="You better be good to me this year"></textarea>
 <div class="caption-row">
 <button id="emojiBtn">+ EMOJI</button>
@@ -975,6 +1005,11 @@
 <div class="color-row"><span>OUTLINE</span><div class="color-end"><button class="none-toggle" id="outlineToggle">NONE</button><div class="color-input-wrap"><input type="color" id="outlineColor" value="#000000"></div></div></div>
 <label><span>OUTLINE WIDTH</span><input type="range" id="outlineWidth" min="0" max="20" value="0"></label>
 <label><span>BG OPACITY</span><input type="range" id="bgOpacity" min="0" max="100" value="55"></label>
+<!-- v4.6: free-position sliders. X is hidden when the active overlay is in
+     BAR style (always centered). Y always available. Drag on canvas also
+     works and updates these sliders live. -->
+<label id="captionXLabel" style="display:none"><span>X POSITION</span><input type="range" id="captionX" min="0" max="100" value="50"></label>
+<label><span>Y POSITION</span><input type="range" id="captionY" min="0" max="100" value="50"></label>
 </div>
 </div>
 </div>
@@ -1769,15 +1804,31 @@ const EMOJI_CATEGORIES = [
 // ============================================================================
 // STATE
 // ============================================================================
+//
+// v4.6: multi-text overlay model. The editor used to support exactly ONE
+// caption — `state.caption`, `state.captionY`, `state.captionSize`, etc. —
+// rendered as a Snapchat-style bar at a fixed X (always centered, full
+// width). v4.6 introduces `state._texts[]`, an array of text overlay
+// objects; each overlay has independent text/position/font/size/color/style/
+// outline/bg. The previously-single `state.caption` and friends are now
+// PROXIES (Object.defineProperty getters/setters) that read/write the
+// currently-ACTIVE overlay's properties. This keeps the ~120 existing
+// references to `state.caption`, `state.captionY`, etc. working with zero
+// changes — they all just operate on the active overlay now.
+//
+// Renderer iterates `state._texts[]` and calls renderCaption() once per
+// overlay. Drag handler is generalized to detect WHICH overlay was hit
+// (via per-overlay `bounds`) and to drag in BOTH x and y for 'box'/'plain'
+// styles (the original 'bar' style stays full-width + y-only).
 const state = {
   mediaType: null, mediaElement: null, mediaWidth: 0, mediaHeight: 0,
-  caption: '', fontIndex: 0, captionSize: 36, bgOpacity: 55,
-  // captionStyle: 'bar' = full-width Snapchat bar (default, classic look),
-  //               'box' = rounded pill just around the text (Reels-style),
-  //               'plain' = no bar at all, just text (use outline for legibility).
-  captionStyle: 'bar',
-  textColor: '#ffffff', outlineColor: '#000000', outlineWidth: 0, outlineEnabled: false,
-  captionY: 0.5,
+  // === v4.6 multi-text overlay model ===
+  // _texts: array of overlay objects, each with own text/pos/font/style.
+  // _activeId: id of the focused overlay (its props are exposed via proxies
+  //            below as state.caption/captionY/fontIndex/etc.)
+  _texts: [],
+  _activeId: null,
+  // ======================================
   saturation: 100, contrast: 100, brightness: 100, warmth: 0, grain: 0, vignette: 0,
   // v4.2.23: filter chips ported from carousel. `filters` is an ordered list of
   // FILTER_LIBRARY ids that are stacked on top of the image. Each filter has a
@@ -1793,8 +1844,154 @@ const state = {
   // Persisted to localStorage so chatters set once and forget.
   exportMode: (typeof localStorage !== 'undefined' && localStorage.getItem('snapcap_export_mode')) || 'fast',
   exportRes: '1080', exportFps: 30, sourceFps: null, isExporting: false,
-  captionBounds: null, isDragging: false, dragOffsetY: 0,
+  isDragging: false, dragOffsetX: 0, dragOffsetY: 0,
 };
+
+// ============================================================================
+// MULTI-TEXT OVERLAY HELPERS (v4.6)
+// ============================================================================
+function createTextOverlay(props) {
+  return Object.assign({
+    id: 'tx_' + Math.random().toString(36).slice(2, 10),
+    text: '',
+    x: 0.5,                  // 0..1 normalized horizontal center
+    y: 0.5,                  // 0..1 normalized vertical center
+    fontIndex: 0,
+    size: 36,
+    color: '#ffffff',
+    style: 'bar',            // 'bar' | 'box' | 'plain'
+    outlineEnabled: false,
+    outlineWidth: 0,
+    outlineColor: '#000000',
+    bgOpacity: 55,
+    bounds: null,            // {x,y,w,h} — set by renderer for hit-testing
+  }, props || {});
+}
+
+function currentText() {
+  if (!state._activeId) return null;
+  return state._texts.find(t => t.id === state._activeId) || null;
+}
+
+function ensureActiveText() {
+  let t = currentText();
+  if (!t) {
+    t = createTextOverlay();
+    state._texts.push(t);
+    state._activeId = t.id;
+  }
+  return t;
+}
+
+function addTextOverlay(props) {
+  const t = createTextOverlay(props);
+  state._texts.push(t);
+  state._activeId = t.id;
+  return t;
+}
+
+function removeTextOverlay(id) {
+  const idx = state._texts.findIndex(t => t.id === id);
+  if (idx < 0) return;
+  state._texts.splice(idx, 1);
+  if (state._activeId === id) {
+    state._activeId = state._texts[0]?.id || null;
+  }
+}
+
+function setActiveText(id) {
+  if (state._texts.find(t => t.id === id)) {
+    state._activeId = id;
+    if (typeof syncUIToState === 'function') syncUIToState();
+    if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
+  }
+}
+
+// === Legacy proxies — read/write the ACTIVE overlay's props ===
+// All existing code that does `state.caption`, `state.captionSize`, etc. now
+// transparently operates on the focused text overlay. Writes auto-create an
+// overlay if none exists (so typing in the caption input creates the first
+// one without UI ceremony).
+function _defProxy(prop, overlayKey, defaultVal) {
+  Object.defineProperty(state, prop, {
+    get() {
+      const t = currentText();
+      return t ? t[overlayKey] : defaultVal;
+    },
+    set(v) {
+      // For caption text: don't create an empty overlay on read-time write of ''
+      if (overlayKey === 'text' && !v && !currentText()) return;
+      ensureActiveText()[overlayKey] = v;
+    },
+    enumerable: true,
+    configurable: true,
+  });
+}
+_defProxy('caption',        'text',           '');
+_defProxy('captionX',       'x',              0.5);
+_defProxy('captionY',       'y',              0.5);
+_defProxy('captionSize',    'size',           36);
+_defProxy('captionStyle',   'style',          'bar');
+_defProxy('textColor',      'color',          '#ffffff');
+_defProxy('outlineEnabled', 'outlineEnabled', false);
+_defProxy('outlineWidth',   'outlineWidth',   0);
+_defProxy('outlineColor',   'outlineColor',   '#000000');
+_defProxy('bgOpacity',      'bgOpacity',      55);
+_defProxy('fontIndex',      'fontIndex',      0);
+_defProxy('captionBounds',  'bounds',         null);
+
+// Bootstrap: ensure there's always at least one overlay so the legacy
+// caption input has somewhere to write on first paint.
+state._texts.push(createTextOverlay({ style: 'bar' }));
+state._activeId = state._texts[0].id;
+
+// Render the layers list in the sidebar. Called from syncUIToState() and
+// after ADD/DELETE actions. Each row: order index, text preview, style badge,
+// delete button. Clicking the row sets it active.
+function renderTextLayers() {
+  const wrap = document.getElementById('textLayersList');
+  if (!wrap) return;
+  // Hide the list entirely when there's only one overlay — keeps the sidebar
+  // clean for users who never touch multi-text. Becomes visible the moment
+  // they hit ADD TEXT.
+  if (state._texts.length <= 1) { wrap.innerHTML = ''; wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  wrap.innerHTML = state._texts.map((t, i) => {
+    const isActive = t.id === state._activeId;
+    const preview = (t.text || '').slice(0, 24).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+    return `<div class="text-layer-row${isActive ? ' active' : ''}" data-layer-id="${t.id}">
+      <span class="layer-num">${String(i+1).padStart(2,'0')}</span>
+      <span class="layer-text">${preview}</span>
+      <span class="layer-style">${t.style}</span>
+      <button class="layer-del" data-del-id="${t.id}" title="Delete layer">×</button>
+    </div>`;
+  }).join('');
+  wrap.querySelectorAll('.text-layer-row').forEach(row => {
+    row.addEventListener('click', (e) => {
+      // Don't fire if the delete button was the target
+      if (e.target.closest('.layer-del')) return;
+      setActiveText(row.dataset.layerId);
+    });
+  });
+  wrap.querySelectorAll('.layer-del').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.delId;
+      // Don't allow deleting the last remaining overlay — keep at least one
+      if (state._texts.length <= 1) {
+        // Instead clear its text and reset to bar style
+        const t = state._texts[0];
+        t.text = ''; t.style = 'bar'; t.x = 0.5; t.y = 0.5;
+        if (typeof syncUIToState === 'function') syncUIToState();
+        if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
+        return;
+      }
+      removeTextOverlay(id);
+      if (typeof syncUIToState === 'function') syncUIToState();
+      if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
+    });
+  });
+}
 
 const canvas = document.getElementById('previewCanvas');
 const ctx = canvas.getContext('2d');
@@ -1869,8 +2066,10 @@ async function ensureFontLoaded(family, size, weight) {
   } catch (e) {}
 }
 
-function buildFontString(size) {
-  const f = FONT_OPTIONS[state.fontIndex] || FONT_OPTIONS[0];
+function buildFontString(size, fontIdx) {
+  // v4.6: per-overlay fontIdx param (defaults to active overlay's via state.fontIndex proxy)
+  const idx = (fontIdx !== undefined && fontIdx !== null) ? fontIdx : state.fontIndex;
+  const f = FONT_OPTIONS[idx] || FONT_OPTIONS[0];
   return `${f.weight} ${size}px ${f.family}`;
 }
 
@@ -1912,18 +2111,32 @@ function getGrainPattern(size) {
 }
 
 // ============================================================================
-// CAPTION RENDERING
+// CAPTION RENDERING (v4.6: multi-overlay)
 // ============================================================================
+// renderCaption() — top-level entry. Iterates state._texts and renders each
+// overlay independently. Called from renderFrame / renderPreview.
 async function renderCaption(targetCtx, w, h) {
-  const text = state.caption;
-  if (!text) { state.captionBounds = null; return; }
+  if (!state._texts || state._texts.length === 0) return;
+  // Render in array order — later overlays paint on top of earlier ones.
+  for (const overlay of state._texts) {
+    await renderTextOverlay(targetCtx, w, h, overlay);
+  }
+}
 
-  const fontSize = Math.round(h * (state.captionSize / 1080));
+// renderTextOverlay() — paints ONE overlay. Position controlled by:
+//   - 'bar' style:   full canvas width, vertically positioned at overlay.y
+//   - 'box'/'plain': pill/text positioned at (overlay.x, overlay.y) center
+// Computed bounds stored on overlay.bounds for hit-testing (drag/select).
+async function renderTextOverlay(targetCtx, w, h, overlay) {
+  const text = overlay.text;
+  if (!text) { overlay.bounds = null; return; }
+
+  const fontSize = Math.round(h * (overlay.size / 1080));
   const padding = Math.round(fontSize * 0.5);
   const lineHeight = Math.round(fontSize * 1.4);
-  const fontStr = buildFontString(fontSize);
+  const fontStr = buildFontString(fontSize, overlay.fontIndex);
 
-  const fOpt = FONT_OPTIONS[state.fontIndex];
+  const fOpt = FONT_OPTIONS[overlay.fontIndex] || FONT_OPTIONS[0];
   await ensureFontLoaded(fOpt.family, fontSize, fOpt.weight);
 
   targetCtx.font = fontStr;
@@ -1943,50 +2156,67 @@ async function renderCaption(targetCtx, w, h) {
     }
   }
 
-  const maxWidth = w - padding * 4;
+  const captionStyle = overlay.style || 'bar';
+
+  // 'bar' wraps at full canvas width (minus padding); 'box'/'plain' wrap at
+  // a more comfortable 70% width so the pill doesn't get too long.
+  const maxWidth = captionStyle === 'bar' ? (w - padding * 4) : (w * 0.7);
   const lines = wrapSegments(measured, maxWidth, targetCtx);
   const totalHeight = lines.length * lineHeight + padding * 0.6 * 2;
 
-  // Clamp captionY so the bar stays fully on canvas
+  // Vertical position: clamp so the overlay stays on canvas
   const minY = totalHeight / 2 / h;
   const maxY = 1 - totalHeight / 2 / h;
-  const clampedY = Math.max(minY, Math.min(maxY, state.captionY));
+  const clampedY = Math.max(minY, Math.min(maxY, overlay.y));
   const yCenter = clampedY * h;
   const yTop = yCenter - totalHeight / 2;
 
-  // Draw bar — three styles:
-  //   'bar'   (Snapchat classic) = full-width fill across the canvas
-  //   'box'   (Reels-style)      = rounded pill around each text line, with padding
-  //   'plain' (no background)    = text only, no fill drawn
-  // Plain users typically need outline for legibility — the UI handler auto-
-  // enables outline when switching to 'plain' for the first time.
-  const barAlpha = state.bgOpacity / 100;
-  const captionStyle = state.captionStyle || 'bar';
+  // Horizontal position:
+  //   'bar' style is always full-width centered (x ignored)
+  //   'box'/'plain' use overlay.x as the centered position, clamped to keep
+  //                 the content on-canvas given its measured width
+  let xCenter, leftEdge, contentWidth;
+  if (captionStyle === 'bar') {
+    xCenter = w / 2;
+    leftEdge = 0;
+    contentWidth = w;
+  } else {
+    // Find widest line for clamping
+    const widest = lines.reduce((m, l) => Math.max(m, l.width), 0);
+    contentWidth = widest + padding * 1.1;  // include pill padding
+    const halfW = contentWidth / 2;
+    const minX = halfW / w;
+    const maxX = 1 - halfW / w;
+    const clampedX = Math.max(minX, Math.min(maxX, overlay.x));
+    xCenter = clampedX * w;
+    leftEdge = xCenter - halfW;
+  }
+
+  // Draw background — bar/box/plain handling
+  const barAlpha = overlay.bgOpacity / 100;
   if (barAlpha > 0 && captionStyle !== 'plain') {
     targetCtx.fillStyle = `rgba(0,0,0,${barAlpha})`;
     if (captionStyle === 'box') {
-      // Pill around each line (per-line so multi-line captions get separate pills)
       const pillPad = padding * 0.55;
       let lineY = yTop + padding * 0.6;
       const lineCornerR = lineHeight * 0.32;
       for (const line of lines) {
-        const startX = (w - line.width) / 2;
-        const pillX = startX - pillPad;
-        const pillY = lineY;
+        // Center each line's pill around xCenter
         const pillW = line.width + pillPad * 2;
+        const pillX = xCenter - pillW / 2;
+        const pillY = lineY;
         const pillH = lineHeight;
         if (typeof targetCtx.roundRect === 'function') {
           targetCtx.beginPath();
           targetCtx.roundRect(pillX, pillY, pillW, pillH, lineCornerR);
           targetCtx.fill();
         } else {
-          // Fallback for very old WebKit without roundRect — flat rect
           targetCtx.fillRect(pillX, pillY, pillW, pillH);
         }
         lineY += lineHeight;
       }
     } else {
-      // 'bar' — full-width Snapchat-style
+      // 'bar' — full-width Snapchat-style (always centered)
       targetCtx.fillRect(0, yTop, w, totalHeight);
     }
   }
@@ -1997,30 +2227,30 @@ async function renderCaption(targetCtx, w, h) {
 
   let lineY = yTop + padding * 0.6 + lineHeight / 2;
   for (const line of lines) {
-    const startX = (w - line.width) / 2;
+    const startX = xCenter - line.width / 2;
     let cursorX = startX;
     for (const seg of line.segments) {
       if (seg.type === 'text') {
-        if (state.outlineEnabled && state.outlineWidth > 0) {
+        if (overlay.outlineEnabled && overlay.outlineWidth > 0) {
           targetCtx.lineJoin = 'round';
           targetCtx.miterLimit = 2;
-          targetCtx.lineWidth = state.outlineWidth * (fontSize / 36);
-          targetCtx.strokeStyle = state.outlineColor;
+          targetCtx.lineWidth = overlay.outlineWidth * (fontSize / 36);
+          targetCtx.strokeStyle = overlay.outlineColor;
           targetCtx.strokeText(seg.value, cursorX, lineY);
         }
-        targetCtx.fillStyle = state.textColor;
+        targetCtx.fillStyle = overlay.color;
         targetCtx.fillText(seg.value, cursorX, lineY);
         cursorX += seg.width;
       } else if (seg.type === 'emoji' && seg.img) {
         targetCtx.drawImage(seg.img, cursorX, lineY - emojiSize / 2, emojiSize, emojiSize);
         cursorX += emojiSize;
       } else if (seg.type === 'emoji') {
-        if (state.outlineEnabled && state.outlineWidth > 0) {
-          targetCtx.strokeStyle = state.outlineColor;
-          targetCtx.lineWidth = state.outlineWidth * (fontSize / 36);
+        if (overlay.outlineEnabled && overlay.outlineWidth > 0) {
+          targetCtx.strokeStyle = overlay.outlineColor;
+          targetCtx.lineWidth = overlay.outlineWidth * (fontSize / 36);
           targetCtx.strokeText(seg.value, cursorX, lineY);
         }
-        targetCtx.fillStyle = state.textColor;
+        targetCtx.fillStyle = overlay.color;
         targetCtx.fillText(seg.value, cursorX, lineY);
         cursorX += seg.width;
       }
@@ -2028,7 +2258,13 @@ async function renderCaption(targetCtx, w, h) {
     lineY += lineHeight;
   }
 
-  state.captionBounds = { x: 0, y: yTop, w, h: totalHeight };
+  // Bounds for hit-testing — bar style spans full width, box/plain are tighter
+  overlay.bounds = {
+    x: leftEdge,
+    y: yTop,
+    w: contentWidth,
+    h: totalHeight,
+  };
 }
 
 function wrapSegments(measured, maxWidth, targetCtx) {
@@ -2180,16 +2416,10 @@ const editorHistory = { past: [], future: [], paused: false, last: null };
 
 function snapshotEditorState() {
   return {
-    caption: state.caption,
-    captionY: state.captionY,
-    fontIndex: state.fontIndex,
-    captionSize: state.captionSize,
-    bgOpacity: state.bgOpacity,
-    captionStyle: state.captionStyle,
-    textColor: state.textColor,
-    outlineColor: state.outlineColor,
-    outlineWidth: state.outlineWidth,
-    outlineEnabled: state.outlineEnabled,
+    // v4.6: serialize the full multi-overlay array (deep clone so undo
+    // doesn't replay mutated references). Active id stored separately.
+    _texts: state._texts.map(t => ({ ...t })),
+    _activeId: state._activeId,
     saturation: state.saturation,
     contrast: state.contrast,
     brightness: state.brightness,
@@ -2204,9 +2434,33 @@ function snapshotEditorState() {
 }
 
 function applyEditorSnapshot(snap) {
-  Object.assign(state, snap);
-  // Re-deserialize filter arrays/objects so subsequent edits don't mutate the
-  // history copy — Object.assign aliases the stored references.
+  // v4.6: handle both new (_texts[]) and legacy (caption + captionY + ...)
+  // snapshot shapes. Legacy from before v4.6 may still live in undo history
+  // or saved drafts; rehydrate into a single overlay.
+  if (Array.isArray(snap._texts)) {
+    state._texts = snap._texts.map(t => ({ ...t }));
+    state._activeId = snap._activeId || (state._texts[0]?.id || null);
+  } else if (snap.caption !== undefined || snap.captionY !== undefined) {
+    // Legacy single-caption snapshot
+    state._texts = [createTextOverlay({
+      text:           snap.caption           ?? '',
+      y:              snap.captionY          ?? 0.5,
+      x:              0.5,
+      fontIndex:      snap.fontIndex         ?? 0,
+      size:           snap.captionSize       ?? 36,
+      style:          snap.captionStyle      ?? 'bar',
+      color:          snap.textColor         ?? '#ffffff',
+      outlineEnabled: snap.outlineEnabled    ?? false,
+      outlineWidth:   snap.outlineWidth      ?? 0,
+      outlineColor:   snap.outlineColor      ?? '#000000',
+      bgOpacity:      snap.bgOpacity         ?? 55,
+    })];
+    state._activeId = state._texts[0].id;
+  }
+  // Non-text fields are still plain keys on state — just assign
+  for (const k of ['saturation','contrast','brightness','warmth','grain','vignette','mirror']) {
+    if (snap[k] !== undefined) state[k] = snap[k];
+  }
   if (snap.filters) state.filters = [...snap.filters];
   if (snap.filterStrengths) state.filterStrengths = { ...snap.filterStrengths };
   if (typeof syncUIToState === 'function') syncUIToState();
@@ -2887,19 +3141,42 @@ function getCanvasCoords(clientX, clientY) {
   return { x, y };
 }
 
-function isInsideCaption(x, y) {
-  const b = state.captionBounds;
-  if (!b) return false;
-  return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
+// v4.6: walk all overlays and return the one whose bounds contain (x,y).
+// Later overlays are on top, so we iterate in reverse for hit-priority.
+function hitTestOverlays(x, y) {
+  if (!state._texts) return null;
+  for (let i = state._texts.length - 1; i >= 0; i--) {
+    const o = state._texts[i];
+    const b = o.bounds;
+    if (!b) continue;
+    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) {
+      return o;
+    }
+  }
+  return null;
 }
 
 function setupCanvasDrag() {
+  // Track which overlay is being dragged (decoupled from state._activeId so
+  // clicking-without-selecting doesn't change focus). Active selection is set
+  // on pointerdown when an overlay is hit.
+  let dragOverlay = null;
+
   canvas.addEventListener('pointerdown', (e) => {
     if (!state.mediaElement) return;
     const { x, y } = getCanvasCoords(e.clientX, e.clientY);
-    if (isInsideCaption(x, y)) {
+    const hit = hitTestOverlays(x, y);
+    if (hit) {
+      // Select the overlay (refreshes sidebar to show its controls)
+      if (state._activeId !== hit.id) {
+        state._activeId = hit.id;
+        if (typeof syncUIToState === 'function') syncUIToState();
+      }
+      dragOverlay = hit;
       state.isDragging = true;
-      state.dragOffsetY = y - state.captionBounds.y;
+      // Record where in the bounds the pointer landed (top-left offset)
+      state.dragOffsetX = x - hit.bounds.x;
+      state.dragOffsetY = y - hit.bounds.y;
       canvas.classList.add('dragging');
       canvas.setPointerCapture?.(e.pointerId);
       e.preventDefault();
@@ -2909,20 +3186,28 @@ function setupCanvasDrag() {
   canvas.addEventListener('pointermove', (e) => {
     if (!state.mediaElement) return;
     const { x, y } = getCanvasCoords(e.clientX, e.clientY);
-    if (state.isDragging) {
-      const barH = state.captionBounds ? state.captionBounds.h : 100;
-      const targetCenter = y - state.dragOffsetY + barH / 2;
-      state.captionY = targetCenter / previewH;
+    if (state.isDragging && dragOverlay) {
+      const b = dragOverlay.bounds || { x: 0, y: 0, w: 100, h: 100 };
+      // Vertical drag — works for all styles
+      const yCenter = y - state.dragOffsetY + b.h / 2;
+      dragOverlay.y = yCenter / previewH;
+      // Horizontal drag — only meaningful for 'box'/'plain' (bar is always
+      // full width). Skip x update for 'bar' so dragging stays predictable.
+      if (dragOverlay.style !== 'bar') {
+        const xCenter = x - state.dragOffsetX + b.w / 2;
+        dragOverlay.x = xCenter / previewW;
+      }
       schedulePreviewRender();
       e.preventDefault();
     } else {
-      canvas.classList.toggle('draggable', isInsideCaption(x, y));
+      canvas.classList.toggle('draggable', !!hitTestOverlays(x, y));
     }
   });
 
   const endDrag = (e) => {
     if (state.isDragging) {
       state.isDragging = false;
+      dragOverlay = null;
       canvas.classList.remove('dragging');
       try { canvas.releasePointerCapture?.(e.pointerId); } catch (err) {}
     }
@@ -6717,6 +7002,15 @@ function syncUIToState() {
   document.querySelectorAll('#captionStyleSeg .seg-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.capStyle === capStyleVal);
   });
+  // v4.6: sync free-position X/Y sliders + show/hide X based on style
+  const xSlider = document.getElementById('captionX');
+  const ySlider = document.getElementById('captionY');
+  const xLabel = document.getElementById('captionXLabel');
+  if (xSlider) xSlider.value = Math.round((state.captionX ?? 0.5) * 100);
+  if (ySlider) ySlider.value = Math.round((state.captionY ?? 0.5) * 100);
+  if (xLabel) xLabel.style.display = (capStyleVal === 'bar') ? 'none' : '';
+  // v4.6: redraw the layer list to reflect any added/removed/renamed overlays
+  if (typeof renderTextLayers === 'function') renderTextLayers();
 
   document.getElementById('saturation').value = state.saturation;
   document.getElementById('contrast').value = state.contrast;
@@ -6843,7 +7137,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.5.1';
+const APP_VERSION = '4.6.0';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13898,11 +14192,42 @@ function bindEvents() {
   const captionTa = document.getElementById('captionText');
   captionTa.addEventListener('input', (e) => {
     state.caption = e.target.value;
+    if (typeof renderTextLayers === 'function') renderTextLayers();
     schedulePreviewRender();
   });
   document.getElementById('clearCaptionBtn').addEventListener('click', () => {
     captionTa.value = '';
     state.caption = '';
+    if (typeof renderTextLayers === 'function') renderTextLayers();
+    schedulePreviewRender();
+  });
+
+  // v4.6: ADD TEXT button — appends a new BOX-style overlay centered on canvas
+  const addTextBtn = document.getElementById('addTextOverlayBtn');
+  if (addTextBtn) addTextBtn.addEventListener('click', () => {
+    const n = (state._texts?.length || 0) + 1;
+    addTextOverlay({
+      text: 'Text ' + n,
+      style: 'box',
+      x: 0.5,
+      y: 0.5,
+      bgOpacity: 70,
+    });
+    syncUIToState();
+    schedulePreviewRender();
+    captionTa.focus();
+    captionTa.select();
+  });
+
+  // v4.6: free-position sliders
+  const xSlider = document.getElementById('captionX');
+  const ySlider = document.getElementById('captionY');
+  if (xSlider) xSlider.addEventListener('input', (e) => {
+    state.captionX = parseInt(e.target.value, 10) / 100;
+    schedulePreviewRender();
+  });
+  if (ySlider) ySlider.addEventListener('input', (e) => {
+    state.captionY = parseInt(e.target.value, 10) / 100;
     schedulePreviewRender();
   });
 
@@ -14788,6 +15113,28 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.6.0',
+    date: '2026-05-11',
+    title: 'Multi-text overlays + free positioning',
+    sections: [
+      { h: 'The big one', items: [
+        '✍ <b>Add as many text overlays as you want.</b> Hit the new <b>+ ADD TEXT</b> button at the top of the CAPTION section. Each overlay is independent — its own text, font, size, color, outline, background style. Reels / Story / Snap workflows that need multiple captions, watermarks, brand marks, etc. now work in one shot.',
+        '🎯 <b>Free-position each overlay anywhere on the canvas.</b> Click + drag the text on the preview to move it. New BAR/BOX/PLAIN style modes: BAR (Snapchat — full width, y-only drag, default), BOX (Reels — rounded pill, drag x+y freely), PLAIN (text only, drag freely). Style picker per overlay.',
+      ]},
+      { h: 'New controls', items: [
+        '🪜 <b>Layers list</b> appears in the CAPTION section as soon as you have 2+ overlays. Click a row to focus that overlay; click × to delete. Active overlay is highlighted with a violet outline. The rest of the TEXT STYLE controls (font, size, color, outline, bg) bind to whatever overlay is focused.',
+        '📐 <b>X POSITION + Y POSITION sliders</b> at the bottom of TEXT STYLE. Dragging on canvas updates them live, and vice versa. X is hidden for BAR style (always centered, full-width). For new overlays the default style is BOX so x+y both work out of the box.',
+      ]},
+      { h: 'How it works under the hood (for the curious)', items: [
+        'New state shape: <code>state._texts[]</code> is an array of overlay objects. <code>state._activeId</code> tracks which one is focused. The legacy properties (<code>state.caption</code>, <code>state.captionY</code>, <code>state.captionSize</code>, etc.) are now <code>Object.defineProperty</code> getter/setter proxies onto the active overlay — so every existing piece of UI code (font picker, size slider, color input, snapshot/restore, presets, undo/redo) keeps working with zero changes. Writes to those props transparently mutate the focused overlay. Reads return the focused overlay\'s property. Net: a ~130-line addition refactors the data model + renderer + drag, and the other ~120 existing references just route through the proxies untouched.',
+        'Migration is automatic. Loading an old snapshot or undo entry that has <code>caption: "..."</code> (the pre-v4.6 shape) rehydrates into a single overlay with those properties. No data loss, no toggle.',
+      ]},
+      { h: 'What\'s NOT in v4.6.0 (next minor)', items: [
+        '⏳ Per-text rotation, text templates ("Reels caption" / "Story sticker" / "Snap bar" presets), per-text shadow + glow, animation on video export, curved text. All flagged for v4.6.1+. v4.6.0 is the MVP — get the data model + free positioning live so we can iterate on flair.',
+      ]},
+    ]
+  },
   {
     version: '4.5.1',
     date: '2026-05-11',
