@@ -1,0 +1,133 @@
+name: Refresh iOS / iPhone version pool
+
+# Keeps dist/index.html's IPHONE_DEVICE_POOL in sync with the latest iOS
+# releases per supported iPhone, scraped from AppleDB. Runs twice a week so
+# new iOS point releases (typical cadence: 2-4 weeks) show up within a few
+# days, but not so often that we flood the PR list.
+#
+# Manual trigger:  gh workflow run refresh-ios-pool.yml
+# Or via UI:       Actions → Refresh iOS / iPhone version pool → Run workflow
+
+on:
+  schedule:
+    # Mondays + Thursdays at 09:00 UTC (05:00 ET / 02:00 PT). Early enough
+    # in the day that a Monday-morning iOS release reaches the pool by
+    # Tuesday at the latest.
+    - cron: '0 9 * * MON,THU'
+  workflow_dispatch:
+    inputs:
+      open_pr:
+        description: 'Open a PR even if no changes are detected (smoke test)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write       # commit the regenerated dist/index.html + audit log
+  pull-requests: write  # open the PR
+  issues: write         # file an issue if AppleDB schema breaks
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # We push a branch + open a PR. Default GITHUB_TOKEN is fine for
+          # both because permissions: above grant write.
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run refresher (writes pool + audit log)
+        id: refresh
+        run: |
+          set -e
+          python3 scripts/refresh-ios-pool.py --output-summary /tmp/pr-body.md
+          # The script writes `changes=true|false` to $GITHUB_OUTPUT itself.
+          # If `open_pr` input is true, force changes=true so the smoke-test
+          # path still opens a PR.
+          if [ "${{ github.event.inputs.open_pr }}" = "true" ]; then
+            echo "force_pr=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open issue on script failure
+        if: failure() && steps.refresh.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date().toISOString().slice(0, 10);
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[autobot] refresh-ios-pool failed — ${today}`,
+              body: [
+                "The iPhone/iOS pool refresher (`scripts/refresh-ios-pool.py`) failed.",
+                "",
+                "Likely cause: AppleDB endpoint changed shape, or network/HTTP error.",
+                "",
+                `[Failed run](${process.env.GITHUB_SERVER_URL}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+                "",
+                "The pool was NOT updated. Fix the scraper before next scheduled run.",
+              ].join("\n"),
+              labels: ["autobot", "broken"],
+            });
+
+      - name: Check for changes
+        id: diff
+        if: steps.refresh.outcome == 'success'
+        run: |
+          if git diff --quiet dist/index.html scripts/last-refresh.json; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create PR branch + commit
+        if: steps.diff.outputs.has_changes == 'true' || steps.refresh.outputs.force_pr == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TODAY=$(date -u +%Y-%m-%d)
+          BRANCH="autobot/refresh-ios-pool-${TODAY}"
+
+          # Configure git as the autobot identity. Using github-actions[bot]'s
+          # known email lets the commit show up with the bot avatar in the UI.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Clean checkout of a new branch from current HEAD
+          git checkout -b "$BRANCH"
+          git add dist/index.html scripts/last-refresh.json
+
+          git commit -m "chore(injector): refresh iPhone/iOS pool — ${TODAY}
+
+          Automated update from AppleDB.
+
+          See PR body for the model/iOS diff. Manual review required before merge.
+
+          [autobot]"
+
+          git push -u origin "$BRANCH"
+
+          # If a PR already exists for this branch (re-run on same day), reuse it
+          if gh pr view "$BRANCH" --json url --jq .url 2>/dev/null; then
+            echo "PR already exists for $BRANCH"
+            exit 0
+          fi
+
+          # Open the PR. Body comes from the script's --output-summary file.
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore(injector): refresh iPhone/iOS pool — ${TODAY}" \
+            --body-file /tmp/pr-body.md \
+            --label "autobot"
+
+      - name: No changes — exit clean
+        if: steps.diff.outputs.has_changes == 'false' && steps.refresh.outputs.force_pr != 'true'
+        run: echo "Pool is already up to date — nothing to commit."
