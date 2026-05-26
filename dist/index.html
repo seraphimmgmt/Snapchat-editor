@@ -898,6 +898,18 @@
   .diff-empty{padding:30px 24px;text-align:center;color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.05em;}
   .diff-empty strong{color:var(--green);font-weight:700;}
 
+  /* === v4.6.5: AI provenance / C2PA detection banner === */
+  /* Banner sits inside the metadata table as a cell spanning ONE file column —
+     so multi-file comparison only flags the columns that actually have C2PA. */
+  .ai-banner-row td{padding:0 !important;background:transparent !important;}
+  .ai-banner-row td.ai-banner-blank{background:rgba(0,0,0,.15) !important;}
+  .ai-banner{display:block;background:#FFCC00;color:#1A1408;padding:10px 14px;border-left:4px solid #FF9500;font-family:'JetBrains Mono',monospace;text-align:left;cursor:help;}
+  .ai-banner .ai-banner-title{font-family:'Antonio',sans-serif;font-weight:700;font-size:13px;letter-spacing:.14em;text-transform:uppercase;display:flex;align-items:center;gap:6px;line-height:1.2;}
+  .ai-banner .ai-banner-title .ai-banner-emoji{font-size:16px;filter:saturate(1.2);}
+  .ai-banner .ai-banner-subtitle{font-size:10px;letter-spacing:.04em;margin-top:4px;color:#3A2A08;line-height:1.4;}
+  .ai-banner-summary{margin:0 0 12px;padding:10px 14px;background:#FFCC00;color:#1A1408;border-left:4px solid #FF9500;border-radius:0 2px 2px 0;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:help;}
+  .ai-banner-summary b{font-family:'Antonio',sans-serif;letter-spacing:.14em;}
+
   /* === V3.3: Filename template === */
   .filename-input{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:2px;font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;transition:border-color .15s;letter-spacing:.02em;}
   .filename-input:focus{border-color:var(--accent);}
@@ -3650,7 +3662,7 @@ function generateIphoneFilename(extUpper) {
   return `IMG_${num}.${extUpper}`;
 }
 
-// Plausible iPhone 17 Pro Max EXIF — main camera, randomized exposure values
+// Plausible iPhone EXIF — main camera, randomized exposure values.
 // Numeric tag IDs for fields piexifjs 1.0.6 is missing. We extend its
 // internal TAGS lookup at runtime so dump() can serialize them.
 // (Without this, exif[piexif.ExifIFD.OffsetTime] = ... silently sets a key
@@ -3662,6 +3674,141 @@ const APPLE_TAG_IDS = {
   CompositeImage:       42080, // 0xA460
 };
 
+// ============================================================================
+// IPHONE DEVICE POOL — current + previous 3 generations of Pro/Pro Max bodies.
+// Updated automatically by .github/workflows/refresh-ios-pool.yml every Mon/Thu.
+// Last refreshed: 2026-05-25. To force a refresh: gh workflow run refresh-ios-pool.yml
+//
+// Each entry models ONE iPhone identity. buildIphoneExif and buildIphoneUdta
+// pull every device-specific EXIF / QuickTime atom from this single pool so a
+// scrape-and-rewrite job (the workflow above) can update them as Apple ships
+// new iOS versions / hardware without surgery on the injector functions.
+//
+// Field meanings:
+//   model           → EXIF IFD0.Model + IFD0.HostComputer + QT com.apple.quicktime.model
+//   software        → EXIF IFD0.Software (iOS version, e.g. "26.4.2")
+//   qtSoftware      → QuickTime com.apple.quicktime.software (numeric e.g. "19.2",
+//                     iOS QT atoms historically use the build/internal version)
+//   lensModel       → EXIF Exif.LensModel (e.g. "iPhone 17 Pro Max back triple camera 6.765mm f/1.78")
+//   lensSpec        → EXIF Exif.LensSpecification [[minF],[maxF],[minA],[maxA]] as rationals
+//   focalLength     → EXIF Exif.FocalLength (rational, mm of main lens at 1×)
+//   focalLength35mm → EXIF Exif.FocalLengthIn35mmFilm (number, 35mm-equivalent)
+//   fNumber         → EXIF Exif.FNumber (rational, main lens widest aperture)
+//   apertureValue   → EXIF Exif.ApertureValue (rational APEX, ≈ 2·log2(fNumber))
+//
+// If you edit this manually, keep entries newest-first. The refresher script
+// preserves that order.
+// ============================================================================
+const IPHONE_DEVICE_POOL = [
+  {
+    model: 'iPhone 17 Pro Max',
+    software: '26.4.2',
+    qtSoftware: '19.2',
+    lensModel: 'iPhone 17 Pro Max back triple camera 6.765mm f/1.78',
+    lensSpec: [[222,100],[16890625,1000000],[178,100],[2798828125,1000000000]],
+    focalLength: [676, 100],
+    focalLength35mm: 24,
+    fNumber: [178, 100],
+    apertureValue: [167, 100],
+  },
+  {
+    model: 'iPhone 17 Pro',
+    software: '26.4.2',
+    qtSoftware: '19.2',
+    lensModel: 'iPhone 17 Pro back triple camera 6.765mm f/1.78',
+    lensSpec: [[222,100],[16890625,1000000],[178,100],[2798828125,1000000000]],
+    focalLength: [676, 100],
+    focalLength35mm: 24,
+    fNumber: [178, 100],
+    apertureValue: [167, 100],
+  },
+  {
+    model: 'iPhone 17',
+    software: '26.4.2',
+    qtSoftware: '19.2',
+    lensModel: 'iPhone 17 back dual camera 5.96mm f/1.6',
+    lensSpec: [[159,100],[596,100],[16,10],[24,10]],
+    focalLength: [596, 100],
+    focalLength35mm: 26,
+    fNumber: [16, 10],
+    apertureValue: [136, 100],
+  },
+  {
+    model: 'iPhone 16 Pro Max',
+    software: '18.3.2',
+    qtSoftware: '18.3',
+    lensModel: 'iPhone 16 Pro Max back triple camera 6.765mm f/1.78',
+    lensSpec: [[222,100],[16890625,1000000],[178,100],[2798828125,1000000000]],
+    focalLength: [676, 100],
+    focalLength35mm: 24,
+    fNumber: [178, 100],
+    apertureValue: [167, 100],
+  },
+  {
+    model: 'iPhone 16 Pro',
+    software: '18.3.2',
+    qtSoftware: '18.3',
+    lensModel: 'iPhone 16 Pro back triple camera 6.765mm f/1.78',
+    lensSpec: [[222,100],[16890625,1000000],[178,100],[2798828125,1000000000]],
+    focalLength: [676, 100],
+    focalLength35mm: 24,
+    fNumber: [178, 100],
+    apertureValue: [167, 100],
+  },
+  {
+    model: 'iPhone 16',
+    software: '18.3.2',
+    qtSoftware: '18.3',
+    lensModel: 'iPhone 16 back dual camera 5.96mm f/1.6',
+    lensSpec: [[159,100],[596,100],[16,10],[24,10]],
+    focalLength: [596, 100],
+    focalLength35mm: 26,
+    fNumber: [16, 10],
+    apertureValue: [136, 100],
+  },
+  {
+    model: 'iPhone 15 Pro Max',
+    software: '17.6.1',
+    qtSoftware: '17.6',
+    lensModel: 'iPhone 15 Pro Max back triple camera 6.86mm f/1.78',
+    lensSpec: [[222,100],[1715,100],[178,100],[28,10]],
+    focalLength: [686, 100],
+    focalLength35mm: 24,
+    fNumber: [178, 100],
+    apertureValue: [167, 100],
+  },
+  {
+    model: 'iPhone 15 Pro',
+    software: '17.6.1',
+    qtSoftware: '17.6',
+    lensModel: 'iPhone 15 Pro back triple camera 6.86mm f/1.78',
+    lensSpec: [[222,100],[686,100],[178,100],[28,10]],
+    focalLength: [686, 100],
+    focalLength35mm: 24,
+    fNumber: [178, 100],
+    apertureValue: [167, 100],
+  },
+  {
+    model: 'iPhone 14 Pro Max',
+    software: '16.7.10',
+    qtSoftware: '16.7',
+    lensModel: 'iPhone 14 Pro Max back triple camera 6.86mm f/1.78',
+    lensSpec: [[222,100],[686,100],[178,100],[28,10]],
+    focalLength: [686, 100],
+    focalLength35mm: 24,
+    fNumber: [178, 100],
+    apertureValue: [167, 100],
+  },
+];
+
+// Pick a random device from the pool. EXIF / QuickTime builders use this as
+// the default identity when no explicit device is passed. Per-export the
+// caller may pin one device (e.g. carousel burst should be consistent across
+// all images) by selecting once and passing the result to every build call.
+function pickIphoneDevice() {
+  return IPHONE_DEVICE_POOL[Math.floor(Math.random() * IPHONE_DEVICE_POOL.length)];
+}
+
 function ensurePiexifAppleTags() {
   if (typeof piexif === 'undefined' || !piexif.TAGS || !piexif.TAGS.Exif) return;
   if (piexif.TAGS.Exif._appleExtended) return; // idempotent
@@ -3672,9 +3819,13 @@ function ensurePiexifAppleTags() {
   piexif.TAGS.Exif._appleExtended = true;
 }
 
-function buildIphoneExif(width, height, captureDateOverride) {
+function buildIphoneExif(width, height, captureDateOverride, deviceOverride) {
   if (typeof piexif === 'undefined') return null;
   ensurePiexifAppleTags();
+
+  // Device identity. Caller may pin a device (e.g. carousel burst must use
+  // ONE iPhone across all images). Otherwise pick at random from the pool.
+  const device = deviceOverride || pickIphoneDevice();
 
   const now = new Date();
   // If caller passed a date (e.g. carousel render sequencing), use it.
@@ -3704,15 +3855,15 @@ function buildIphoneExif(width, height, captureDateOverride) {
 
   // ===== IFD0 =====
   zeroth[piexif.ImageIFD.Make] = 'Apple';
-  zeroth[piexif.ImageIFD.Model] = 'iPhone 17 Pro Max';
-  zeroth[piexif.ImageIFD.Software] = '26.4.2';
+  zeroth[piexif.ImageIFD.Model] = device.model;
+  zeroth[piexif.ImageIFD.Software] = device.software;
   zeroth[piexif.ImageIFD.DateTime] = exifDate;
   zeroth[piexif.ImageIFD.XResolution] = [72, 1];
   zeroth[piexif.ImageIFD.YResolution] = [72, 1];
   zeroth[piexif.ImageIFD.ResolutionUnit] = 2;
   zeroth[piexif.ImageIFD.Orientation] = 1;
   zeroth[piexif.ImageIFD.YCbCrPositioning] = 1;
-  zeroth[piexif.ImageIFD.HostComputer] = 'iPhone 17 Pro Max';
+  zeroth[piexif.ImageIFD.HostComputer] = device.model;
 
   // ===== Exif IFD =====
   // Version markers — real iPhone 17 / iOS 18+ uses ExifVersion 0232
@@ -7280,7 +7431,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.6.3';
+const APP_VERSION = '4.6.5';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13925,7 +14076,201 @@ async function extractMetadata(file) {
     } catch (e) {}
   }
 
+  // v4.6.5: bundled exiftool pass — exifr (above) doesn't surface JUMBF / CBOR
+  // / XMP-c2pa groups, which is exactly where C2PA / AI provenance lives. We
+  // run the same exiftool the injector uses with -G1 -a -s -ee (extract
+  // embedded) + LargeFileSupport, then filter for c2pa-shaped groups and
+  // synthesize an "AI PROVENANCE (C2PA)" group. Hidden entirely if no signals
+  // — keeps the table clean for normal photos. Order inserted between IPTC
+  // and XMP by walking the existing groups (we just put it after IPTC if
+  // present, otherwise after EXIF, otherwise at the front).
+  try {
+    const aiGroup = await readC2paViaExiftool(file);
+    if (aiGroup && Object.keys(aiGroup).length) {
+      // Insert into meta in a sensible order: after IPTC / EXIF if present
+      const target = 'AI PROVENANCE (C2PA)';
+      const keys = Object.keys(meta);
+      const after = keys.lastIndexOf('IPTC') >= 0 ? 'IPTC'
+                  : keys.lastIndexOf('EXIF') >= 0 ? 'EXIF'
+                  : null;
+      const reordered = {};
+      let inserted = false;
+      for (const k of keys) {
+        reordered[k] = meta[k];
+        if (!inserted && k === after) {
+          reordered[target] = aiGroup;
+          inserted = true;
+        }
+      }
+      if (!inserted) reordered[target] = aiGroup;
+      // mutate meta in place to preserve reference semantics for callers
+      for (const k of Object.keys(meta)) delete meta[k];
+      Object.assign(meta, reordered);
+    }
+  } catch (e) {
+    console.warn('[inspector] exiftool C2PA pass failed:', e);
+  }
+
   return meta;
+}
+
+// v4.6.5: Spawn bundled exiftool, dump JUMBF / CBOR / XMP-c2pa groups.
+// Returns { fieldName: stringValue } object, or null if nothing relevant.
+// Skips silently if exiftool sidecar isn't reachable (Windows w/o bundle, etc).
+async function readC2paViaExiftool(file) {
+  if (!window.__TAURI__?.core?.invoke) return null;
+  const { invoke } = window.__TAURI__.core;
+  // Write the dropped File to a sandbox temp path so exiftool can read it.
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  // Bytes need to be a plain array for Tauri JSON IPC.
+  let tmpPath;
+  try {
+    tmpPath = await invoke('save_temp_file', {
+      name: file.name || 'inspector_input',
+      bytes: Array.from(bytes),
+    });
+  } catch (e) {
+    console.warn('[inspector] save_temp_file failed:', e);
+    return null;
+  }
+
+  let stdout = '';
+  try {
+    stdout = await invoke('exiftool_run', {
+      // -G1: tag groups (e.g. [JUMBF], [CBOR], [XMP-c2pa])
+      // -a:  allow duplicate tags (CBOR has many "Item0" entries etc)
+      // -s:  short tag names (no descriptions)
+      // -ee: extract embedded metadata (drills into JUMBF nested boxes)
+      // -api LargeFileSupport=1: allow files >4GB
+      // -api StructFormat=JSON would be nice but we keep tab format for
+      // back-compat with the rest of the codebase.
+      args: ['-G1', '-a', '-s', '-ee', '-api', 'LargeFileSupport=1'],
+      filePath: tmpPath,
+    });
+  } catch (e) {
+    console.warn('[inspector] exiftool_run failed:', e);
+  } finally {
+    // Best-effort cleanup; if it fails the temp dir gets reused/cleared later.
+    try { await invoke('delete_temp_file', { path: tmpPath }); } catch (e) {}
+  }
+  if (!stdout) return null;
+  return parseExiftoolC2paOutput(stdout);
+}
+
+// Parses the line-based exiftool -G1 -a -s output and pulls JUMBF / CBOR /
+// XMP-c2pa fields plus any tag whose value contains C2PA / SynthID markers.
+// Returns the AI PROVENANCE group as a flat { field: value } dict (suitable
+// for the inspector table). Order preserved by insertion. Multi-value fields
+// (e.g. duplicate JUMDLabel) get suffixed " (2)", " (3)" so they don't
+// collide.
+function parseExiftoolC2paOutput(stdout) {
+  const out = {};
+  const seen = {};
+  const lines = stdout.split(/\r?\n/);
+  // Pattern: [GROUP] Tag : Value      (group right-padded, tag right-padded)
+  const re = /^\[([A-Za-z0-9_\-]+)\]\s+([A-Za-z0-9_\-]+)\s*:\s*(.*)$/;
+  for (const line of lines) {
+    const m = line.match(re);
+    if (!m) continue;
+    const group = m[1];
+    const tag = m[2];
+    const value = m[3].trim();
+    const isC2paGroup = group === 'JUMBF' || group === 'CBOR'
+                      || /^XMP-c2pa$/i.test(group) || /^c2pa/i.test(group);
+    // Also pull XMP rows that happen to mention C2PA/SynthID even when the
+    // group label isn't c2pa — these are rare but worth surfacing.
+    const valueLooksAi = /c2pa|synthid|generative ai|trainedAlgorithmicMedia/i.test(value);
+    if (!isC2paGroup && !valueLooksAi) continue;
+    const label = `[${group}] ${tag}`;
+    seen[label] = (seen[label] || 0) + 1;
+    const key = seen[label] > 1 ? `${label} (${seen[label]})` : label;
+    out[key] = value;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+// v4.6.5: Heuristic detector — given a fully-built metadata object, returns an
+// array of { signal, detail } pairs describing why this file is flagged as AI.
+// Empty array → no flag, no banner. Multiple signals → all listed in subtitle.
+function detectAiSignals(meta) {
+  if (!meta) return [];
+  const signals = [];
+  const aiGroup = meta['AI PROVENANCE (C2PA)'];
+  const contentCreds = meta['CONTENT CREDENTIALS (C2PA)'];
+
+  // Signal: explicit C2PA JUMBF chain present (from exiftool pass)
+  if (aiGroup) {
+    const jumdLabels = Object.entries(aiGroup)
+      .filter(([k, v]) => /JUMDLabel/i.test(k) && /^c2pa/i.test(v))
+      .map(([k, v]) => v);
+    if (jumdLabels.length) {
+      signals.push({
+        signal: 'C2PA chain present',
+        detail: `${jumdLabels.length} JUMBF boxes (c2pa.signature, c2pa.assertions, ...)`,
+      });
+    }
+    // Signal: trainedAlgorithmicMedia in DigitalSourceType
+    const trained = Object.entries(aiGroup)
+      .filter(([k, v]) => /trainedAlgorithmicMedia/i.test(String(v)));
+    if (trained.length) {
+      signals.push({
+        signal: 'IPTC trainedAlgorithmicMedia',
+        detail: 'DigitalSourceType claims AI generation',
+      });
+    }
+    // Signal: SynthID watermark assertion
+    const synthid = Object.entries(aiGroup)
+      .filter(([k, v]) => /SynthID/i.test(String(v)));
+    if (synthid.length) {
+      signals.push({
+        signal: 'SynthID watermark assertion',
+        detail: 'Pixel-level watermark likely embedded',
+      });
+    }
+    // Signal: c2pa.created / c2pa.actions in Actions
+    const actions = Object.entries(aiGroup)
+      .filter(([k, v]) => /c2pa\.(created|actions)/i.test(String(v)));
+    if (actions.length && !signals.find(s => s.signal === 'C2PA chain present')) {
+      signals.push({
+        signal: 'c2pa.actions present',
+        detail: 'c2pa.created or c2pa.actions assertion found',
+      });
+    }
+    // Signal: Generative AI in description
+    const genai = Object.entries(aiGroup)
+      .filter(([k, v]) => /generative ai/i.test(String(v)));
+    if (genai.length) {
+      signals.push({
+        signal: 'Generative AI description',
+        detail: 'Actions description mentions Generative AI',
+      });
+    }
+    // Signal: Claim_Generator_InfoName
+    const generator = Object.entries(aiGroup)
+      .find(([k, v]) => /Claim_Generator_InfoName/i.test(k));
+    if (generator) {
+      signals.push({
+        signal: `Generator: ${String(generator[1]).split(/[,;]/)[0].trim()}`,
+        detail: 'Claim_Generator_InfoName tag present',
+      });
+    }
+  }
+
+  // Fallback signal: legacy JPEG segment walker found JUMBF APP11
+  if (contentCreds && !aiGroup) {
+    signals.push({
+      signal: 'JUMBF box in APP11',
+      detail: 'C2PA segment detected by JPEG segment walker',
+    });
+  }
+
+  // De-duplicate by signal text (preserve order)
+  const seen = new Set();
+  return signals.filter(s => {
+    if (seen.has(s.signal)) return false;
+    seen.add(s.signal);
+    return true;
+  });
 }
 
 // Diff classifier — returns boolean array; true = highlight cell as "different"
@@ -14059,6 +14404,29 @@ function renderInspectorTable() {
     return;
   }
 
+  // v4.6.5: AI signal detection per slot — used to render the amber banner
+  // in each file's column inside the table header AND to inject a top-level
+  // summary line when at least one slot is flagged. Empty array for normal
+  // photos / Seraphim-injected files (which have C2PA stripped already).
+  const aiSignals = metas.map(m => m ? detectAiSignals(m) : []);
+  const anyFlagged = aiSignals.some(sig => sig.length > 0);
+
+  if (anyFlagged) {
+    // Top-of-table summary, single banner when only one file or generic when
+    // multiple. Tooltip explains the limitation honestly.
+    const flaggedCount = aiSignals.filter(s => s.length > 0).length;
+    const tip = 'Detected from exiftool metadata: JUMBF / CBOR boxes, IPTC '
+              + 'DigitalSourceType, or SynthID assertions. Note that metadata '
+              + "alone isn't sufficient: if C2PA was stripped, Seraphim can't "
+              + 'see it. Google\'s SynthID verifier reads pixel-level '
+              + 'watermarks and can still detect AI imagery after metadata '
+              + 'removal.';
+    html += `<div class="ai-banner-summary" title="${escHtml(tip)}">`
+          + `<span style="font-size:14px;">🤖</span> <b>AI-GENERATED</b> — `
+          + `C2PA markers detected in ${flaggedCount} of ${activeSlots.length} loaded file${activeSlots.length === 1 ? '' : 's'}.`
+          + `</div>`;
+  }
+
   html += '<table class="metadata-table"><colgroup><col style="width:200px;">';
   for (let i = 0; i < 3; i++) {
     if (metas[i]) html += '<col>';
@@ -14074,6 +14442,38 @@ function renderInspectorTable() {
     }
   }
   html += '</tr>';
+
+  // v4.6.5: AI provenance per-column banner row. Only rendered when at least
+  // one slot is flagged — otherwise the row is omitted entirely so normal
+  // photo inspections stay clean. Each flagged column gets its own amber
+  // pill; unflagged columns show an empty placeholder cell. The field-name
+  // column is left blank.
+  if (anyFlagged) {
+    const tooltipText = 'This file carries C2PA / JUMBF metadata claiming AI generation. '
+      + 'Metadata-based detection is the floor — if C2PA was stripped, exiftool sees '
+      + 'nothing to flag. Pixel-level watermarks like Google SynthID can still be '
+      + 'detected by their verifier even after metadata removal. Files run through '
+      + "Seraphim's injector won't trigger this banner because the chain is gone.";
+    html += '<tr class="ai-banner-row"><td class="ai-banner-blank"></td>';
+    for (let i = 0; i < 3; i++) {
+      if (!metas[i]) continue;
+      const sigs = aiSignals[i];
+      if (sigs.length === 0) {
+        html += '<td class="ai-banner-blank"></td>';
+        continue;
+      }
+      const subtitleParts = sigs.map(s => s.signal);
+      const subtitle = subtitleParts.join(' · ');
+      html += `<td><div class="ai-banner" title="${escHtml(tooltipText)}">`
+            + `<div class="ai-banner-title">`
+            + `<span class="ai-banner-emoji">🤖</span>`
+            + `<span>AI-GENERATED — C2PA markers detected</span>`
+            + `</div>`
+            + `<div class="ai-banner-subtitle">${escHtml(subtitle)}</div>`
+            + `</div></td>`;
+    }
+    html += '</tr>';
+  }
 
   for (const g of groupOrder) {
     // Pre-filter rows for diff mode
@@ -15335,6 +15735,34 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.6.5',
+    date: '2026-05-25',
+    title: 'Inspector now flags AI-generated images via C2PA / JUMBF metadata',
+    sections: [
+      { h: '🤖 Inspector now flags AI-generated images', items: [
+        '🚨 <b>New amber AI-GENERATED banner</b> at the top of the Inspector\'s metadata column whenever C2PA / JUMBF / SynthID markers are detected in the file. Banner sits inside that file\'s column, so a side-by-side comparison only flags the files that actually have C2PA — clean iPhone photos and Seraphim-injected outputs stay quiet.',
+        '🔍 <b>Triggers on:</b> any [JUMBF] / [CBOR] group present, JUMDLabel starting with <code>c2pa</code>, any value containing <code>trainedAlgorithmicMedia</code>, /SynthID/i match, <code>Generative AI</code> in actions description, <code>c2pa.created</code> / <code>c2pa.actions</code> assertions, or a <code>Claim_Generator_InfoName</code> tag. All matched signals are listed in the banner subtitle (e.g. "C2PA chain present · SynthID watermark assertion · Generator: Google C2PA Core Generator Library").',
+        '💡 <b>Hover the banner</b> for the full explanation: metadata-based detection is the floor; pixel-level watermarks like SynthID can still be detected by Google\'s verifier even after C2PA is stripped.',
+      ]},
+      { h: 'New AI Provenance (C2PA) metadata section', items: [
+        '📦 <b>New "AI PROVENANCE (C2PA)" group</b> appears between IPTC and XMP, but ONLY when at least one C2PA / JUMBF / CBOR / XMP-c2pa field is present. Normal photos stay clean — no new noise.',
+        '🧪 Surfaced tags include <code>JUMDLabel</code> (e.g. "c2pa", "c2pa.signature", "c2pa.assertions", "c2pa.actions.v2"), <code>Claim_Generator_InfoName</code> ("Google C2PA Core Generator Library"), <code>ActionsAction</code> ("c2pa.created, c2pa.edited"), <code>ActionsDescription</code> ("Created by Google Generative AI", "Applied imperceptible SynthID watermark"), <code>ActionsDigitalSourceType</code> (the IPTC <code>trainedAlgorithmicMedia</code> URI), <code>Signature</code> / <code>Alg</code> / <code>Hash</code> / <code>InstanceID</code>, and every duplicate Item* binary descriptor.',
+        '🛠 <b>Under the hood:</b> Inspector now runs the bundled exiftool (<code>-G1 -a -s -ee -api LargeFileSupport=1</code>) on top of the existing exifr JS pass. exifr can\'t see JUMBF / CBOR; exiftool can. Output is parsed line-by-line and filtered down to C2PA-shaped groups before being grafted onto the metadata tree.',
+      ]},
+      { h: "Why your Seraphim-injected images don't flag", items: [
+        '🫥 <b>Once you run an AI image through Seraphim\'s iPhone metadata injector, the C2PA chain is gone</b> — the injector rebuilds the file with Apple EXIF + Display P3 ICC, which means exiftool sees zero remaining metadata signals. The Inspector banner only flags what\'s readable. We won\'t fake it: if there\'s nothing to detect at the metadata layer, no banner is shown.',
+        '🧬 <b>This does NOT mean the image is untraceable.</b> The pixels themselves likely still carry Google\'s SynthID — an imperceptible watermark the C2PA <code>ActionsDescription</code> on the original explicitly mentions ("Applied imperceptible SynthID watermark"). SynthID survives re-encoding, mild filtering, and crop. Google\'s verifier (currently invite-only) reads it directly off the pixels. Adobe Firefly and OpenAI DALL-E 3 use the same approach with their own watermark schemes.',
+        '🔮 <b>v4.7 candidates:</b> integrate a pixel-level AI detector — Google SynthID Detector API (when it opens up) or Hive Moderation\'s AI detector (commercial, ~$100/mo). For now, Inspector is honest about its limits: metadata in, metadata out. If the C2PA chain has been wiped, only a pixel-level detector can still call it.',
+      ]},
+      { h: 'Test references', items: [
+        '✅ <b>Original Gemini PNG with full C2PA chain</b> → banner fires with "C2PA chain present · SynthID watermark assertion · Generator: Google" subtitle.',
+        '⬜ <b>Same Gemini image with metadata wiped</b> (e.g. via online stripper) → no banner. Exiftool sees no JUMBF, no CBOR, no XMP-c2pa. Honest "we don\'t know".',
+        '⬜ <b>Seraphim-injected output</b> (iPhone EXIF, no C2PA) → no banner. Pre-injection AI provenance is replaced with Apple metadata.',
+        '⬜ <b>Real iPhone photos</b> → no banner. (No false positives.)',
+      ]},
+    ]
+  },
   {
     version: '4.6.3',
     date: '2026-05-18',
