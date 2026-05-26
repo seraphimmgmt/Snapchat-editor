@@ -120,6 +120,11 @@ jobs:
             exit 0
           fi
 
+          # Ensure the `autobot` label exists (idempotent — ignore "already exists")
+          gh label create autobot \
+            --description "Opened by an automated workflow — do not auto-merge" \
+            --color "C5DEF5" 2>/dev/null || true
+
           # Open the PR. Body comes from the script's --output-summary file.
           gh pr create \
             --base main \
