@@ -4094,7 +4094,10 @@ async function enrichWithExiftool(jpegPath, opts) {
   const args = [
     '-overwrite_original',
     '-q', '-q', // quiet stdout/stderr unless something fails
-    `-Apple:HDRImageType=3`,
+    // NOTE: do NOT write Apple:HDRImageType here. Claiming HDR without shipping
+    // a matching gain-map auxiliary image makes iOS Photos (18–26) try to apply
+    // a non-existent gain map → the image renders grey/washed in the gallery.
+    // A non-HDR iPhone capture simply omits this. See buildAppleMakerNote().
     `-Apple:ContentIdentifier=${_uuidV4()}`,
     `-Apple:LivePhotoVideoIndex=-1`,
     `-Apple:RunTimeEpoch=${runTimeNanos}`,
@@ -4265,6 +4268,16 @@ async function exportImage() {
   if (!state.metaClean && state.iphoneMeta) {
     const customDate = state.iphoneCaptureDate ? new Date(state.iphoneCaptureDate) : undefined;
     const exifObj = buildIphoneExif(w, h, customDate && !isNaN(customDate.getTime()) ? customDate : undefined);
+    // Single-image export renders on a plain sRGB canvas and embeds NO ICC
+    // profile (unlike the carousel path, which renders in display-p3 and swaps
+    // in the Apple P3 ICC). buildIphoneExif defaults ColorSpace to Uncalibrated
+    // (0xFFFF) — authentic ONLY when a real profile is also embedded. Here there
+    // is none, so the HEIC sips produces declares no colour space at all and iOS
+    // Photos greys it out in the gallery. Declare the sRGB we actually rendered
+    // so the file is colour-coherent. (To regain Apple-P3 authenticity on this
+    // path, mirror the carousel's display-p3 canvas + ICC swap — needs visual
+    // testing because the LUT/filter pass assumes sRGB; see renderItemToBlob.)
+    if (exifObj && exifObj.Exif) exifObj.Exif[piexif.ExifIFD.ColorSpace] = 1; // sRGB
     finalDataUrl = injectExifIntoJpegDataUrl(dataUrl, exifObj);
     filename = generateIphoneFilename('JPG');
     metaTag = ' · 📱 iPhone EXIF';
@@ -7497,7 +7510,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.7.0';
+const APP_VERSION = '4.7.1';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -8017,20 +8030,17 @@ function buildAppleMakerNote() {
   focusDV.setUint32(0, 11, false);  focusDV.setUint32(4, 100, false);  // 0.11 m
   focusDV.setUint32(8, 75, false);  focusDV.setUint32(12, 100, false); // 0.75 m
 
-  // HDRHeadroom URATIONAL (8 bytes)
-  const hdrHeadroom = new Uint8Array(8);
-  new DataView(hdrHeadroom.buffer).setUint32(0, 101, false);
-  new DataView(hdrHeadroom.buffer).setUint32(4, 100, false); // 1.01
-
   // SignalToNoiseRatio URATIONAL (8 bytes)
   const snr = new Uint8Array(8);
   new DataView(snr.buffer).setUint32(0, 3390, false);
   new DataView(snr.buffer).setUint32(4, 100, false); // 33.9 dB
 
-  // HDRGain URATIONAL (8 bytes)
-  const hdrGain = new Uint8Array(8);
-  new DataView(hdrGain.buffer).setUint32(0, 176, false);
-  new DataView(hdrGain.buffer).setUint32(4, 100, false); // 1.76
+  // NOTE: HDRHeadroom (0x0021), HDRGain (0x0030) and HDRImageType (0x000A) are
+  // intentionally NOT emitted. They tell iOS Photos to apply an HDR gain map —
+  // but we ship no gain-map auxiliary image, so iOS (18–26) renders the photo
+  // grey/washed in the gallery. Presenting as a non-HDR capture is fully
+  // plausible iPhone metadata and removes the trigger. To restore HDR
+  // authenticity later, generate a real gain map and re-add these together.
 
   // PhotoIdentifier — 36-char UUID string + null terminator
   const uuid = generateUUID() + '\0';
@@ -8060,8 +8070,7 @@ function buildAppleMakerNote() {
     { tag: 0x0007, type: TYPE_LONG, count: 1, inline: 1 },
     // 0x0008: AccelerationVector — 3 SRATIONALs (24 bytes external)
     { tag: 0x0008, type: TYPE_SRATIONAL, count: 3, ext: accelData },
-    // 0x000A: HDRImageType LONG: 3=HDR
-    { tag: 0x000A, type: TYPE_LONG, count: 1, inline: 3 },
+    // 0x000A HDRImageType omitted — see note above (orphaned HDR greys out iOS)
     // 0x000C: FocusDistanceRange — 2 URATIONALs (16 bytes external)
     { tag: 0x000C, type: TYPE_URATIONAL, count: 2, ext: focusData },
     // 0x000F: OISMode LONG: 3=Active
@@ -8074,14 +8083,12 @@ function buildAppleMakerNote() {
     { tag: 0x0017, type: TYPE_LONG, count: 1, inline: livePhotoIdx },
     // 0x001A: QualityHint — short string like "q825s" (6 bytes incl null)
     { tag: 0x001A, type: TYPE_ASCII, count: 6, ext: new TextEncoder().encode('q825s\0') },
-    // 0x0021: HDRHeadroom URATIONAL (8 bytes external)
-    { tag: 0x0021, type: TYPE_URATIONAL, count: 1, ext: hdrHeadroom },
+    // 0x0021 HDRHeadroom omitted — see note above (orphaned HDR greys out iOS)
     // 0x0027: SignalToNoiseRatio URATIONAL (8 bytes external)
     { tag: 0x0027, type: TYPE_URATIONAL, count: 1, ext: snr },
     // 0x002F: FocusPosition LONG (typical 80-110)
     { tag: 0x002F, type: TYPE_LONG, count: 1, inline: Math.floor(Math.random() * 30) + 80 },
-    // 0x0030: HDRGain URATIONAL (8 bytes external)
-    { tag: 0x0030, type: TYPE_URATIONAL, count: 1, ext: hdrGain },
+    // 0x0030 HDRGain omitted — see note above (orphaned HDR greys out iOS)
     // 0x0038: AFMeasuredDepth LONG (typical 30-100)
     { tag: 0x0038, type: TYPE_LONG, count: 1, inline: Math.floor(Math.random() * 70) + 30 },
     // 0x003D: AFConfidence LONG (typical 80-100)
