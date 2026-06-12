@@ -1,7 +1,9 @@
 # Rust / Cargo
 src-tauri/target/
 src-tauri/gen/
-src-tauri/Cargo.lock
+# Cargo.lock IS committed (this is an app, not a library) so CI builds the exact
+# dep versions we do. Without it, a fresh CI resolution pulled a newer `time`
+# crate that broke tauri-utils (E0119) and failed the macOS release build.
 
 # OS / editor
 .DS_Store
