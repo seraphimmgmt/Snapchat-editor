@@ -332,15 +332,8 @@ async fn jpeg_to_heic(app: tauri::AppHandle, jpeg_path: String) -> Result<String
                 }
             }
         }
-        // --clli writes the 'content light level' box (MaxCLL 203, MaxFALL 64 —
-        // the BT.2408 SDR reference values Apple's `sips` emits). WITHOUT it the
-        // heif-enc HEIC renders GREY in Apple Photos on older decoders (iPhone
-        // 13, macOS Photos); newer ones (iPhone 17 Pro Max) tolerate its
-        // absence. Pixels/HEVC are otherwise identical to a working sips file —
-        // this box was the missing piece. (macOS path uses sips, which already
-        // writes it, so this only affects the Windows/Linux heif-enc branch.)
         let output = sidecar
-            .args(["-q", "92", "--clli", "203,64", &jpeg_path, "-o", &heic_str])
+            .args(["-q", "92", &jpeg_path, "-o", &heic_str])
             .output()
             .await
             .map_err(|e| format!("heif-enc invoke: {e}"))?;
