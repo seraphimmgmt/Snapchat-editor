@@ -86,7 +86,21 @@ jobs:
           # which killed the script before bundling. Use `|| true` so we
           # tolerate that, then verify the binaries we need actually exist.
           /c/msys64/usr/bin/pacman.exe -Sy --noconfirm --needed mingw-w64-x86_64-libheif mingw-w64-x86_64-ntldd-git || true
+          # PIN libheif to 1.21.2 (v4.7.3). MSYS2 is a rolling repo: the May-26
+          # build silently picked up libheif 1.22.0, which changed the HEIF
+          # container in a way older Apple HEVC decoders reject — Windows HEIC
+          # exports render GREY in Apple Photos (iPhone 13, macOS) while newer
+          # chips tolerate it. 1.21.2 is the last good version (our pre-May-26
+          # builds used it); x265 (the actual pixel encoder) is unchanged at 4.2.
+          # Downgrade libheif + codec deps to the exact known-good versions.
+          /c/msys64/usr/bin/pacman.exe -U --noconfirm \
+            https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libheif-1.21.2-7-any.pkg.tar.zst \
+            https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libde265-1.0.18-2-any.pkg.tar.zst \
+            https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-x265-4.2-2-any.pkg.tar.zst
+          /c/msys64/usr/bin/pacman.exe -Q mingw-w64-x86_64-libheif
+          /c/msys64/usr/bin/pacman.exe -Q mingw-w64-x86_64-libheif | grep -q '1\.21\.2' || { echo "libheif pin FAILED — expected 1.21.2"; exit 1; }
           test -f /c/msys64/mingw64/bin/heif-enc.exe || { echo "heif-enc.exe not installed by pacman"; exit 1; }
+          /c/msys64/mingw64/bin/heif-enc.exe --version || { echo "pinned heif-enc.exe failed to load (DLL/ABI)"; exit 1; }
           test -f /c/msys64/mingw64/bin/ntldd.exe    || { echo "ntldd.exe not installed by pacman"; exit 1; }
           # libheif 1.21+ renamed heif-convert → heif-dec. Try both names so
           # we work across mingw64 versions; the sidecar always lands as
