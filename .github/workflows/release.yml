@@ -93,10 +93,15 @@ jobs:
           # chips tolerate it. 1.21.2 is the last good version (our pre-May-26
           # builds used it); x265 (the actual pixel encoder) is unchanged at 4.2.
           # Downgrade libheif + codec deps to the exact known-good versions.
-          /c/msys64/usr/bin/pacman.exe -U --noconfirm \
-            https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libheif-1.21.2-7-any.pkg.tar.zst \
-            https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libde265-1.0.18-2-any.pkg.tar.zst \
-            https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-x265-4.2-2-any.pkg.tar.zst
+          # Pin libheif AND its full codec/image dependency closure to the exact
+          # May-2026 versions. Downgrading libheif alone left it linked against
+          # newer codec DLLs it wasn't built for ("failed to load"), so pin the
+          # whole set that heif-enc 1.21.2 was built against (verified present in
+          # the MSYS2 repo and matching our last known-good build's manifest).
+          PINS="libheif-1.21.2-7 libde265-1.0.18-2 x265-4.2-2 aom-3.13.3-1 dav1d-1.5.3-1 rav1e-0.8.1-1 svt-av1-4.1.0-1 libjpeg-turbo-3.1.4.1-2 libpng-1.6.58-1 libwebp-1.6.0-1 lcms2-2.19.1-1 openjpeg2-2.5.4-2 openjph-0.27.1-1 brotli-1.2.0-1 zstd-1.5.7-2"
+          URLS=""
+          for p in $PINS; do URLS="$URLS https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-$p-any.pkg.tar.zst"; done
+          /c/msys64/usr/bin/pacman.exe -U --noconfirm $URLS
           /c/msys64/usr/bin/pacman.exe -Q mingw-w64-x86_64-libheif
           /c/msys64/usr/bin/pacman.exe -Q mingw-w64-x86_64-libheif | grep -q '1\.21\.2' || { echo "libheif pin FAILED — expected 1.21.2"; exit 1; }
           test -f /c/msys64/mingw64/bin/heif-enc.exe || { echo "heif-enc.exe not installed by pacman"; exit 1; }
