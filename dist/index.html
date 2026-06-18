@@ -11839,19 +11839,10 @@ async function renderCarouselOutputs(onProgress) {
         //             ends are P3. Color fidelity AND iPhone signature both
         //             preserved.
         //
-        // Gating: only swap when wantP3 actually took effect (browser may
-        // have ignored colorSpace option on very old WebView builds). Check
-        // the canvas's reported colorSpace before swapping.
-        const ctxAttrs = ctx?.getContextAttributes?.();
-        const canvasIsP3 = ctxAttrs && ctxAttrs.colorSpace === 'display-p3';
-        if (canvasIsP3) {
-          try {
-            blob = await blobReplaceIccWithApple(blob);
-          } catch (e) {
-            console.warn('ICC swap failed for', item.name, e);
-            iccFailed = true;
-          }
-        }
+        // (Apple ICC swap now runs inside renderItemToBlob, off the real P3
+        // canvas. This block referenced the GLOBAL sRGB `ctx` (~line 2104), so
+        // canvasIsP3 was always false and it never ran — that's why Windows
+        // kept WebView2's "Google Inc. 2016" profile. Fixed at the source.)
       } catch (e) {
         console.warn('iPhone meta block failed for', item.name, e);
       }
@@ -12347,12 +12338,18 @@ async function renderItemToBlob(item, mime, quality) {
   // request we silently fall back so the export still works (just sRGB).
   const wantP3 = !!carouselState.iphoneMeta;
   let ctx;
+  let p3Used = false;
   if (wantP3) {
     try {
       ctx = c.getContext('2d', { colorSpace: 'display-p3' });
       const attrs = ctx?.getContextAttributes?.();
       if (!ctx || (attrs && attrs.colorSpace && attrs.colorSpace !== 'display-p3')) {
-        ctx = c.getContext('2d');
+        ctx = c.getContext('2d'); // browser genuinely ignored the request → sRGB fallback
+      } else {
+        // P3 context active. Windows WebView2 honours the display-p3 request but
+        // reports colorSpace as undefined in getContextAttributes(), so treat
+        // "did not fall back" as P3 rather than trusting the readback.
+        p3Used = true;
       }
     } catch (_) {
       ctx = c.getContext('2d');
@@ -12406,8 +12403,23 @@ async function renderItemToBlob(item, mime, quality) {
     } catch (_) {}
   }
 
+  // Replace the browser's embedded ICC with Apple's real-iPhone "Display P3"
+  // blob whenever the canvas rendered in P3. This was attempted in
+  // renderCarouselOutputs() but gated on the GLOBAL sRGB `ctx` (~line 2104), so
+  // canvasIsP3 was always false and the swap NEVER ran (since v4.0.0). Mac
+  // shipped WKWebView's native Apple P3 profile by luck; Windows WebView2
+  // shipped Chromium's "Display P3 Gamut with sRGB Transfer" / "Google Inc.
+  // 2016" — a dead giveaway it's not an iPhone. Doing it here, off the real P3
+  // canvas, makes every export carry Apple's profile. (heif-enc/sips preserve
+  // this APP2 ICC; piexif.insert downstream preserves it too.)
   return new Promise(resolve => {
-    c.toBlob(b => resolve(b), mime, quality);
+    c.toBlob(async b => {
+      if (p3Used && b && typeof blobReplaceIccWithApple === 'function') {
+        try { b = await blobReplaceIccWithApple(b); }
+        catch (e) { console.warn('[carousel] Apple ICC swap failed:', e); }
+      }
+      resolve(b);
+    }, mime, quality);
   });
 }
 
