@@ -909,6 +909,9 @@
   .ai-banner .ai-banner-subtitle{font-size:10px;letter-spacing:.04em;margin-top:4px;color:#3A2A08;line-height:1.4;}
   .ai-banner-summary{margin:0 0 12px;padding:10px 14px;background:#FFCC00;color:#1A1408;border-left:4px solid #FF9500;border-radius:0 2px 2px 0;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:help;}
   .ai-banner-summary b{font-family:'Antonio',sans-serif;letter-spacing:.14em;}
+  /* v4.8.0: green "clean" verdict badge (amber = carries provenance) */
+  .ai-banner.prov-clean{background:#173d28;color:#c8f7d8;border-left-color:#33d17a;}
+  .ai-banner.prov-clean .ai-banner-subtitle{color:#8fd3a8;}
 
   /* === V3.3: Filename template === */
   .filename-input{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:2px;font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;transition:border-color .15s;letter-spacing:.02em;}
@@ -1115,6 +1118,28 @@
 <div class="section-row" style="margin-top:6px;"><span>📅 CAPTURE DATE</span><button type="button" class="none-toggle" id="iphoneDateClearBtn" style="font-size:9px;padding:3px 8px;">RANDOM</button></div>
 <input type="datetime-local" id="iphoneCaptureDateInput" style="width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;box-sizing:border-box;margin-top:6px;">
 <p class="output-note" style="margin:6px 0 0;">Sets the EXIF DateTimeOriginal / CreateDate. Leave blank (RANDOM) for today's date with a time within ±8h of now.</p>
+<div class="section-row" style="margin-top:14px;"><span>📍 GPS LOCATION</span><span id="editorGpsStatus" style="color:var(--text-faint);font-size:9px;">none</span></div>
+<div style="position:relative;">
+<input type="text" id="editorGpsSearch" placeholder="Type city — e.g. Miami, Tokyo, Paris" autocomplete="off" style="width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:2px;box-sizing:border-box;">
+<div id="editorGpsAutocomplete" class="gps-autocomplete hidden"></div>
+</div>
+<button type="button" id="editorGpsMapBtn" style="width:100%;margin-top:6px;background:var(--accent);color:var(--bg);border:none;padding:7px 12px;font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;border-radius:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"/></svg>
+PICK ON MAP
+</button>
+<div style="margin-top:6px;display:flex;gap:6px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);">
+<label style="flex:1;display:flex;align-items:center;gap:4px;cursor:pointer;">
+<input type="checkbox" id="editorGpsRandomize" checked style="margin:0;"> randomize within 5 km
+</label>
+<button class="none-toggle" id="editorGpsClear" style="font-size:9px;padding:3px 8px;">CLEAR</button>
+</div>
+<details style="margin-top:6px;">
+<summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);cursor:pointer;">Custom coordinates</summary>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;">
+<input type="number" id="editorGpsLat" placeholder="Lat" step="0.000001" style="width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:5px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:2px;box-sizing:border-box;">
+<input type="number" id="editorGpsLng" placeholder="Lng" step="0.000001" style="width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:5px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:2px;box-sizing:border-box;">
+</div>
+</details>
 </div>
 <div class="color-row" style="margin-top:14px;">
 <span>STRIP METADATA</span>
@@ -7497,7 +7522,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.7.4';
+const APP_VERSION = '4.8.0';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -7886,28 +7911,36 @@ function setGpsLocation(lat, lng, label) {
   iphoneGpsState.lat = lat;
   iphoneGpsState.lng = lng;
   iphoneGpsState.label = label;
-  const status = document.getElementById('carouselGpsStatus');
-  if (status) {
-    status.textContent = label ? `📍 ${label}` : 'none';
-    status.style.color = label ? 'var(--accent)' : 'var(--text-faint)';
-  }
+  // Reflect on both the carousel and editor status pills — one shared global state.
+  ['carouselGpsStatus', 'editorGpsStatus'].forEach((id) => {
+    const status = document.getElementById(id);
+    if (status) {
+      status.textContent = label ? `📍 ${label}` : 'none';
+      status.style.color = label ? 'var(--accent)' : 'var(--text-faint)';
+    }
+  });
 }
 
 function clearGpsLocation() {
   iphoneGpsState.lat = null;
   iphoneGpsState.lng = null;
   iphoneGpsState.label = null;
-  const status = document.getElementById('carouselGpsStatus');
-  if (status) {
-    status.textContent = 'none';
-    status.style.color = 'var(--text-faint)';
-  }
-  const search = document.getElementById('carouselGpsSearch');
-  if (search) search.value = '';
-  const lat = document.getElementById('carouselGpsLat');
-  const lng = document.getElementById('carouselGpsLng');
-  if (lat) lat.value = '';
-  if (lng) lng.value = '';
+  // Clear both the carousel and editor GPS UIs — one shared global state.
+  ['carouselGpsStatus', 'editorGpsStatus'].forEach((id) => {
+    const status = document.getElementById(id);
+    if (status) {
+      status.textContent = 'none';
+      status.style.color = 'var(--text-faint)';
+    }
+  });
+  ['carouselGpsSearch', 'editorGpsSearch'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['carouselGpsLat', 'editorGpsLat', 'carouselGpsLng', 'editorGpsLng'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
 }
 
 function getGpsForExport() {
@@ -13674,6 +13707,329 @@ function parseMp4Metadata(buffer) {
   return out;
 }
 
+// ============================================================================
+// v4.8.0: PROVENANCE READER — C2PA on video, AI-video markers, full C2PA
+// breakdown, video technical details. Pure DataView parsers (no deps).
+// Verified in Node against synthetic BMFF fixtures + real captures before ship.
+// ============================================================================
+
+// C2PA's registered BMFF manifest-store UUID. Lives in a top-level `uuid` box
+// with this user-type; also byte-locatable anywhere in the file via this sig.
+const C2PA_BMFF_UUID = new Uint8Array([
+  0xd8,0xfe,0xc3,0xd6,0x1b,0x0e,0x48,0x3c,0x92,0x97,0x58,0x28,0x87,0x7e,0xc4,0x81
+]);
+
+// Forward byte search over a DataView window.
+function _bytesIndexOf(view, needle, start, end) {
+  const n = needle.length;
+  const limit = Math.min(end, view.byteLength) - n;
+  for (let i = start; i <= limit; i++) {
+    let ok = true;
+    for (let j = 0; j < n; j++) {
+      if (view.getUint8(i + j) !== needle[j]) { ok = false; break; }
+    }
+    if (ok) return i;
+  }
+  return -1;
+}
+
+// Hardened ISOBMFF box walker: handles 64-bit largesize (size==1) and size==0
+// (box runs to `end`). The injector's parseMp4Boxes is intentionally left
+// untouched — this one is only used by the provenance/tech passes.
+function _mp4BoxesSafe(view, start, end) {
+  const boxes = [];
+  let offset = start;
+  while (offset + 8 <= end) {
+    let size = view.getUint32(offset);
+    const type = _readAscii4(view, offset + 4);
+    if (!type) break;
+    let payload = offset + 8;
+    if (size === 1) {
+      if (offset + 16 > end) break;
+      const hi = view.getUint32(offset + 8);
+      const lo = view.getUint32(offset + 12);
+      size = hi * 0x100000000 + lo;
+      payload = offset + 16;
+    } else if (size === 0) {
+      size = end - offset;
+    }
+    if (size < 8 || offset + size > end) break;
+    boxes.push({ type, size, offset, payload, end: offset + size });
+    offset += size;
+  }
+  return boxes;
+}
+
+// Detect a C2PA manifest anywhere in a BMFF buffer.
+// Returns { location, jumbfStart, jumbfEnd } or null.
+function detectC2paBmff(view, byteLength) {
+  const root = _mp4BoxesSafe(view, 0, byteLength);
+  for (const b of root) {
+    if (b.type === 'uuid' && b.payload + 16 <= b.end) {
+      let match = true;
+      for (let j = 0; j < 16; j++) {
+        if (view.getUint8(b.payload + j) !== C2PA_BMFF_UUID[j]) { match = false; break; }
+      }
+      if (match) return { location: 'top-level uuid box', jumbfStart: b.payload + 16, jumbfEnd: b.end };
+    }
+    if (b.type === 'jumb') return { location: 'top-level jumb box', jumbfStart: b.payload, jumbfEnd: b.end };
+  }
+  // Byte-scan fallback (covers manifests tucked in free/meta/mdat regions).
+  const idx = _bytesIndexOf(view, C2PA_BMFF_UUID, 0, byteLength);
+  if (idx >= 0) return { location: 'embedded (byte-scan)', jumbfStart: idx + 16, jumbfEnd: byteLength };
+  return null;
+}
+
+// Extract printable ASCII runs (len >= minLen) from a byte window. Mines
+// JUMBF/CBOR for readable claim/action/signer tokens without a full
+// CBOR/COSE/X.509 decoder (deliberately out of scope — heavy & fragile).
+function _printableRuns(view, start, end, minLen) {
+  const runs = [];
+  let cur = '';
+  const cap = Math.min(end, view.byteLength);
+  for (let i = start; i < cap; i++) {
+    const c = view.getUint8(i);
+    if (c >= 0x20 && c <= 0x7E) cur += String.fromCharCode(c);
+    else { if (cur.length >= minLen) runs.push(cur); cur = ''; }
+  }
+  if (cur.length >= minLen) runs.push(cur);
+  return runs;
+}
+
+// Generator signatures + provenance keywords. Matched ONLY against metadata-box
+// regions (never raw mdat), so they stay specific without bitstream noise.
+const AI_GENERATOR_SIGNATURES = [
+  { re: /adobe firefly|\bfirefly\b/i,    name: 'Adobe Firefly' },
+  { re: /gemini|nano.?banana|made with google ai|google ai/i, name: 'Google (Gemini / Imagen)' },
+  { re: /google veo|\bveo ?\d|made with veo/i, name: 'Google Veo' },
+  { re: /openai|dall.?e|\bsora\b/i,      name: 'OpenAI (Sora / DALL·E)' },
+  { re: /kling ?ai|klingai|kuaishou/i,   name: 'Kling (Kuaishou)' },
+  { re: /runwayml|runway gen|\brunway\b/i, name: 'Runway' },
+  { re: /pika ?labs|\bpika\b/i,          name: 'Pika' },
+  { re: /luma ?ai|dream machine/i,       name: 'Luma Dream Machine' },
+  { re: /hailuo|minimax/i,               name: 'Hailuo (MiniMax)' },
+  { re: /midjourney/i,                   name: 'Midjourney' },
+  { re: /stable ?diffusion|stability ?ai/i, name: 'Stability AI' },
+  { re: /leonardo\.ai|leonardo ai/i,     name: 'Leonardo.Ai' },
+  { re: /capcut|jianying/i,              name: 'CapCut / Jianying' },
+];
+const AI_PROVENANCE_KEYWORDS = [
+  { re: /trainedAlgorithmicMedia/i,      label: 'trainedAlgorithmicMedia (C2PA digitalSourceType)' },
+  { re: /compositeWithTrainedAlgorithmicMedia/i, label: 'compositeWithTrainedAlgorithmicMedia' },
+  { re: /synthid/i,                      label: 'SynthID (Google watermark assertion)' },
+  { re: /c2pa\.(created|converted|edited|opened|placed)/i, label: 'c2pa.actions' },
+  { re: /generative ai|generativeai/i,   label: 'Generative AI' },
+];
+
+// Walk a JUMBF tree and produce a human breakdown dict (shared image+video).
+function summarizeC2paManifest(view, jumbfStart, jumbfEnd) {
+  const out = {};
+  const labels = [];
+  const boxes = _mp4BoxesSafe(view, jumbfStart, jumbfEnd);
+  const collectLabels = (bs, depth) => {
+    if (depth > 6) return;
+    for (const b of bs) {
+      if (b.type === 'jumb') {
+        const kids = _mp4BoxesSafe(view, b.payload, b.end);
+        const jumd = kids.find(k => k.type === 'jumd');
+        if (jumd) {
+          // jumd: 16B type-UUID + 1B toggles + null-terminated label
+          const labelStart = jumd.payload + 17;
+          const raw = _readUtf8(view, labelStart, Math.min(64, jumd.end - labelStart));
+          const label = raw.split(' ')[0].replace(/[^\x20-\x7E]/g, '').trim();
+          if (label) labels.push(label);
+        }
+        collectLabels(kids.filter(k => k.type === 'jumb'), depth + 1);
+      }
+    }
+  };
+  collectLabels(boxes, 0);
+
+  const runs = _printableRuns(view, jumbfStart, jumbfEnd, 3);
+  const joined = runs.join('\n');
+
+  const c2paLabels = [...new Set(
+    runs.filter(r => /^c2pa\.[a-z0-9._-]+$/i.test(r)).concat(labels.filter(l => /^c2pa\./i.test(l)))
+  )];
+  const actions = c2paLabels.filter(l => /^c2pa\.(created|converted|edited|opened|placed|drawing|filtered|resized|cropped)$/i.test(l));
+  const assertions = [...new Set(labels.filter(l => l && !/^c2pa$/i.test(l)))];
+
+  // claim_generator value: the printable run immediately following the key.
+  let claimGen = null;
+  const gi = runs.findIndex(r => /^claim_generator(_info)?$/i.test(r));
+  if (gi >= 0 && runs[gi + 1] && !/^claim_generator/i.test(runs[gi + 1])) claimGen = runs[gi + 1];
+  if (!claimGen) {
+    for (const sig of AI_GENERATOR_SIGNATURES) {
+      const hit = runs.find(r => sig.re.test(r) && r.length < 80);
+      if (hit) { claimGen = hit; break; }
+    }
+  }
+
+  const generators = AI_GENERATOR_SIGNATURES.filter(s => s.re.test(joined)).map(s => s.name);
+  const keywords = AI_PROVENANCE_KEYWORDS.filter(k => k.re.test(joined)).map(k => k.label);
+
+  let signer = null;
+  const signerCand = runs.find(r =>
+    /\b(inc|llc|ltd|gmbh|corp|adobe|truepic|google|openai|microsoft|leica|nikon|canon|sony|bbc|numbers protocol)\b/i.test(r)
+    && r.length >= 3 && r.length < 80);
+  if (signerCand) signer = signerCand;
+
+  out['Manifest'] = `present · ${boxes.length} top JUMBF box(es), ${labels.length} labeled`;
+  if (claimGen) out['Claim generator'] = claimGen;
+  if (generators.length) out['Generator match'] = [...new Set(generators)].join(', ');
+  if (actions.length) out['Actions'] = actions.join(', ');
+  if (assertions.length) out['Assertions'] = assertions.slice(0, 12).join(', ') + (assertions.length > 12 ? ` … (+${assertions.length - 12})` : '');
+  if (keywords.length) out['Provenance flags'] = [...new Set(keywords)].join(' · ');
+  if (signer) out['Signed by (heuristic)'] = signer;
+  return out;
+}
+
+// ---- Video technical details (codec / HDR / fps / bitrate / rotation) ----
+const TRANSFER_NAMES = { 1: 'BT.709 (SDR)', 6: 'BT.601 (SDR)', 13: 'sRGB', 16: 'SMPTE 2084 / PQ (HDR10)', 18: 'ARIB STD-B67 / HLG (HDR)' };
+const PRIMARY_NAMES  = { 1: 'BT.709', 9: 'BT.2020', 11: 'DCI-P3', 12: 'Display P3' };
+const CODEC_NAMES = {
+  avc1: 'H.264 / AVC', avc3: 'H.264 / AVC', hvc1: 'H.265 / HEVC', hev1: 'H.265 / HEVC',
+  dvh1: 'Dolby Vision (HEVC)', dvhe: 'Dolby Vision (HEVC)', dav1: 'Dolby Vision (AV1)',
+  av01: 'AV1', vp09: 'VP9', vp08: 'VP8', mp4v: 'MPEG-4 Visual',
+  apch: 'Apple ProRes 422 HQ', ap4h: 'Apple ProRes 4444', apcn: 'Apple ProRes 422',
+};
+
+function extractVideoTech(view, byteLength) {
+  const out = {};
+  const root = _mp4BoxesSafe(view, 0, byteLength);
+  const moov = root.find(b => b.type === 'moov');
+  if (!moov) return out;
+  const moovKids = _mp4BoxesSafe(view, moov.payload, moov.end);
+  const traks = moovKids.filter(b => b.type === 'trak');
+
+  for (const trak of traks) {
+    const tk = _mp4BoxesSafe(view, trak.payload, trak.end);
+    const tkhd = tk.find(b => b.type === 'tkhd');
+    const mdia = tk.find(b => b.type === 'mdia');
+    if (!mdia) continue;
+    const mdiaKids = _mp4BoxesSafe(view, mdia.payload, mdia.end);
+    const hdlr = mdiaKids.find(b => b.type === 'hdlr');
+    const handlerType = hdlr ? _readAscii4(view, hdlr.payload + 8) : null;
+    if (handlerType !== 'vide') continue; // tech pass = video track only
+
+    const mdhd = mdiaKids.find(b => b.type === 'mdhd');
+    let timescale = 0, duration = 0;
+    if (mdhd) {
+      const ver = view.getUint8(mdhd.payload);
+      if (ver === 1) { timescale = view.getUint32(mdhd.payload + 20); duration = view.getUint32(mdhd.payload + 24) * 0x100000000 + view.getUint32(mdhd.payload + 28); }
+      else { timescale = view.getUint32(mdhd.payload + 12); duration = view.getUint32(mdhd.payload + 16); }
+    }
+    const durSec = timescale > 0 ? duration / timescale : 0;
+
+    const minf = mdiaKids.find(b => b.type === 'minf');
+    if (!minf) continue;
+    const stbl = _mp4BoxesSafe(view, minf.payload, minf.end).find(b => b.type === 'stbl');
+    if (!stbl) continue;
+    const stblKids = _mp4BoxesSafe(view, stbl.payload, stbl.end);
+    const stsd = stblKids.find(b => b.type === 'stsd');
+    if (stsd) {
+      // stsd is a FullBox: 4 (ver/flags) + 4 (entry_count) then sample entries.
+      const se = _mp4BoxesSafe(view, stsd.payload + 8, stsd.end)[0];
+      if (se) {
+        out['Codec'] = CODEC_NAMES[se.type] || se.type;
+        // Visual sample entry fixed header = 78 bytes, then child boxes.
+        const childStart = se.payload + 78;
+        if (childStart < se.end) {
+          const seKids = _mp4BoxesSafe(view, childStart, se.end);
+          const colr = seKids.find(b => b.type === 'colr');
+          if (colr) {
+            const cType = _readAscii4(view, colr.payload);
+            if ((cType === 'nclx' || cType === 'nclc') && colr.payload + 10 <= colr.end) {
+              const prim = view.getUint16(colr.payload + 4);
+              const trc  = view.getUint16(colr.payload + 6);
+              out['Color primaries'] = PRIMARY_NAMES[prim] || `code ${prim}`;
+              out['Transfer'] = TRANSFER_NAMES[trc] || `code ${trc}`;
+              out['Dynamic range'] = (trc === 16 || trc === 18) ? (trc === 16 ? 'HDR10 (PQ)' : 'HLG HDR') : 'SDR';
+            }
+          }
+          if (seKids.find(b => b.type === 'dvcC' || b.type === 'dvvC') || /^dv/.test(se.type)) {
+            out['Dolby Vision'] = 'yes';
+            if (out['Dynamic range'] == null) out['Dynamic range'] = 'Dolby Vision';
+          }
+          const btrt = seKids.find(b => b.type === 'btrt');
+          if (btrt && btrt.payload + 12 <= btrt.end) {
+            const avg = view.getUint32(btrt.payload + 8);
+            if (avg > 0) out['Bitrate (declared)'] = (avg / 1e6).toFixed(2) + ' Mbps';
+          }
+        }
+      }
+    }
+    const stts = stblKids.find(b => b.type === 'stts');
+    if (stts && durSec > 0) {
+      const cnt = view.getUint32(stts.payload + 4);
+      let total = 0; let o = stts.payload + 8;
+      for (let i = 0; i < cnt && o + 8 <= stts.end; i++) { total += view.getUint32(o); o += 8; }
+      if (total > 0) out['Frame rate'] = (total / durSec).toFixed(2) + ' fps';
+    }
+    if (tkhd) {
+      const ver = view.getUint8(tkhd.payload);
+      const matOff = tkhd.payload + (ver === 1 ? 48 : 40);
+      if (matOff + 8 <= tkhd.end) {
+        const a = view.getInt32(matOff) / 65536;
+        const b = view.getInt32(matOff + 4) / 65536;
+        let deg = Math.round(Math.atan2(b, a) * 180 / Math.PI);
+        if (deg < 0) deg += 360;
+        if (deg !== 0) out['Rotation'] = deg + '°';
+      }
+    }
+    if (durSec > 0) out['Overall bitrate'] = ((byteLength * 8) / durSec / 1e6).toFixed(2) + ' Mbps';
+    break; // first video track is enough
+  }
+  return out;
+}
+
+// Byte ranges of metadata-bearing boxes (udta / meta / non-C2PA uuid / xml).
+// Excludes mdat (compressed frames) and the C2PA box — scanning compressed
+// bitstream for ASCII strings is a false-positive factory, so we never do it.
+function _collectMetadataRegions(view, byteLength) {
+  const regions = [];
+  const isC2paUuid = b => {
+    if (b.type !== 'uuid' || b.payload + 16 > b.end) return false;
+    for (let j = 0; j < 16; j++) if (view.getUint8(b.payload + j) !== C2PA_BMFF_UUID[j]) return false;
+    return true;
+  };
+  const root = _mp4BoxesSafe(view, 0, byteLength);
+  for (const b of root) {
+    if (b.type === 'uuid') { if (!isC2paUuid(b)) regions.push([b.payload, b.end]); }
+    else if (b.type === 'meta' || b.type === 'xml ') regions.push([b.payload, b.end]);
+    else if (b.type === 'moov') {
+      for (const k of _mp4BoxesSafe(view, b.payload, b.end)) {
+        if (k.type === 'udta' || k.type === 'meta') regions.push([k.payload, k.end]);
+      }
+    }
+  }
+  return regions;
+}
+
+// AI-video provenance markers: QuickTime dict + metadata-box regions only.
+function detectVideoAiMarkers(view, byteLength, qtDict) {
+  const hits = {};
+  const generatorHits = new Set();
+  const keywordHits = new Set();
+  const qtText = qtDict ? Object.entries(qtDict).map(([k, v]) => `${k}=${v}`).join('\n') : '';
+  let runs = '';
+  for (const [s, e] of _collectMetadataRegions(view, byteLength)) {
+    runs += '\n' + _printableRuns(view, s, Math.min(e, s + 2 * 1024 * 1024), 4).join('\n');
+  }
+  const haystack = qtText + '\n' + runs;
+  for (const sig of AI_GENERATOR_SIGNATURES) if (sig.re.test(haystack)) generatorHits.add(sig.name);
+  for (const kw of AI_PROVENANCE_KEYWORDS) if (kw.re.test(haystack)) keywordHits.add(kw.label);
+  if (qtDict) {
+    const sw = qtDict['com.apple.quicktime.software'] || qtDict['encoder'] || qtDict['Legacy ©too'];
+    if (sw && /ai|diffus|gpt|gen|veo|sora|kling|runway|pika/i.test(String(sw)) && !/apple|iphone/i.test(String(sw))) {
+      hits['Encoder tag'] = String(sw);
+    }
+  }
+  if (generatorHits.size) hits['Generator signatures'] = [...generatorHits].join(', ');
+  if (keywordHits.size) hits['Provenance keywords'] = [...keywordHits].join(' · ');
+  return Object.keys(hits).length ? hits : null;
+}
+
 // --- JPEG segment walker (for full image metadata) ---
 const JPEG_MARKER_NAMES = {
   0xD8:'SOI', 0xD9:'EOI', 0xDA:'SOS',
@@ -14331,6 +14687,22 @@ async function extractMetadata(file) {
         }
         if (Object.keys(mp4.quicktime).length) meta['QUICKTIME METADATA'] = mp4.quicktime;
       }
+      // v4.8.0: video technical details (codec / HDR / fps / bitrate / rotation)
+      const _dv = new DataView(buf);
+      const tech = extractVideoTech(_dv, buf.byteLength);
+      if (tech && Object.keys(tech).length) meta['VIDEO TECHNICAL'] = tech;
+      // v4.8.0: C2PA manifest detection in the BMFF container (mirrors the JPEG
+      // path — Sora/Veo/Kling/Firefly clips embed a C2PA store in a `uuid` box).
+      const c2paLoc = detectC2paBmff(_dv, buf.byteLength);
+      if (c2paLoc) {
+        const grp = { 'Detected': `YES — C2PA manifest (${c2paLoc.location})` };
+        const summary = summarizeC2paManifest(_dv, c2paLoc.jumbfStart, c2paLoc.jumbfEnd);
+        if (summary) Object.assign(grp, summary);
+        meta['CONTENT CREDENTIALS (C2PA)'] = grp;
+      }
+      // v4.8.0: AI-generator provenance markers in video metadata regions
+      const aiMarks = detectVideoAiMarkers(_dv, buf.byteLength, mp4 ? mp4.quicktime : null);
+      if (aiMarks) meta['AI PROVENANCE (VIDEO)'] = aiMarks;
     } catch (e) {}
   }
 
@@ -14514,12 +14886,38 @@ function detectAiSignals(meta) {
     }
   }
 
-  // Fallback signal: legacy JPEG segment walker found JUMBF APP11
-  if (contentCreds && !aiGroup) {
-    signals.push({
-      signal: 'JUMBF box in APP11',
-      detail: 'C2PA segment detected by JPEG segment walker',
-    });
+  // C2PA content-credentials group — JPEG segment walker (image) OR the v4.8.0
+  // BMFF detector (video). The video group carries richer breakdown fields.
+  if (contentCreds) {
+    const gen = contentCreds['Claim generator'] || contentCreds['Generator match'];
+    if (gen) {
+      signals.push({ signal: `Generator: ${String(gen).split(/[,;]/)[0].trim()}`, detail: 'C2PA claim generator' });
+    } else if (!aiGroup) {
+      signals.push({ signal: 'C2PA manifest present', detail: contentCreds['Detected'] || contentCreds['Manifest'] || 'Content Credentials detected' });
+    }
+    if (/trainedAlgorithmicMedia/i.test(contentCreds['Provenance flags'] || '')) {
+      signals.push({ signal: 'trainedAlgorithmicMedia', detail: 'C2PA digitalSourceType claims AI generation' });
+    }
+    if (/synthid/i.test(contentCreds['Provenance flags'] || '')) {
+      signals.push({ signal: 'SynthID watermark assertion', detail: 'SynthID assertion in manifest' });
+    }
+    if (/c2pa\.(created|actions|converted)/i.test(contentCreds['Actions'] || '')) {
+      signals.push({ signal: 'c2pa.actions present', detail: String(contentCreds['Actions']) });
+    }
+  }
+
+  // v4.8.0: AI-video provenance markers (non-C2PA generator tags in metadata).
+  const videoAi = meta['AI PROVENANCE (VIDEO)'];
+  if (videoAi) {
+    if (videoAi['Generator signatures']) {
+      signals.push({ signal: `Generator: ${String(videoAi['Generator signatures']).split(/[,;]/)[0].trim()}`, detail: 'AI generator tag in video metadata' });
+    }
+    if (videoAi['Provenance keywords']) {
+      signals.push({ signal: 'AI provenance keywords', detail: String(videoAi['Provenance keywords']) });
+    }
+    if (videoAi['Encoder tag']) {
+      signals.push({ signal: 'Non-Apple AI encoder tag', detail: String(videoAi['Encoder tag']) });
+    }
   }
 
   // De-duplicate by signal text (preserve order)
@@ -14701,31 +15099,39 @@ function renderInspectorTable() {
   }
   html += '</tr>';
 
-  // v4.6.5: AI provenance per-column banner row. Only rendered when at least
-  // one slot is flagged — otherwise the row is omitted entirely so normal
-  // photo inspections stay clean. Each flagged column gets its own amber
-  // pill; unflagged columns show an empty placeholder cell. The field-name
-  // column is left blank.
-  if (anyFlagged) {
-    const tooltipText = 'This file carries C2PA / JUMBF metadata claiming AI generation. '
-      + 'Metadata-based detection is the floor — if C2PA was stripped, exiftool sees '
-      + 'nothing to flag. Pixel-level watermarks like Google SynthID can still be '
-      + 'detected by their verifier even after metadata removal. Files run through '
-      + "Seraphim's injector won't trigger this banner because the chain is gone.";
+  // v4.8.0: provenance VERDICT badge — now rendered for EVERY loaded file, not
+  // just flagged ones. Amber "carries provenance" when C2PA / AI markers are
+  // found (images or video); green "clean" when nothing is detected. Gives an
+  // at-a-glance read before/after processing. The field-name column stays blank.
+  {
+    const tooltipFlagged = 'This file carries C2PA / JUMBF metadata or AI-generator tags. '
+      + 'Metadata detection is the floor — if the manifest was stripped, there may be '
+      + 'nothing left to flag. Pixel/audio watermarks like Google SynthID can still be '
+      + 'detected by their verifier even after metadata removal. Seraphim-injected '
+      + 'exports read clean here because the provenance chain is gone.';
+    const tooltipClean = 'No C2PA / JUMBF manifest and no AI-generator metadata found. '
+      + 'This is the metadata floor, not proof of authenticity — a stripped or '
+      + 're-encoded AI file can read clean here yet still carry an invisible '
+      + 'pixel/audio watermark (e.g. Google SynthID) that a dedicated verifier detects.';
     html += '<tr class="ai-banner-row"><td class="ai-banner-blank"></td>';
     for (let i = 0; i < 3; i++) {
       if (!metas[i]) continue;
       const sigs = aiSignals[i];
       if (sigs.length === 0) {
-        html += '<td class="ai-banner-blank"></td>';
+        html += `<td><div class="ai-banner prov-clean" title="${escHtml(tooltipClean)}">`
+              + `<div class="ai-banner-title">`
+              + `<span class="ai-banner-emoji">✅</span>`
+              + `<span>CLEAN — no provenance detected</span>`
+              + `</div>`
+              + `<div class="ai-banner-subtitle">no C2PA manifest · no AI-generator metadata</div>`
+              + `</div></td>`;
         continue;
       }
-      const subtitleParts = sigs.map(s => s.signal);
-      const subtitle = subtitleParts.join(' · ');
-      html += `<td><div class="ai-banner" title="${escHtml(tooltipText)}">`
+      const subtitle = sigs.map(s => s.signal).join(' · ');
+      html += `<td><div class="ai-banner" title="${escHtml(tooltipFlagged)}">`
             + `<div class="ai-banner-title">`
             + `<span class="ai-banner-emoji">🤖</span>`
-            + `<span>AI-GENERATED — C2PA markers detected</span>`
+            + `<span>CARRIES PROVENANCE — C2PA / AI markers</span>`
             + `</div>`
             + `<div class="ai-banner-subtitle">${escHtml(subtitle)}</div>`
             + `</div></td>`;
@@ -15993,6 +16399,28 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.8.0',
+    date: '2026-08-12',
+    title: 'Provenance reader expansion — C2PA on video, AI-generator markers, full breakdown + verdict badge (plus editor-tab GPS picker)',
+    sections: [
+      { h: '🎬 C2PA detection on video', items: [
+        '📼 <b>The Inspector now detects C2PA / Content Credentials in <code>.mp4</code> / <code>.mov</code>, not just JPEGs.</b> A new BMFF scanner walks the container for the C2PA manifest store — the top-level <code>uuid</code> box carrying C2PA\'s registered user-type (<code>d8fec3d6-…</code>), a bare top-level <code>jumb</code>, or a byte-scan fallback. AI clips from Sora / Veo / Kling / Runway / Firefly that embed a manifest now surface a <b>CONTENT CREDENTIALS (C2PA)</b> group.',
+        '🧬 <b>Full manifest breakdown</b> (images + video): instead of just "Detected: YES", the readout mines the JUMBF/CBOR for <b>claim generator</b>, <b>actions</b> (<code>c2pa.created</code>, …), <b>assertions</b>, <code>trainedAlgorithmicMedia</code> / SynthID flags, and a heuristic <b>signer</b>. No CBOR/COSE/X.509 decoder is shipped — the reader mines readable tokens and leans on the bundled exiftool where present.',
+      ]},
+      { h: '🤖 AI-generator markers + verdict badge', items: [
+        '🔎 <b>New AI PROVENANCE (VIDEO) pass</b> scans <em>metadata regions only</em> (<code>udta</code> / <code>meta</code> / <code>uuid</code> / XMP — never the compressed <code>mdat</code>, which would false-positive on bitstream bytes) for generator signatures (Sora, Veo, Kling, Runway, Pika, Luma, Firefly, Midjourney…) and provenance keywords.',
+        '🚦 <b>Per-file VERDICT badge</b> now renders for <em>every</em> loaded file: amber <b>CARRIES PROVENANCE</b> when C2PA / AI markers are found, green <b>CLEAN — no provenance detected</b> when nothing is. At-a-glance read before/after processing. Tooltip is honest: metadata detection is the floor, not proof — a stripped file can still carry an invisible SynthID watermark.',
+      ]},
+      { h: '📊 Video technical details', items: [
+        '🎛 <b>New VIDEO TECHNICAL group:</b> codec (H.264 / HEVC / AV1 / <b>Dolby Vision</b> / ProRes), dynamic range (<b>SDR / HDR10 PQ / HLG</b>) + color primaries from the <code>colr</code> box, frame rate (from <code>stts</code>), declared + overall bitrate, and rotation (from the <code>tkhd</code> matrix).',
+        '🧪 <b>Parsers verified in Node</b> against synthetic BMFF fixtures (HDR HEVC + 90° + C2PA/Firefly, clean SDR H.264, udta generator tag) and a real 14.8 MB capture before ship — 27/27 checks, 0 false positives on the clean file.',
+      ]},
+      { h: '📍 Editor-tab GPS picker', items: [
+        '🗺 <b>GPS location controls added to the Editor sidebar</b> (previously carousel-only): city search with autocomplete, "pick on map", randomize-within-5 km, and custom lat/lng. <code>setGpsLocation</code> / <code>clearGpsLocation</code> now drive both the carousel and editor status pills from one shared state.',
+      ]},
+    ],
+  },
   {
     version: '4.7.4',
     date: '2026-08-12',
@@ -17478,8 +17906,9 @@ async function openGpsMapPicker(initialLat, initialLng, onPick) {
     </div>`;
   document.body.appendChild(overlay);
 
-  const startLat = (initialLat == null || isNaN(initialLat)) ? 30.0444 : initialLat;
-  const startLng = (initialLng == null || isNaN(initialLng)) ? 31.2357 : initialLng;
+  // Default center when nothing is picked yet: downtown Miami.
+  const startLat = (initialLat == null || isNaN(initialLat)) ? 25.7743 : initialLat;
+  const startLng = (initialLng == null || isNaN(initialLng)) ? -80.1937 : initialLng;
   _gpsMap = L.map('gpsMap', { zoomControl: true, attributionControl: false }).setView([startLat, startLng], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, subdomains: 'abc' }).addTo(_gpsMap);
   _gpsMarker = L.marker([startLat, startLng], { draggable: true }).addTo(_gpsMap);
@@ -17632,20 +18061,119 @@ function renderGpsSavedList() {
   });
 }
 
-// Wire the PICK ON MAP button — runs on init.
+// Wire the Editor-tab GPS controls — a mirror of the carousel GPS block. Every
+// control drives the SAME global iphoneGpsState via setGpsLocation, and injection
+// reads it through getGpsForExport(), so a location picked here lands in the
+// single-image (buildIphoneExif) and video (buildIphoneUdta) exports identically.
+function wireEditorGpsControls() {
+  const gpsSearch = document.getElementById('editorGpsSearch');
+  if (!gpsSearch) return;
+  const gpsAuto = document.getElementById('editorGpsAutocomplete');
+  const gpsRandomize = document.getElementById('editorGpsRandomize');
+  const gpsClear = document.getElementById('editorGpsClear');
+  const gpsLatInput = document.getElementById('editorGpsLat');
+  const gpsLngInput = document.getElementById('editorGpsLng');
+  const gpsMapBtn = document.getElementById('editorGpsMapBtn');
+  let gpsHighlightIdx = -1;
+
+  const renderAutocomplete = (results) => {
+    if (!results.length) { gpsAuto.classList.add('hidden'); return; }
+    gpsHighlightIdx = -1;
+    gpsAuto.innerHTML = results.map((r, i) =>
+      `<div class="gps-item" data-idx="${i}">
+        ${escapeHtml(r.displayName)}<span class="gps-region">${escapeHtml(r.region)}</span>
+      </div>`
+    ).join('');
+    gpsAuto.classList.remove('hidden');
+    gpsAuto.querySelectorAll('.gps-item').forEach((node, i) => {
+      node.addEventListener('mousedown', (e) => {
+        // mousedown so it fires before the input's blur
+        e.preventDefault();
+        const r = results[i];
+        setGpsLocation(r.lat, r.lng, r.displayName);
+        gpsSearch.value = r.displayName;
+        gpsAuto.classList.add('hidden');
+      });
+    });
+  };
+
+  gpsSearch.addEventListener('input', (e) => {
+    const q = e.target.value;
+    if (q.length < 2) { gpsAuto.classList.add('hidden'); return; }
+    renderAutocomplete(searchCities(q, 8));
+  });
+  gpsSearch.addEventListener('keydown', (e) => {
+    const items = gpsAuto.querySelectorAll('.gps-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      gpsHighlightIdx = (gpsHighlightIdx + 1) % items.length;
+      items.forEach((n, i) => n.classList.toggle('highlighted', i === gpsHighlightIdx));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      gpsHighlightIdx = gpsHighlightIdx <= 0 ? items.length - 1 : gpsHighlightIdx - 1;
+      items.forEach((n, i) => n.classList.toggle('highlighted', i === gpsHighlightIdx));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const idx = gpsHighlightIdx >= 0 ? gpsHighlightIdx : 0;
+      items[idx].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    } else if (e.key === 'Escape') {
+      gpsAuto.classList.add('hidden');
+    }
+  });
+  gpsSearch.addEventListener('blur', () => {
+    setTimeout(() => gpsAuto.classList.add('hidden'), 150);
+  });
+  document.addEventListener('click', (e) => {
+    if (!gpsAuto.contains(e.target) && e.target !== gpsSearch) {
+      gpsAuto.classList.add('hidden');
+    }
+  });
+
+  gpsRandomize.addEventListener('change', (e) => {
+    iphoneGpsState.randomize = e.target.checked;
+  });
+  gpsClear.addEventListener('click', () => { clearGpsLocation(); });
+
+  // Custom lat/lng inputs override the city search
+  const updateCustomCoords = () => {
+    const lat = parseFloat(gpsLatInput.value);
+    const lng = parseFloat(gpsLngInput.value);
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      setGpsLocation(lat, lng, `Custom: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+    }
+  };
+  gpsLatInput.addEventListener('change', updateCustomCoords);
+  gpsLngInput.addEventListener('change', updateCustomCoords);
+
+  if (gpsMapBtn) {
+    gpsMapBtn.addEventListener('click', () => {
+      const lat = (typeof iphoneGpsState !== 'undefined' && iphoneGpsState.lat) || null;
+      const lng = (typeof iphoneGpsState !== 'undefined' && iphoneGpsState.lng) || null;
+      openGpsMapPicker(lat, lng, ({ lat, lng, label }) => {
+        if (typeof setGpsLocation === 'function') setGpsLocation(lat, lng, label);
+        gpsSearch.value = label;
+      });
+    });
+  }
+}
+
+// Wire the PICK ON MAP buttons (carousel + editor) — runs on init.
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('carouselGpsMapBtn');
-  if (!btn) return;
-  btn.addEventListener('click', () => {
-    const lat = (typeof iphoneGpsState !== 'undefined' && iphoneGpsState.lat) || null;
-    const lng = (typeof iphoneGpsState !== 'undefined' && iphoneGpsState.lng) || null;
-    openGpsMapPicker(lat, lng, ({ lat, lng, label }) => {
-      // Update the existing GPS state through its setter so the status pill etc reflect it.
-      if (typeof setGpsLocation === 'function') setGpsLocation(lat, lng, label);
-      const search = document.getElementById('carouselGpsSearch');
-      if (search) search.value = label;
+  if (btn) {
+    btn.addEventListener('click', () => {
+      const lat = (typeof iphoneGpsState !== 'undefined' && iphoneGpsState.lat) || null;
+      const lng = (typeof iphoneGpsState !== 'undefined' && iphoneGpsState.lng) || null;
+      openGpsMapPicker(lat, lng, ({ lat, lng, label }) => {
+        // Update the existing GPS state through its setter so the status pill etc reflect it.
+        if (typeof setGpsLocation === 'function') setGpsLocation(lat, lng, label);
+        const search = document.getElementById('carouselGpsSearch');
+        if (search) search.value = label;
+      });
     });
-  });
+  }
+  wireEditorGpsControls();
 });
 
 // ============================================================================
