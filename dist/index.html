@@ -7497,7 +7497,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.7.3';
+const APP_VERSION = '4.7.4';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13739,14 +13739,68 @@ function _makeFullBox(type, ...kids) {
   return _makeBox(type, new Uint8Array(4), ...kids);
 }
 
-function buildIphoneUdta(deviceOverride) {
+// v4.7.4: SHA-256 → UUID for camera.identifier. Stable per device.model, so
+// every export from the same pool entry claims the same physical camera.
+// Cached on the device object; only the first call per device runs SubtleCrypto.
+async function _computeCameraIdentifier(device) {
+  if (device._cameraId) return device._cameraId;
+  try {
+    const input = (device.model || '') + '|lens|main';
+    const bytes = new TextEncoder().encode(input);
+    const hash = await crypto.subtle.digest('SHA-256', bytes);
+    const hex = Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
+    // Format first 32 hex chars as XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX (uppercase, matches iPhone)
+    const uuid = `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`.toUpperCase();
+    device._cameraId = uuid;
+    return uuid;
+  } catch (e) {
+    // Fallback: deterministic non-crypto hash if SubtleCrypto is unavailable.
+    // Shouldn't happen in Tauri or modern browsers, but keeps builds safe.
+    let h = 0x811c9dc5 >>> 0;
+    const s = (device.model || 'iPhone') + '|lens|main';
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    const hex = (h.toString(16).padStart(8, '0') + h.toString(16).padStart(8, '0')).slice(0, 32).padEnd(32, '0');
+    const uuid = `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`.toUpperCase();
+    device._cameraId = uuid;
+    return uuid;
+  }
+}
+
+// v4.7.4: format WGS84 signed decimals per ISO 6709 as real iPhone videos do.
+// Example: +25.7749-80.1791+000.000/
+// - Lat: signed, 4 decimals, no zero-padding on integer part
+// - Lon: signed, 4 decimals, no zero-padding on integer part
+// - Alt: signed, 3 decimals, integer part zero-padded to 3 digits ("000.000")
+// - Terminates with '/'.
+function _formatIso6709(lat, lon, alt) {
+  const signed = (v, decimals, intPad) => {
+    const sign = v >= 0 ? '+' : '-';
+    let s = Math.abs(v).toFixed(decimals);
+    if (intPad) {
+      const [ip, fp] = s.split('.');
+      s = ip.padStart(intPad, '0') + (fp ? '.' + fp : '');
+    }
+    return sign + s;
+  };
+  return signed(lat, 4, 0) + signed(lon, 4, 0) + signed(alt || 0, 3, 3) + '/';
+}
+
+async function buildIphoneUdta(deviceOverride, dateOverride) {
   // Pick a device from the pool unless one was passed in. Video exports
   // don't share device state with image exports — they're independent paths.
   const device = deviceOverride || (typeof pickIphoneDevice === 'function'
     ? pickIphoneDevice()
     : { model: 'iPhone 17 Pro Max', qtSoftware: '19.2' });
 
-  const date = new Date();
+  // Timestamp source: caller override > state.iphoneCaptureDate > now.
+  // Same field the image path reads (dist/index.html state.iphoneCaptureDate),
+  // so the datetime-local input in the iPhone-meta panel drives BOTH paths.
+  let date = dateOverride instanceof Date ? dateOverride : null;
+  if (!date && typeof state !== 'undefined' && state && state.iphoneCaptureDate) {
+    date = new Date(state.iphoneCaptureDate);
+  }
+  if (!date || isNaN(date.getTime())) date = new Date();
+
   // QuickTime expects ISO 8601 with explicit offset
   const tzOffset = -date.getTimezoneOffset();
   const sign = tzOffset >= 0 ? '+' : '-';
@@ -13760,6 +13814,25 @@ function buildIphoneUdta(deviceOverride) {
     ['com.apple.quicktime.software', device.qtSoftware],
     ['com.apple.quicktime.creationdate', isoDate],
   ];
+
+  // v4.7.4: GPS location. Same source as image path (iphoneGpsState +
+  // getGpsForExport). If the user hasn't picked a location, skip the atoms
+  // entirely — real iPhones without a GPS fix omit them too; a stubbed
+  // (0,0) coordinate would be its own forensic tell (Null Island).
+  if (typeof getGpsForExport === 'function') {
+    const coords = getGpsForExport();
+    if (coords && coords.length === 2 && isFinite(coords[0]) && isFinite(coords[1])) {
+      entries.push(['com.apple.quicktime.location.ISO6709', _formatIso6709(coords[0], coords[1], 0)]);
+      // Matches typical iPhone GPS horizontal accuracy (meters), stringified float.
+      entries.push(['com.apple.quicktime.location.accuracy.horizontal', '9.000000']);
+    }
+  }
+
+  // v4.7.4: camera identity atoms — closes the atom-count gap vs real iPhone.
+  entries.push(['com.apple.quicktime.camera.lens_model', device.lensModel || `${device.model} back camera`]);
+  const cameraId = await _computeCameraIdentifier(device);
+  entries.push(['com.apple.quicktime.camera.identifier', cameraId]);
+  entries.push(['com.apple.quicktime.focal_length.35mm_equivalent', String(device.focalLength35mm || 24)]);
 
   // hdlr for metadata handler 'mdta'
   const hdlrPayload = _concatU8([
@@ -13843,6 +13916,82 @@ function patchOffsetsInRange(arr, start, end, delta) {
   }
 }
 
+// v4.7.4: MP4/MOV container timestamp patcher.
+// Real iPhone videos have real creation_time / modification_time in the
+// container box headers (mvhd + tkhd + mdhd), NOT just in udta atoms. A file
+// with zeroed timestamps but rich udta is its own forensic tell — mvhd
+// timestamps came first in the format and every real capture has them.
+//
+// QuickTime epoch = 1904-01-01 00:00:00 UTC. Unix epoch = 1970-01-01 UTC.
+// Delta = 2082844800 seconds (add to Unix time → QT time).
+//
+// Boxes patched (all three share the layout: FullBox header, then two time
+// fields as the first payload bytes):
+//   moov → mvhd                     (movie header, one per file)
+//   moov → trak → tkhd              (track header, one per track)
+//   moov → trak → mdia → mdhd       (media header, one per track)
+//
+// Version 0 uses 32-bit times; version 1 uses 64-bit. Version 0 max is
+// year 2040 (2^32 seconds from 1904), well past any realistic capture
+// date, so we never overflow when writing v0.
+const _QT_EPOCH_DELTA = 2082844800; // seconds between 1904-01-01 and 1970-01-01
+
+function _patchTimestampBox(view, boxOffset, qtSeconds) {
+  // Layout inside every mvhd/tkhd/mdhd:
+  //   byte 0..3 : box size (already read by caller)
+  //   byte 4..7 : box type
+  //   byte 8    : version
+  //   byte 9..11: flags
+  //   byte 12+  : creation_time, modification_time (4 or 8 bytes each per version)
+  const version = view.getUint8(boxOffset + 8);
+  const timesOff = boxOffset + 12;
+  if (version === 1) {
+    // 64-bit. JS DataView lacks setBigUint64 in older Safari — write hi/lo halves.
+    const hi = Math.floor(qtSeconds / 0x100000000);
+    const lo = qtSeconds >>> 0;
+    view.setUint32(timesOff, hi);
+    view.setUint32(timesOff + 4, lo);
+    view.setUint32(timesOff + 8, hi);
+    view.setUint32(timesOff + 12, lo);
+  } else {
+    // Version 0 — 32-bit. Clamp defensively to avoid a wrap that would
+    // land the file in "year 1904" (not the "recent capture" we want).
+    const t = Math.min(qtSeconds >>> 0, 0xFFFFFFFF);
+    view.setUint32(timesOff, t);
+    view.setUint32(timesOff + 4, t);
+  }
+}
+
+function patchMp4Timestamps(bytes, dateEpochSeconds) {
+  // Accepts a Uint8Array of the moov region (or full file — we bound-check).
+  // Returns the same array, mutated in place. Idempotent for already-set
+  // timestamps: we always overwrite with our chosen date.
+  const qt = Math.max(0, Math.floor(dateEpochSeconds + _QT_EPOCH_DELTA));
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+  // Walk top-level boxes to find moov.
+  const walk = (start, end, path) => {
+    let offset = start;
+    while (offset + 8 <= end) {
+      const size = view.getUint32(offset);
+      if (size < 8 || size > end - offset) break;
+      const type = _readAscii4(view, offset + 4);
+      if (!type) break;
+
+      if (type === 'mvhd' || type === 'tkhd' || type === 'mdhd') {
+        _patchTimestampBox(view, offset, qt);
+      }
+      // Recurse into container boxes on the mvhd/tkhd/mdhd path.
+      if (type === 'moov' || type === 'trak' || type === 'mdia' || type === 'edts') {
+        walk(offset + 8, offset + size, path.concat(type));
+      }
+      offset += size;
+    }
+  };
+  walk(0, bytes.byteLength, []);
+  return bytes;
+}
+
 // --- iPhone MP4 metadata injection ---
 async function injectIphoneMp4Metadata(blob) {
   try {
@@ -13866,13 +14015,32 @@ async function injectIphoneMp4Metadata(blob) {
       return null;
     }
 
-    const udta = buildIphoneUdta();
+    const udta = await buildIphoneUdta();
     const delta = udta.byteLength;
     const moovEnd = moovOffset + moovSize;
 
     // Take a writable copy of bytes 0..moovEnd
     const head = new Uint8Array(buffer.slice(0, moovEnd));
-    // Patch moov size header
+
+    // v4.7.4: rewrite mvhd/tkhd/mdhd timestamps so exiftool reports real
+    // dates instead of "0000:00:00". Source date matches the udta
+    // creationdate — same field the image path uses (state.iphoneCaptureDate),
+    // fallback to now.
+    //
+    // ORDER MATTERS: must patch timestamps BEFORE bumping the moov size.
+    // patchMp4Timestamps walks the box tree using each container's declared
+    // size to bound the recursion; if we bumped moov to (moovSize + delta)
+    // first, the walk would see a size larger than head.byteLength and bail
+    // out before reaching mvhd/tkhd/mdhd.
+    let tsDate = null;
+    if (typeof state !== 'undefined' && state && state.iphoneCaptureDate) {
+      const d = new Date(state.iphoneCaptureDate);
+      if (!isNaN(d.getTime())) tsDate = d;
+    }
+    if (!tsDate) tsDate = new Date();
+    patchMp4Timestamps(head, Math.floor(tsDate.getTime() / 1000));
+
+    // Patch moov size header (grow by udta length).
     new DataView(head.buffer).setUint32(moovOffset, moovSize + delta);
 
     // If moov sits before mdat, patch stco/co64 entries (they reference absolute file offsets)
@@ -15825,6 +15993,43 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.7.4',
+    date: '2026-08-12',
+    title: 'Video-side iPhone metadata parity — 5 new QuickTime atoms + real container timestamps',
+    sections: [
+      { h: '🎬 Video metadata parity', items: [
+        '📱 <b>Video exports were shipping with 4 <code>com.apple.quicktime.*</code> atoms while real iPhone videos carry ~10.</b> That gap was its own forensic tell — a "made on iPhone" clip with only Make/Model/Software/CreationDate reads like a stripped file, not an authentic capture.',
+        '➕ <b>5 new atoms wired into <code>buildIphoneUdta()</code>:</b> <code>com.apple.quicktime.location.ISO6709</code>, <code>com.apple.quicktime.location.accuracy.horizontal</code> ("9.000000" — matches typical iPhone GPS accuracy), <code>com.apple.quicktime.camera.lens_model</code> (from the pool entry), <code>com.apple.quicktime.camera.identifier</code> (stable UUID per device — SHA-256 of <code>device.model + \'|lens|main\'</code>, so the same physical camera identity persists across exports of the same pool entry), and <code>com.apple.quicktime.focal_length.35mm_equivalent</code> ("24" for main).',
+        '🧪 <b>Verified against <code>IMG_1686.mov</code>:</b> source has 0 <code>[Keys]</code> atoms → v4.7.3 output would have 4 → v4.7.4 output has <b>9 with GPS set / 7 without GPS</b>. Exiftool reports every new atom correctly parsed (e.g. <code>GPSCoordinates: 25 deg 46\' 29.64" N, 80 deg 10\' 44.76" W, 0 m Above Sea Level</code>).',
+      ]},
+      { h: '🕒 Container timestamps', items: [
+        '🕰 <b>Real iPhone videos have real <code>creation_time</code> / <code>modification_time</code> in <code>mvhd</code> + <code>tkhd</code> + <code>mdhd</code>.</b> Our exports (and the wiped source) had all zeros — <code>0000:00:00</code>. Even with a perfect udta chain, container timestamps at zero are their own signal that the file has been rebuilt.',
+        '🩹 <b>New <code>patchMp4Timestamps(bytes, epochSeconds)</code>.</b> Recursively walks <code>moov → mvhd</code>, <code>moov → trak → tkhd</code>, and <code>moov → trak → mdia → mdhd</code>. Rewrites both timestamps in each header using the QuickTime epoch (1904-01-01) — Unix time gets <b>+2082844800 seconds</b> added to convert. Supports both version-0 (32-bit) and version-1 (64-bit) time fields.',
+        '⚠️ <b>Order matters</b> in <code>injectIphoneMp4Metadata</code>: timestamps must be patched BEFORE the <code>moov</code> box size header is bumped. The walker uses each container\'s declared size to bound recursion; bumping <code>moov</code> first would push the declared size past <code>head.byteLength</code> and the walk would bail before reaching any of the timestamp boxes.',
+      ]},
+      { h: '🗺 GPS for videos', items: [
+        '🌍 <b>Video path now reads the same <code>iphoneGpsState</code> / <code>getGpsForExport()</code> as the image path.</b> One GPS picker in the panel drives both. If the user hasn\'t chosen a location, the video atoms are omitted entirely — real iPhones without a GPS fix omit them too; a stubbed (0, 0) coordinate would be its own tell (Null Island).',
+        '📐 <b>ISO 6709 formatting matches real iPhone output:</b> <code>+DD.DDDD</code> (lat, 4 decimals, signed) + <code>±DDD.DDDD</code> (lon) + <code>±HHH.HHH</code> (altitude, 3-digit integer zero-padded) + <code>/</code>. Example: <code>+25.7749-80.1791+000.000/</code> for Miami at sea level.',
+      ]},
+      { h: 'Coverage table — atoms now written per export', items: [
+        '✅ <code>com.apple.quicktime.make</code> — "Apple" (unchanged)',
+        '✅ <code>com.apple.quicktime.model</code> — from pool (unchanged)',
+        '✅ <code>com.apple.quicktime.software</code> — from pool (unchanged)',
+        '✅ <code>com.apple.quicktime.creationdate</code> — ISO 8601 with tz offset (unchanged)',
+        '🆕 <code>com.apple.quicktime.location.ISO6709</code> — WGS84 signed decimals (when GPS set)',
+        '🆕 <code>com.apple.quicktime.location.accuracy.horizontal</code> — "9.000000" (when GPS set)',
+        '🆕 <code>com.apple.quicktime.camera.lens_model</code> — pool <code>lensModel</code> string',
+        '🆕 <code>com.apple.quicktime.camera.identifier</code> — SHA-256 UUID, stable per pool entry',
+        '🆕 <code>com.apple.quicktime.focal_length.35mm_equivalent</code> — "24" for main camera',
+        '🕒 <code>mvhd</code>/<code>tkhd</code>/<code>mdhd</code> container timestamps — now written from <code>state.iphoneCaptureDate</code> (or now, if unset). Previously left as <code>0000:00:00</code>.',
+      ]},
+      { h: 'What you do NOT need to do', items: [
+        '✅ Nothing. Any existing project with the iPhone-meta toggle enabled will pick up the new atoms + timestamps automatically. The GPS picker in the panel now drives BOTH image and video exports.',
+        '🔧 If you want to verify: bundled exiftool at <code>src-tauri/exiftool/exiftool</code>, then <code>./exiftool -G1 -a -s YOUR_EXPORT.mov</code> — look for the <code>[Keys]</code> group and confirm 7+ atoms (or 9+ with GPS) plus non-zero <code>CreateDate</code>/<code>ModifyDate</code>/<code>TrackCreate</code>/<code>MediaCreate</code>.',
+      ]},
+    ]
+  },
   {
     version: '4.7.0',
     date: '2026-05-25',
