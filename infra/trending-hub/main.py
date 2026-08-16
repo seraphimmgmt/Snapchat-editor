@@ -44,7 +44,7 @@ from fastapi import FastAPI, HTTPException, Header, Request, Response
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-HUB_VERSION = "1.3.0"
+HUB_VERSION = "1.3.1"
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 BASE = Path(os.environ.get("TRENDING_HUB_DIR", "/opt/trending-hub"))
 DB_PATH = BASE / "hub.db"
@@ -376,6 +376,27 @@ def sync_hiker(acc, deep):
             with _db_lock, db() as c:
                 c.execute("UPDATE trial_links SET last_error=? WHERE pk=? AND code=?", (str(e)[:200], pk, ln["code"]))
     _status(f"Syncing @{acc['username']} — {len(links)} tracked trial links…")
+    # Trial discovery probe (1 request): HikerAPI documents /v1/user/clips/chunk
+    # as "includes trial publications". Verified NOT true for every account, but
+    # cheap to check — any code that isn't in the profile feed gets auto-tracked
+    # as a trial, so if it ever surfaces we catch it without a manual link.
+    try:
+        j = hiker("/v1/user/clips/chunk", {"user_id": pk})
+        probe = j[0] if isinstance(j, list) and len(j) == 2 else (j.get("items") or [])
+        have = {r["code"] for r in got if r.get("code")} | {r.get("code") for r in load_reels(pk)}
+        tracked_codes = {ln["code"] for ln in links}
+        for it in probe:
+            m = it.get("media", it) if isinstance(it, dict) else {}
+            code = m.get("code")
+            if code and code not in have and code not in tracked_codes:
+                r = norm_hiker_v1_media(m, trial=True); r["discovered"] = True
+                if r["id"]:
+                    got.append(r)
+                    with _db_lock, db() as c:
+                        c.execute("INSERT OR IGNORE INTO trial_links (pk, code, media_id, added, added_by) VALUES (?,?,?,?,?)", (pk, code, r["id"], time.time(), "auto"))
+                    log("sync", "trial_discovered", f"@{acc['username']} {code}")
+    except Exception as e:
+        log("sync", "probe_warn", f"@{acc['username']}: {e}")
     # Posts + carousels from the profile feed. Reels also appear here; the
     # clips pull above stays authoritative for reels (it's the one carrying the
     # trial signal), so reels coming back from /medias are skipped.
