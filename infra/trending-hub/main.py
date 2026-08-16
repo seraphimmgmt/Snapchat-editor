@@ -44,7 +44,8 @@ from fastapi import FastAPI, HTTPException, Header, Request, Response
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-HUB_VERSION = "1.1.0"
+HUB_VERSION = "1.2.0"
+UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 BASE = Path(os.environ.get("TRENDING_HUB_DIR", "/opt/trending-hub"))
 DB_PATH = BASE / "hub.db"
 ADMIN_TOKEN_FILE = BASE / "admin_token"
@@ -127,7 +128,9 @@ def auth(authorization: Optional[str], need: str = "viewer"):
 def _get_json(url, headers, params=None, timeout=30):
     if params:
         url = url + ("&" if "?" in url else "?") + urlparse.urlencode({k: str(v) for k, v in params.items() if v is not None})
-    req = urlreq.Request(url, headers={"accept": "application/json", **headers})
+    # Cloudflare in front of api.hikerapi.com rejects urllib's default UA
+    # (error 1010 "browser signature") — send a normal browser UA.
+    req = urlreq.Request(url, headers={"accept": "application/json", "user-agent": UA, "accept-language": "en-US,en;q=0.9", **headers})
     try:
         with urlreq.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", "replace"))
@@ -198,10 +201,13 @@ def norm_hiker_clip(it, kind="reel"):
         if not thumb and media: thumb = media[0]["img"]
     views = m.get("play_count") if m.get("play_count") is not None else (m.get("view_count") or 0)
     ig_views = m.get("ig_play_count") if m.get("ig_play_count") is not None else views
+    fb = m.get("fb_play_count") if m.get("fb_play_count") is not None else max(0, (views or 0) - (ig_views or 0))
     return {"id": str(m.get("pk") or m.get("id") or ""), "code": m.get("code") or "", "type": typ,
             "ts": (m.get("taken_at") or 0) * 1000, "views": views or 0, "igViews": ig_views or 0,
-            "fb": max(0, (views or 0) - (ig_views or 0)), "likes": m.get("like_count") or 0,
+            "fb": fb or 0, "likes": m.get("like_count") or 0,
             "comments": m.get("comment_count") or 0, "shares": m.get("reshare_count") or m.get("share_count") or 0,
+            "saves": m.get("save_count"), "fbLikes": m.get("fb_like_count"), "fbComments": m.get("fb_comment_count"),
+            "duration": m.get("video_duration") or 0, "inGrid": m.get("is_in_profile_grid"),
             "thumb": thumb, "videoUrl": video, "media": media,
             "trial": (kind == "reel" and not thumb), "source": "hiker",
             "caption": ((m.get("caption") or {}).get("text") if isinstance(m.get("caption"), dict) else m.get("caption_text")) or ""}
@@ -465,7 +471,10 @@ def sync_status(authorization: Optional[str] = Header(default=None)):
 async def sync_now(req: Request, authorization: Optional[str] = Header(default=None)):
     who = auth(authorization, "admin")
     body = await req.json() if req.headers.get("content-length", "0") not in ("0", "") else {}
-    pk, deep, force = body.get("pk"), bool(body.get("deep")), bool(body.get("force"))
+    # `full` = complete backfill (all pages). Plain sync = newest pages only. The
+    # old `deep` name is accepted but no longer means full — clicking SYNC NOW
+    # repeatedly must not cost 30 pages a click.
+    pk, deep, force = body.get("pk"), bool(body.get("full")), bool(body.get("force"))
     last = int(get_setting("last_sync", "0") or 0) / 1000
     if not force and not pk and time.time() - last < 600:
         raise HTTPException(429, "Synced less than 10 minutes ago — pass force=true to override")
@@ -648,14 +657,16 @@ def export_csv(pk: str, authorization: Optional[str] = Header(default=None)):
     if not accs: raise HTTPException(404, "unknown account")
     a = accs[0]
     buf = io.StringIO(); w = csv.writer(buf)
-    w.writerow(["handle", "source", "reel_id", "date", "trial", "total_views", "ig_views", "fb_views", "likes", "comments", "shares", "saves", "reach", "avg_watch_s", "link"])
+    w.writerow(["handle", "source", "type", "reel_id", "date", "trial", "total_views", "ig_views", "fb_views", "likes", "fb_likes", "comments", "fb_comments", "shares", "saves", "reach", "avg_watch_s", "duration_s", "link"])
     from datetime import datetime, timezone
     for r in sorted(load_reels(pk), key=lambda r: -(r.get("views") or 0)):
         date = datetime.fromtimestamp(r["ts"] / 1000, tz=timezone.utc).strftime("%Y-%m-%d") if r.get("ts") else ""
         link = r.get("permalink") or (f"https://www.instagram.com/reel/{r['code']}/" if r.get("code") else "")
-        w.writerow(["@" + a["username"], r.get("source", "hiker"), r["id"], date, "TRIAL" if r.get("trial") else "",
-                    r.get("views", 0), r.get("igViews", 0), r.get("fb", 0), r.get("likes", 0), r.get("comments", 0), r.get("shares", 0),
-                    r.get("saves", ""), r.get("reach", ""), f"{r['watch']/1000:.1f}" if r.get("watch") else "", link])
+        w.writerow(["@" + a["username"], r.get("source", "hiker"), r.get("type", "reel"), r["id"], date, "TRIAL" if r.get("trial") else "",
+                    r.get("views", 0), r.get("igViews", 0), r.get("fb", 0), r.get("likes", 0), r.get("fbLikes") if r.get("fbLikes") is not None else "",
+                    r.get("comments", 0), r.get("fbComments") if r.get("fbComments") is not None else "", r.get("shares", 0),
+                    r.get("saves") if r.get("saves") is not None else "", r.get("reach", ""), f"{r['watch']/1000:.1f}" if r.get("watch") else "",
+                    f"{r['duration']:.1f}" if r.get("duration") else "", link])
     return Response(buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{a["username"]}-reels.csv"'})
 
 # ---- download proxy: CDN media URLs are cross-origin + signed, so `<a download>`
@@ -694,7 +705,7 @@ def download(pk: str, mid: str, idx: int = 0, exp: int = 0, sig: str = ""):
         src = r.get("videoUrl") or r.get("thumb"); ext = "mp4" if r.get("videoUrl") else "jpg"
     if not src: raise HTTPException(404, "no media url stored — re-sync")
     try:
-        up = urlreq.urlopen(urlreq.Request(src, headers={"user-agent": "Mozilla/5.0"}), timeout=60)
+        up = urlreq.urlopen(urlreq.Request(src, headers={"user-agent": UA}), timeout=60)
     except urlerr.HTTPError as e:
         raise HTTPException(410, f"source link expired (HTTP {e.code}) — re-sync the account to refresh media links")
     except Exception as e:

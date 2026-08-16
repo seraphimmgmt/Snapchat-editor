@@ -73,9 +73,10 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .flabel{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.16em;margin-left:12px}
 .sel{background:var(--surface);border:1px solid var(--border);border-radius:2px;padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text);outline:none;cursor:pointer;margin-left:10px}
 .reels{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;padding:12px clamp(16px,3vw,40px) 16px}
-.reel{position:relative;aspect-ratio:9/16;background:var(--surface);border-radius:3px;overflow:hidden;cursor:pointer;border:1px solid transparent}
+.reels{align-items:start}
+.reel{position:relative;height:0;padding-bottom:177.78%;background:var(--surface);border-radius:3px;overflow:hidden;cursor:pointer;border:1px solid transparent}
 .reel:hover{border-color:var(--accent)}
-.reel img{width:100%;height:100%;object-fit:cover}
+.reel>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.78) 0%,transparent 38%,transparent 68%,rgba(0,0,0,.45) 100%);pointer-events:none}
 .rtop{position:absolute;top:7px;left:7px;right:7px;display:flex;justify-content:space-between;align-items:center;z-index:2;gap:6px}
 .rtop .lft{display:flex;align-items:center;gap:5px}
@@ -88,8 +89,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .igtag{font-size:8px;font-family:'JetBrains Mono',monospace;background:linear-gradient(90deg,#7B2CBF,#C300FF);color:#fff;padding:2px 5px;border-radius:6px;font-weight:700}
 .fbtag.dim,.igtag.dim{opacity:.55;font-weight:500}
 .typetag{font-size:8px;font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.25);color:#fff;padding:2px 5px;border-radius:6px;letter-spacing:.08em}
-.reel.post,.reel.carousel{aspect-ratio:4/5}
-.rprev video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+.reel.post,.reel.carousel{padding-bottom:125%}
+.rprev>video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:block}
 .rprev .car{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000}
 .rprev .car img,.rprev .car video{width:100%;height:100%;object-fit:contain}
 .carnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.3);color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;z-index:3}
@@ -111,8 +112,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .veil{position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;z-index:50;padding:12px}
 .rmodal{width:min(660px,96vw);background:var(--surface);border:1px solid var(--accent-dim);border-radius:6px;overflow:hidden;display:grid;grid-template-columns:minmax(150px,220px) 1fr}
 @media(max-width:560px){.rmodal{grid-template-columns:1fr}.rprev{max-height:40vh}}
-.rprev{aspect-ratio:9/16;position:relative;background:rgba(255,255,255,.03);overflow:hidden}
-.rprev img{width:100%;height:100%;object-fit:cover}
+.rprev{position:relative;height:0;padding-bottom:177.78%;background:rgba(255,255,255,.03);overflow:hidden;align-self:start}
+.rprev>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .rinfo{display:flex;flex-direction:column;padding:16px;gap:12px;min-width:0}
 .rmtop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .rmhandle{font-family:'Antonio',sans-serif;font-size:16px;font-weight:700}
@@ -352,7 +353,8 @@ window.openReel = function(pk, id){
   } else {
     document.getElementById('rviews').innerHTML = row('TOTAL VIEWS', r.views) + row('IG VIEWS', r.igViews) + row('FB VIEWS', r.fb);
     document.getElementById('rsplit').innerHTML = r.fb > 0 ? '<div class="split"><span class="ig" style="flex:'+pct+'"></span><span class="fb" style="flex:'+(100-pct)+'"></span></div><div class="sleg"><span class="igk">IG '+pct+'%</span><span class="fbk">FB '+(100-pct)+'%</span></div>' : '<div class="sleg"><span class="igk">IG ONLY — NOT CROSSPOSTED TO FB</span></div>';
-    document.getElementById('rmetrics').innerHTML = row('SHARES', r.shares, 'IG COUNTER') + row('LIKES', r.likes, 'IG COUNTER') + row('COMMENTS', r.comments, 'IG COUNTER') + row('SAVES', 0, 'OWNER INSIGHTS ONLY');
+    const fbl = r.fbLikes != null && r.fb > 0, fbc = r.fbComments != null && r.fb > 0;
+    document.getElementById('rmetrics').innerHTML = row('LIKES', r.likes, fbl ? 'IG ' + fmt(Math.max(0, r.likes - r.fbLikes)) + ' · FB ' + fmt(r.fbLikes) : 'IG COUNTER') + row('COMMENTS', r.comments, fbc ? 'IG ' + fmt(Math.max(0, r.comments - r.fbComments)) + ' · FB ' + fmt(r.fbComments) : 'IG COUNTER') + row('SHARES', r.shares, 'IG COUNTER') + (r.saves != null ? row('SAVES', r.saves, 'IG COUNTER') : row('SAVES', '—', 'NOT RETURNED')) + (r.duration ? row('DURATION', r.duration.toFixed(1) + 's', 'REEL LENGTH') : '');
   }
   const link = r.permalink || (r.code ? 'https://www.instagram.com/' + ((r.type||'reel') === 'reel' ? 'reel/' : 'p/') + r.code + '/' : '');
   const op = document.getElementById('ropen'); op.href = link || '#'; op.classList.toggle('hidden', !link);

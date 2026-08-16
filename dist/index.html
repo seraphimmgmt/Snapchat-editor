@@ -1685,6 +1685,9 @@ EXPORT TO DRIVE
 .trx-stat .v.trx-purple{color:var(--accent-hi,#9D4EDD);}
 .trx-sync-row{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);padding:8px 13px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
 .trx-sync-btn{background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 10px;border-radius:2px;cursor:pointer;letter-spacing:.08em;}
+.trx-syncing{color:var(--accent-hi,#9D4EDD);font-weight:700;animation:trxPulse 1.2s ease-in-out infinite;}
+@keyframes trxPulse{0%,100%{opacity:1}50%{opacity:.45}}
+.trx-chip .trx-dot.busy{background:var(--accent-hi,#9D4EDD);animation:trxPulse 1s ease-in-out infinite;}
 .trx-sync-btn:hover{border-color:var(--accent);color:var(--text);}
 .trx-add{background:transparent;border:2px dashed var(--border-strong);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-faint);min-height:200px;gap:10px;padding:16px;}
 .trx-add:hover{border-color:var(--accent);}
@@ -1727,9 +1730,10 @@ EXPORT TO DRIVE
 .trx-flabel{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.16em;margin-left:12px;}
 .trx-select{background:var(--surface);border:1px solid var(--border);border-radius:2px;padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text);outline:none;cursor:pointer;margin-left:10px;}
 .trx-reels{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;padding:12px clamp(20px,3vw,40px) 16px;overflow-y:auto;flex:1;align-content:start;}
-.trx-reel{position:relative;aspect-ratio:9/16;background:var(--surface);border-radius:3px;overflow:hidden;cursor:pointer;border:1px solid transparent;}
+.trx-reels{align-items:start;}
+.trx-reel{position:relative;height:0;padding-bottom:177.78%;background:var(--surface);border-radius:3px;overflow:hidden;cursor:pointer;border:1px solid transparent;box-sizing:border-box;}
 .trx-reel:hover{border-color:var(--accent);}
-.trx-reel img{width:100%;height:100%;object-fit:cover;display:block;}
+.trx-reel>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;}
 .trx-shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.78) 0%,transparent 38%,transparent 68%,rgba(0,0,0,.45) 100%);pointer-events:none;}
 .trx-rtop{position:absolute;top:7px;left:7px;right:7px;display:flex;justify-content:space-between;align-items:center;z-index:2;gap:6px;}
 .trx-rtop .lft{display:flex;align-items:center;gap:5px;}
@@ -1743,8 +1747,8 @@ EXPORT TO DRIVE
 .trx-igtag{font-size:8px;font-family:'JetBrains Mono',monospace;background:linear-gradient(90deg,#7B2CBF,#C300FF);color:#fff;padding:2px 5px;border-radius:6px;font-weight:700;}
 .trx-fbtag.dim,.trx-igtag.dim{opacity:.55;font-weight:500;}
 .trx-typetag{font-size:8px;font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.25);color:#fff;padding:2px 5px;border-radius:6px;letter-spacing:.08em;}
-.trx-reel.trx-post,.trx-reel.trx-carousel{aspect-ratio:4/5;}
-.trx-rprev video{width:100%;height:100%;object-fit:contain;background:#000;display:block;}
+.trx-reel.trx-post,.trx-reel.trx-carousel{padding-bottom:125%;}
+.trx-rprev>video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:block;}
 .trx-rprev .trx-car{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000;}
 .trx-rprev .trx-car img,.trx-rprev .trx-car video{width:100%;height:100%;object-fit:contain;}
 .trx-carnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.3);color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;z-index:3;}
@@ -1776,8 +1780,8 @@ EXPORT TO DRIVE
 .trx-mnote b{color:var(--accent-hi,#9D4EDD);}
 .trx-mfoot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border);}
 .trx-rmodal{width:min(660px,94vw);background:var(--surface);border:1px solid var(--accent-dim);border-radius:6px;overflow:hidden;display:grid;grid-template-columns:minmax(180px,240px) 1fr;}
-.trx-rprev{aspect-ratio:9/16;position:relative;background:rgba(255,255,255,.03);overflow:hidden;}
-.trx-rprev img{width:100%;height:100%;object-fit:cover;}
+.trx-rprev{position:relative;height:0;padding-bottom:177.78%;background:rgba(255,255,255,.03);overflow:hidden;align-self:start;}
+.trx-rprev>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
 .trx-rinfo{display:flex;flex-direction:column;padding:18px;gap:12px;min-width:0;}
 .trx-rmtop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
 .trx-rmhandle{font-family:'Antonio',sans-serif;font-size:16px;font-weight:700;color:var(--text);}
@@ -1813,10 +1817,10 @@ EXPORT TO DRIVE
     <div class="trx-mbody" style="max-height:72vh;overflow-y:auto;">
       <div style="font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.18em;color:var(--text-dim);">HUB — <span style="color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;">ONE SHARED SYNC · KEYS STAY ON THE SERVER · VAs READ FOR FREE</span></div>
       <div class="trx-field"><label>HUB URL</label><input id="trxHubUrl" placeholder="http://137.184.47.65:8790"></div>
-      <div class="trx-field"><label>YOUR HUB TOKEN — admin (you) or viewer (VA)</label><div style="display:flex;gap:6px;"><input type="password" id="trxHubTok" placeholder="sa_… or sv_…" style="flex:1;"><button class="trx-btn" onclick="trxHubTest()">TEST</button></div></div>
+      <div class="trx-field"><label>YOUR HUB TOKEN — admin (you) or viewer (VA) · pasting a magic link works too</label><div style="display:flex;gap:6px;"><input type="password" id="trxHubTok" placeholder="sa_… or sv_…" style="flex:1;"><button class="trx-btn" onclick="trxHubTest()">TEST</button></div></div>
       <div class="trx-mnote" id="trxHubNote">Not connected — the tab syncs locally on this machine only.</div>
       <div id="trxHubAdmin" class="hidden" style="display:flex;flex-direction:column;gap:12px;">
-        <div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="trx-btn" onclick="trxHubPushLocal()">⬆ PUSH LOCAL DATA TO HUB</button><button class="trx-btn" onclick="trxHubSaveKeys()">SAVE KEYS BELOW TO HUB</button></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="trx-btn" onclick="trxHubPushLocal()">⬆ PUSH LOCAL DATA TO HUB</button><button class="trx-btn" onclick="trxHubSaveKeys()">SAVE KEYS BELOW TO HUB</button><button class="trx-btn" onclick="trxHubFullResync()">⟳ FULL RE-SYNC ALL (≈35 req/acct)</button></div>
         <div style="font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.18em;color:var(--text-dim);">TEAM — <span style="color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;">VIEWER TOKENS FOR VAs · READ + FAVORITE ONLY</span></div>
         <div id="trxTokenList" style="display:flex;flex-direction:column;gap:6px;"></div>
         <div style="display:flex;gap:6px;"><input id="trxNewTokName" placeholder="VA name (e.g. Maria)" style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:2px;padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none;"><button class="trx-btn primary" onclick="trxMintToken()">+ VIEWER TOKEN</button></div>
@@ -1899,6 +1903,7 @@ const trxEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&
 
 let toastT;
 function trxToast(msg){ const t = document.getElementById('trxToast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+window.trxToast = trxToast;
 function trxStatus(msg){ document.getElementById('trxStatusLine').textContent = msg || ''; }
 
 async function trxApi(path, params){
@@ -1931,14 +1936,19 @@ function trxHubStatusLine(){
   if (s.sync && s.sync.lastError) return 'HUB LAST ERROR: ' + s.sync.lastError;
   return s.lastSync ? 'HUB · LAST SYNC ' + new Date(s.lastSync).toLocaleString() + ' · every ' + s.cadence : 'HUB · NO SYNC YET';
 }
-let trxHubPoll = null;
+let trxHubPoll = null, trxHubBusyHint = false;
 function trxHubStartPoll(){
   clearInterval(trxHubPoll);
-  trxHubPoll = setInterval(async () => {
+  const tick = async () => {
     if (!trx.hubUrl || !trx.hubToken) return;
     if (document.getElementById('trendingView').classList.contains('hidden')) return;
-    try { await trxHubRefresh(); trxRenderAll(); trxStatus(trxHubStatusLine()); } catch(e){}
-  }, 15000);
+    try {
+      const s = await trxHubRefresh(); trxRenderAll(); trxStatus(trxHubStatusLine());
+      const busy = !!(s.sync && s.sync.busy);
+      if (busy !== trxHubBusyHint) { trxHubBusyHint = busy; trxHubStartPoll(); }
+    } catch(e){}
+  };
+  trxHubPoll = setInterval(tick, trxHubBusyHint ? 3000 : 15000);
 }
 async function trxMeta(path, params){
   if (!trx.metaToken) throw new Error('No Meta token — open ⚙ settings');
@@ -2015,11 +2025,14 @@ function trxNormClip(it, kind){
   if (type === 'carousel') { (m.carousel_media || []).forEach(c => { const u = trxHikerUrls(c); media.push({ img: u.img, video: u.vid }); }); if (!thumb && media.length) thumb = media[0].img; }
   const views = m.play_count ?? m.view_count ?? 0;
   const igViews = m.ig_play_count ?? views;
+  const fb = m.fb_play_count != null ? m.fb_play_count : Math.max(0, views - igViews);
   return {
     id: String(m.pk || m.id || ''), code: m.code || '', type,
     ts: m.taken_at ? m.taken_at * 1000 : 0,
-    views, igViews, fb: Math.max(0, views - igViews),
+    views, igViews, fb,
     likes: m.like_count ?? 0, comments: m.comment_count ?? 0, shares: m.reshare_count ?? m.share_count ?? 0,
+    saves: m.save_count ?? null, fbLikes: m.fb_like_count ?? null, fbComments: m.fb_comment_count ?? null,
+    duration: m.video_duration || 0, inGrid: m.is_in_profile_grid,
     thumb, videoUrl: vid, media,
     trial: kind === 'reel' && !thumb, source: 'hiker',
     caption: (m.caption && m.caption.text) || m.caption_text || '',
@@ -2089,9 +2102,10 @@ async function trxSyncAccount(pk, deep){
   if (trxIsHub()) {
     if (!trxIsAdmin()) return trxToast('Viewer tokens can\'t trigger a sync');
     try {
-      await trxHubCall('POST', '/trending/sync', { pk, deep: !!deep, force: true });
-      trxToast('Hub sync started'); trxStatus('HUB SYNCING…');
-      setTimeout(async () => { try { await trxHubRefresh(); trxRenderAll(); trxStatus(trxHubStatusLine()); } catch(e){} }, 4000);
+      await trxHubCall('POST', '/trending/sync', { pk, full: false, force: true });
+      trxToast('Hub sync started — newest pages only'); trxStatus('HUB SYNCING…');
+      trxHubBusyHint = true; trxHubStartPoll();
+      setTimeout(async () => { try { await trxHubRefresh(); trxRenderAll(); trxStatus(trxHubStatusLine()); } catch(e){} }, 3000);
     } catch(e){ trxToast(String(e.message || e)); }
     return;
   }
@@ -2151,7 +2165,7 @@ async function trxSyncAccount(pk, deep){
 window.trxSyncAll = async function(){
   if (trxIsHub()) {
     if (!trxIsAdmin()) return trxToast('Viewer tokens can\'t trigger a sync');
-    try { await trxHubCall('POST', '/trending/sync', { force: true }); trxToast('Hub sync-all started'); trxStatus('HUB SYNCING…'); }
+    try { await trxHubCall('POST', '/trending/sync', { force: true }); trxToast('Hub sync-all started — newest pages only'); trxStatus('HUB SYNCING…'); trxHubBusyHint = true; trxHubStartPoll(); }
     catch(e){ trxToast(String(e.message || e)); }
     return;
   }
@@ -2232,6 +2246,9 @@ window.trxToggleFav = async function(pk, id){
   trxToast(i >= 0 ? 'Removed from FAVORITES' : '★ Added to FAVORITES');
 };
 
+function trxAgo(t){ const d = Math.max(0, Date.now() - t); if (d < 60e3) return 'JUST NOW'; if (d < 3600e3) return Math.round(d/60e3) + ' MIN AGO'; if (d < 86400e3) return Math.round(d/3600e3) + ' H AGO'; return trxDate(t); }
+function trxHubIsSyncing(a){ const st = trxIsHub() && trxHub.state && trxHub.state.sync; return !!(st && st.busy && st.status && st.status.indexOf('@' + a.username) >= 0); }
+function trxHubSyncDetail(){ const st = trxHub.state && trxHub.state.sync; const m = st && st.status ? st.status.match(/(page \d+[^…]*|Insights[^…]*|posts page \d+)/) : null; return m ? m[0].toUpperCase() : 'SYNCING…'; }
 function trxAccCard(a){
   const reels = trx.reels[a.pk] || [];
   return '<div class="trx-card' + (a.mine ? ' trx-mine' : '') + '" onclick="trxOpenDetail(\'' + a.pk + '\')">' +
@@ -2245,7 +2262,7 @@ function trxAccCard(a){
     '<div class="trx-stat"><div class="l">REELS SYNCED</div><div class="v">' + reels.length + '</div></div>' +
     '<div class="trx-stat"><div class="l">TRIALS</div><div class="v trx-purple">' + (a.trialCount || 0) + '</div></div>' +
     '</div>' +
-    '<div class="trx-sync-row"><span>' + (a.lastSync ? 'SYNCED ' + trxDate(a.lastSync) : 'NEVER SYNCED') + '</span>' +
+    '<div class="trx-sync-row"><span>' + (trxHubIsSyncing(a) ? '<span class="trx-syncing">⟳ ' + trxEsc(trxHubSyncDetail()) + '</span>' : (a.lastSync ? 'SYNCED ' + trxAgo(a.lastSync) : 'NEVER SYNCED')) + '</span>' +
     '<button class="trx-sync-btn" onclick="event.stopPropagation();trxSyncAccount(\'' + a.pk + '\', false)">⟳ SYNC</button></div></div>';
 }
 
@@ -2272,7 +2289,8 @@ function trxRenderAccounts(){
   document.getElementById('trxMetaState').textContent = hub ? (src && src.meta ? 'on hub' : 'not on hub') : (trx.metaToken ? 'connected' : 'no token');
   const hchip = document.getElementById('trxHubChip');
   hchip.classList.toggle('trx-nokey', !hub);
-  document.getElementById('trxHubState').textContent = hub ? (trxHub.role + (trxHub.name && trxHub.role !== 'admin' ? ' · ' + trxHub.name : '')) : (trx.hubUrl && trx.hubToken ? 'offline' : 'local');
+  hchip.querySelector('.trx-dot').classList.toggle('busy', !!(hub && trxHub.state && trxHub.state.sync && trxHub.state.sync.busy));
+  document.getElementById('trxHubState').textContent = hub ? ((trxHub.state && trxHub.state.sync && trxHub.state.sync.busy) ? 'syncing…' : trxHub.role + (trxHub.name && trxHub.role !== 'admin' ? ' · ' + trxHub.name : '')) : (trx.hubUrl && trx.hubToken ? 'offline' : 'local');
   // Viewer tokens: hide anything that spends requests
   const viewer = hub && !trxIsAdmin();
   document.querySelectorAll('#trendingView .trx-add, #trendingView .trx-sync-btn').forEach(el => el.classList.toggle('hidden', viewer));
@@ -2469,7 +2487,8 @@ window.trxSaveSettings = async function(){
   const mt = document.getElementById('trxMetaInput').value.trim();
   if (mt !== trx.metaToken) { trx.metaToken = mt; trx.metaExpires = 0; }
   trx.cadence = document.getElementById('trxCadence').value;
-  const hu = document.getElementById('trxHubUrl').value.trim().replace(/\/+$/, ''), ht = document.getElementById('trxHubTok').value.trim();
+  let hu = document.getElementById('trxHubUrl').value.trim().replace(/\/+$/, ''), ht = document.getElementById('trxHubTok').value.trim();
+  const ml = ht.match(/^(https?:\/\/[^\/]+)\/trending\/report\.html#t=(.+)$/); if (ml) { hu = ml[1]; ht = decodeURIComponent(ml[2]); }
   const hubChanged = hu !== trx.hubUrl || ht !== trx.hubToken;
   trx.hubUrl = hu; trx.hubToken = ht;
   trxSave();
@@ -2479,7 +2498,8 @@ window.trxSaveSettings = async function(){
   if (!trxIsHub() && hu && ht && trxHub.lastErr) trxToast('Hub: ' + trxHub.lastErr);
 };
 window.trxHubTest = async function(){
-  const hu = document.getElementById('trxHubUrl').value.trim().replace(/\/+$/, ''), ht = document.getElementById('trxHubTok').value.trim();
+  let hu = document.getElementById('trxHubUrl').value.trim().replace(/\/+$/, ''), ht = document.getElementById('trxHubTok').value.trim();
+  const ml = ht.match(/^(https?:\/\/[^\/]+)\/trending\/report\.html#t=(.+)$/); if (ml) { hu = ml[1]; ht = decodeURIComponent(ml[2]); document.getElementById('trxHubUrl').value = hu; document.getElementById('trxHubTok').value = ht; }
   if (!hu || !ht) return trxToast('Hub URL and token needed');
   const oldU = trx.hubUrl, oldT = trx.hubToken; trx.hubUrl = hu; trx.hubToken = ht;
   try {
@@ -2499,6 +2519,11 @@ window.trxHubPushLocal = async function(){
     trxToast('Pushed to hub: ' + r.accounts + ' accounts · ' + r.reels + ' reels · ' + r.snaps + ' snapshots');
     await trxHubRefresh(); trxRenderAll();
   } catch(e){ trxToast(String(e.message || e)); }
+};
+window.trxHubFullResync = async function(){
+  if (!trxIsHub() || !trxIsAdmin()) return trxToast('Connect as admin first');
+  try { await trxHubCall('POST', '/trending/sync', { full: true, force: true }); trxToast('Full re-sync started on hub'); trxHubBusyHint = true; trxHubStartPoll(); trxCloseSettings(); }
+  catch(e){ trxToast(String(e.message || e)); }
 };
 window.trxHubSaveKeys = async function(){
   if (!trxIsHub() || !trxIsAdmin()) return trxToast('Connect as admin first');
@@ -2585,7 +2610,13 @@ window.trxOpenReel = function(pk, id){
     document.getElementById('trxRSplit').innerHTML = r.fb > 0
       ? '<div class="trx-split"><span class="ig" style="flex:' + pct + '"></span><span class="fb" style="flex:' + (100 - pct) + '"></span></div><div class="trx-sleg"><span class="igk">IG ' + pct + '%</span><span class="fbk">FB ' + (100 - pct) + '%</span></div>'
       : '<div class="trx-sleg"><span class="igk">IG ONLY — NOT CROSSPOSTED TO FB</span></div>';
-    document.getElementById('trxRMetrics').innerHTML = row('SHARES', r.shares, 'IG COUNTER') + row('LIKES', r.likes, 'IG COUNTER') + row('COMMENTS', r.comments, 'IG COUNTER') + row('SAVES', 0, 'OWNER INSIGHTS ONLY — USE META SOURCE');
+    const fbl = r.fbLikes != null && r.fb > 0, fbc = r.fbComments != null && r.fb > 0;
+    document.getElementById('trxRMetrics').innerHTML =
+      row('LIKES', r.likes, fbl ? 'IG ' + trxFmt(Math.max(0, r.likes - r.fbLikes)) + ' · FB ' + trxFmt(r.fbLikes) : 'IG COUNTER') +
+      row('COMMENTS', r.comments, fbc ? 'IG ' + trxFmt(Math.max(0, r.comments - r.fbComments)) + ' · FB ' + trxFmt(r.fbComments) : 'IG COUNTER') +
+      row('SHARES', r.shares, 'IG COUNTER') +
+      (r.saves != null ? row('SAVES', r.saves, 'IG COUNTER') : row('SAVES', '—', 'NOT RETURNED')) +
+      (r.duration ? row('DURATION', r.duration.toFixed(1) + 's', 'REEL LENGTH') : '');
   }
   const openUrl = u => { const inv = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke; if (inv) inv('open_url', { url: u }); else window.open(u, '_blank'); };
   document.getElementById('trxROpen').onclick = () => (r.permalink || r.code) ? openUrl(r.permalink || ('https://www.instagram.com/reel/' + r.code + '/')) : trxToast('No permalink code in response');
@@ -2649,9 +2680,9 @@ window.trxViewCreator = function(){
 window.trxCsv = function(){
   if (!trxSel) return;
   const a = trx.accounts.find(x => x.pk === trxSel);
-  const rows = [['handle','source','type','reel_id','date','trial','total_views','ig_views','fb_views','likes','comments','shares','saves','reach','avg_watch_s','link']];
+  const rows = [['handle','source','type','reel_id','date','trial','total_views','ig_views','fb_views','likes','fb_likes','comments','fb_comments','shares','saves','reach','avg_watch_s','duration_s','link']];
   [...(trx.reels[trxSel] || [])].sort((x, y) => y.views - x.views).forEach(r => {
-    rows.push(['@' + a.username, r.source || 'hiker', r.type || 'reel', r.id, r.ts ? new Date(r.ts).toISOString().slice(0, 10) : '', r.trial ? 'TRIAL' : '', r.views, r.igViews, r.fb, r.likes, r.comments, r.shares, r.saves ?? '', r.reach ?? '', r.watch ? (r.watch / 1000).toFixed(1) : '', r.permalink || (r.code ? 'https://www.instagram.com/reel/' + r.code + '/' : '')]);
+    rows.push(['@' + a.username, r.source || 'hiker', r.type || 'reel', r.id, r.ts ? new Date(r.ts).toISOString().slice(0, 10) : '', r.trial ? 'TRIAL' : '', r.views, r.igViews, r.fb, r.likes, r.fbLikes ?? '', r.comments, r.fbComments ?? '', r.shares, r.saves ?? '', r.reach ?? '', r.watch ? (r.watch / 1000).toFixed(1) : '', r.duration ? r.duration.toFixed(1) : '', r.permalink || (r.code ? 'https://www.instagram.com/' + ((r.type || 'reel') === 'reel' ? 'reel/' : 'p/') + r.code + '/' : '')]);
   });
   const csv = rows.map(r => r.join(',')).join('\n');
   navigator.clipboard.writeText(csv).then(() => trxToast('CSV copied — paste into Sheets for the VAs'), () => trxToast('Clipboard blocked'));
@@ -8661,7 +8692,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.11.0';
+const APP_VERSION = '4.11.1';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -17541,6 +17572,26 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.11.1',
+    date: '2026-08-16',
+    title: 'TRENDING fixes from the first real sync — grid layout, live sync signal, real saves + FB likes/comments, cheaper SYNC NOW',
+    sections: [
+      { h: '🩹 Fixes', items: [
+        '🧱 <b>Reel grid collapsed into strips</b> in the desktop webview once an account had hundreds of items (WebKit ignored the aspect-ratio sizing). Cards are now sized explicitly — verified on a real 336-item account.',
+        '🍞 COPY MAGIC LINK / COPY TOKEN in TEAM crashed their toast (copy still worked). Fixed.',
+        '💸 <b>SYNC NOW / SYNC ALL on the hub are now "newest pages only"</b> (~3 requests). Before, every click re-ran a full 28-page backfill. Full re-sync moved to ⚙ → HUB → <b>FULL RE-SYNC ALL</b>, labelled with its cost.',
+      ]},
+      { h: '📡 Clearer sync signal', items: [
+        '⟳ While the hub is syncing, the account card shows a pulsing purple pill with live progress (<code>PAGE 12 (140 REELS)</code>), the HUB chip pulses and reads <b>syncing…</b>, and the app polls every 3s until it finishes. Cards then read <b>SYNCED 2 MIN AGO</b>.',
+      ]},
+      { h: '📊 Real data from HikerAPI (learned from the first sync)', items: [
+        '🔖 <b>Saves are returned for any public account</b> (<code>save_count</code>) — no longer owner-only. Shown in the reel modal and CSV.',
+        '📘 <b>FB likes / FB comments / FB views</b> are real fields — the modal now shows <code>LIKES 871 · IG 322 · FB 549</code>-style splits and CSV gains <code>fb_likes</code>, <code>fb_comments</code>, <code>duration_s</code>.',
+        '🔗 The HUB token field accepts a pasted <b>magic link</b> — VAs can use the same link in the browser <em>or</em> the desktop app.',
+      ]},
+    ],
+  },
   {
     version: '4.11.0',
     date: '2026-08-16',
