@@ -17260,6 +17260,34 @@ function ensureSettingsModal() {
 // ============================================================================
 const PATCH_NOTES = [
   {
+    version: '4.10.0',
+    date: '2026-08-16',
+    title: 'TRENDING — Meta API source: owner insights (saves, reach, watch time) alongside HikerAPI',
+    sections: [
+      { h: '📊 Meta API as a second data source', items: [
+        '🔑 <b>Per-account source.</b> Track your own account through the <b>Instagram API with Instagram Login</b> (Meta) instead of — or alongside — HikerAPI. Add-account picker: <b>HIKERAPI · ANY</b> / <b>META · MINE</b>. Meta only sees the token owner\'s account, but returns what nobody else can: <b>saves</b>, <b>reach</b>, <b>shares</b>, and <b>average watch time</b> per reel.',
+        '📈 <b>Growth chart populated on first sync.</b> Meta\'s <code>follower_count</code> daily insight seeds 30 days of follower history instantly; HikerAPI accounts still build history one snapshot per sync.',
+        '⚙ <b>Settings → DATA SOURCES:</b> Meta token with <b>TEST</b> and <b>↻ REFRESH</b> (long-lived tokens last 60 days; expiry tracked). Sort by saves; CSV export gains <code>saves</code>, <code>reach</code>, <code>avg_watch_s</code> columns.',
+        '⚠️ Meta cannot see active trial reels (Meta only exposes trials for <em>publishing</em>) and doesn\'t split IG/FB views — the reel modal says so per source rather than showing blanks.',
+      ]},
+    ],
+  },
+  {
+    version: '4.9.0',
+    date: '2026-08-16',
+    title: 'TRENDING tab — HikerAPI account tracking, trial-reel auto-tag, IG/FB views, favorites, VA export',
+    sections: [
+      { h: '⚡ New TRENDING tab', items: [
+        '👥 <b>Track any Instagram account</b> (public or restricted) via <b>HikerAPI</b> — followers, avg reel views, reel count, trials. Pin creators with ★. Your own account gets a <b>MINE</b> badge. Requests go through the app\'s Rust side (webview CORS can\'t reach HikerAPI directly).',
+        '◌ <b>Trial reels auto-tagged.</b> Reels returned <em>without a thumbnail</em> are flagged <b>TRIAL</b> — dashed card, own filter tab, counted per account.',
+        '📺 <b>Views: TOTAL / IG / FB.</b> HikerAPI returns <code>play_count</code> and <code>ig_play_count</code>; the difference is Facebook views on crossposted reels. FB filter shows crossposted reels only; the reel modal draws the IG/FB split bar. Likes/comments/shares are IG-side counters (FB engagement stays on Facebook); saves are owner-only.',
+        '★ <b>Favorites</b> sub-tab across all tracked accounts. Reel modal: metrics, <b>⬇ Download</b>, <b>↗ Open Link</b>, <b>⚡ View Creator</b>.',
+        '📈 <b>Account growth</b> bar chart from locally stored follower snapshots (7D / 15D / 30D, hover for daily gain).',
+        '📋 <b>VA export:</b> COPY SUMMARY (top reels + active trials as text) and COPY CSV (ranked, with links) for the team sheet.',
+      ]},
+    ],
+  },
+  {
     version: '4.8.0',
     date: '2026-08-12',
     title: 'Provenance reader expansion — C2PA on video, AI-generator markers, full breakdown + verdict badge (plus editor-tab GPS picker)',
