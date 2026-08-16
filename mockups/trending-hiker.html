@@ -382,6 +382,12 @@ main{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;}
       <option value="comments">SORT: COMMENTS</option>
       <option value="saves">SORT: SAVES</option>
     </select>
+    <span class="label" style="margin-left:12px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.16em;">VIEWS</span>
+    <div class="range-chips" id="views-src" style="margin-left:6px">
+      <button class="range-chip active" data-src="total">TOTAL</button>
+      <button class="range-chip" data-src="ig">IG</button>
+      <button class="range-chip" data-src="fb">FB</button>
+    </div>
     <span class="legend-strip">◌ no thumbnail returned → auto-tagged <b>TRIAL</b> · ★ favorite → FAVORITES tab</span>
   </div>
 
@@ -493,7 +499,8 @@ const VIEWS_DAILY = [41200,44800,39500,52100,47300,42800,50900,58200,53400,66100
 const DATES = GAINS.map((_, i) => { const d = new Date(2026, 7, 16); d.setDate(d.getDate() - (GAINS.length - 1 - i)); return d.toLocaleDateString('en-US', {month:'short', day:'2-digit'}).toUpperCase(); });
 
 const fmt = n => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(n<1e4?1:0)+'K' : n;
-let filter = 'all', sortKey = 'recent';
+let filter = 'all', sortKey = 'recent', viewMode = 'total';
+const vv = r => viewMode === 'ig' ? r.views - (r.fb||0) : viewMode === 'fb' ? (r.fb||0) : r.views;
 const FAVS = new Set([1, 6]);
 let modalReelId = null;
 
@@ -556,7 +563,7 @@ function reelCardHTML(r, opts = {}){
   const handle = opts.showHandle ? `<div class="reel-handle">@akira.souls</div>` : '';
   const stats = `
     <div class="reel-stats">
-      <span class="reel-stat">▶ ${fmt(r.views)}</span>
+      <span class="reel-stat">▶ ${fmt(vv(r))}</span>
       <span class="reel-stat">♥ ${fmt(r.likes)}</span>
       <span class="reel-stat">↗ ${fmt(r.shares)}</span>
     </div>`;
@@ -583,10 +590,11 @@ function reelCardHTML(r, opts = {}){
 function render(){
   let list = [...REELS];
   if (filter === 'trial') list = list.filter(r => r.trial);
-  const ranked = [...REELS].filter(r=>!r.trial).sort((a,b)=>b.views-a.views).map(r=>r.id);
+  if (viewMode === 'fb') list = list.filter(r => r.fb > 0);
+  const ranked = [...REELS].filter(r=>!r.trial).sort((a,b)=>vv(b)-vv(a)).map(r=>r.id);
   if (filter === 'top' || sortKey !== 'recent'){
     const k = sortKey === 'recent' ? 'views' : sortKey;
-    list.sort((a,b)=>b[k]-a[k]);
+    list.sort((a,b) => k === 'views' ? vv(b)-vv(a) : b[k]-a[k]);
   }
   document.getElementById('reel-grid').innerHTML = list.map((r, i) => {
     const rank = ranked.indexOf(r.id) + 1;
@@ -731,6 +739,13 @@ document.querySelectorAll('#cd-filters .filter-tab').forEach(t => t.addEventList
   render();
 }));
 document.getElementById('reel-sort').addEventListener('change', e => { sortKey = e.target.value; render(); });
+document.querySelectorAll('#views-src .range-chip').forEach(c => c.addEventListener('click', () => {
+  document.querySelectorAll('#views-src .range-chip').forEach(x => x.classList.remove('active'));
+  c.classList.add('active');
+  viewMode = c.dataset.src;
+  render();
+  toast(viewMode === 'fb' ? 'FB views — crossposted reels only' : viewMode === 'ig' ? 'IG-only views' : 'Total views (IG + FB)');
+}));
 
 function openDetail(){ document.getElementById('view-grid').classList.add('hidden'); document.getElementById('view-detail').classList.remove('hidden'); render(); renderGrowth(); }
 function closeDetail(){ document.getElementById('view-detail').classList.add('hidden'); document.getElementById('view-grid').classList.remove('hidden'); renderFavs(); }
