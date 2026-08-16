@@ -89,6 +89,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .igtag{font-size:8px;font-family:'JetBrains Mono',monospace;background:linear-gradient(90deg,#7B2CBF,#C300FF);color:#fff;padding:2px 5px;border-radius:6px;font-weight:700}
 .fbtag.dim,.igtag.dim{opacity:.55;font-weight:500}
 .typetag{font-size:8px;font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.25);color:#fff;padding:2px 5px;border-radius:6px;letter-spacing:.08em}
+.gradtag{font-size:8px;font-family:'JetBrains Mono',monospace;background:var(--green);color:#050507;padding:2px 5px;border-radius:6px;letter-spacing:.08em;font-weight:700}
 .reel.post,.reel.carousel{padding-bottom:125%}
 .rprev>video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:block}
 .rprev .car{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000}
@@ -281,13 +282,13 @@ function reelCard(pk, r, opts){
   const rank = opts.rank ? '<div class="rank r' + opts.rank + '">' + opts.rank + '</div>' : '';
   const plat = r.fb > 0 ? ((r.igViews||0) >= r.fb ? '<span class="igtag">IG</span><span class="fbtag dim">FB</span>' : '<span class="fbtag">FB</span><span class="igtag dim">IG</span>') : '';
   const type = r.type || 'reel';
-  const typeTag = type === 'carousel' ? '<span class="typetag">▦ ' + ((r.media||[]).length || '') + '</span>' : type === 'post' ? '<span class="typetag">POST</span>' : type === 'video' ? '<span class="typetag">VIDEO</span>' : '';
+  const typeTag = (type === 'carousel' ? '<span class="typetag">▦ ' + ((r.media||[]).length || '') + '</span>' : type === 'post' ? '<span class="typetag">POST</span>' : type === 'video' ? '<span class="typetag">VIDEO</span>' : '') + (r.graduated ? '<span class="gradtag">GRADUATED</span>' : (r.linkTracked && r.trial ? '<span class="typetag">LINK</span>' : ''));
   const handle = opts.handle ? '<div class="rhandle">@' + esc(opts.handle) + '</div>' : '';
   const stats = (type === 'reel' || type === 'video')
     ? '<div class="rstats"><span>▶ ' + fmt(vv(r)) + '</span><span>♥ ' + fmt(r.likes) + '</span><span>↗ ' + fmt(r.shares) + '</span></div>'
-    : '<div class="rstats"><span>♥ ' + fmt(r.likes) + '</span><span>💬 ' + fmt(r.comments) + '</span>' + (r.saves ? '<span>🔖 ' + fmt(r.saves) + '</span>' : '<span></span>') + '</div>';
+    : '<div class="rstats">' + (r.views > 0 ? '<span>▶ ' + fmt(r.views) + '</span>' : '') + '<span>♥ ' + fmt(r.likes) + '</span><span>💬 ' + fmt(r.comments) + '</span>' + (r.saves ? '<span>🔖 ' + fmt(r.saves) + '</span>' : (r.views > 0 ? '' : '<span></span>')) + '</div>';
   const top = '<div class="rtop"><span class="lft">' + star + rank + plat + typeTag + '</span><span class="rdate">' + (r.ts ? dt(r.ts) : '') + '</span></div>';
-  if (r.trial) return '<div class="reel trial" onclick="openReel(\'' + esc(pk) + '\',\'' + esc(r.id) + '\')"><div class="shade"></div>' + top + '<div class="trialc"><div class="trialb">TRIAL</div><div class="nothumb">NO THUMBNAIL</div></div>' + handle + stats + '</div>';
+  if (r.trial) return '<div class="reel trial" onclick="openReel(\'' + esc(pk) + '\',\'' + esc(r.id) + '\')">' + (r.thumb ? '<img loading="lazy" referrerpolicy="no-referrer" src="' + esc(r.thumb) + '" onerror="this.remove()">' : '') + '<div class="shade"></div>' + top + (r.thumb ? '<div class="trialb" style="position:absolute;top:34px;left:7px;z-index:2">TRIAL</div>' : '<div class="trialc"><div class="trialb">TRIAL</div><div class="nothumb">NO THUMBNAIL</div></div>') + handle + stats + '</div>';
   return '<div class="reel ' + type + '" onclick="openReel(\'' + esc(pk) + '\',\'' + esc(r.id) + '\')">' + (r.thumb ? '<img loading="lazy" referrerpolicy="no-referrer" src="' + esc(r.thumb) + '" onerror="this.remove()">' : '') + '<div class="shade"></div>' + top + handle + stats + '</div>';
 }
 function renderReels(){
@@ -308,7 +309,7 @@ function renderReels(){
   const ranked = all.filter(r => !r.trial && (tOf(r) === 'reel' || tOf(r) === 'video')).sort((a,b) => vv(b) - vv(a)).map(r => r.id);
   if (filter === 'top' || sortKey !== 'recent') { let k = sortKey === 'recent' ? 'views' : sortKey; if (nonVideo && k === 'views') k = 'likes'; list.sort((a,b) => k === 'views' ? vv(b) - vv(a) : (b[k]||0) - (a[k]||0)); }
   else list.sort((a,b) => (b.ts||0) - (a.ts||0));
-  document.getElementById('reelGrid').innerHTML = list.length ? list.map(r => { const rk = ranked.indexOf(r.id) + 1; return reelCard(sel, r, { rank: (filter === 'top' && rk >= 1 && rk <= 3) ? rk : 0 }); }).join('') : '<div class="empty"><span>' + (all.length ? (days ? 'NOTHING POSTED IN THE LAST ' + days + ' DAYS FOR THIS FILTER' : 'NOTHING MATCHES THIS FILTER') : 'NO REELS SYNCED YET') + '</span></div>';
+  document.getElementById('reelGrid').innerHTML = list.length ? list.map(r => { const rk = ranked.indexOf(r.id) + 1; return reelCard(sel, r, { rank: (filter === 'top' && rk >= 1 && rk <= 3) ? rk : 0 }); }).join('') : '<div class="empty"><span>' + (filter === 'trial' ? 'NO TRIALS TRACKED YET — THE ADMIN ADDS THEIR SHARE LINKS FROM SERAPHIM STUDIO' : all.length ? (days ? 'NOTHING POSTED IN THE LAST ' + days + ' DAYS FOR THIS FILTER' : 'NOTHING MATCHES THIS FILTER') : 'NO REELS SYNCED YET') + '</span></div>';
   const a = S.accounts.find(x => x.pk === sel);
   document.getElementById('exportNote').textContent = a && a.lastSync ? 'LAST SYNC ' + new Date(a.lastSync).toLocaleString() + ' · ' + all.length + ' REELS · VIA ' + (a.source === 'meta' ? 'META API' : 'HIKERAPI') : '';
 }
@@ -348,11 +349,11 @@ window.openReel = function(pk, id){
   const a = S.accounts.find(x => x.pk === pk);
   carIdx = 0; renderPreview(r);
   document.getElementById('rhandle').textContent = '@' + (a ? a.username : '');
-  document.getElementById('rdate').textContent = (r.type || 'reel').toUpperCase() + (r.ts ? ' · POSTED ' + new Date(r.ts).toLocaleDateString() : '') + (r.caption ? ' · ' + r.caption.slice(0, 90).replace(/\s+/g,' ') + (r.caption.length > 90 ? '…' : '') : '');
+  document.getElementById('rdate').textContent = (r.type || 'reel').toUpperCase() + (r.trial ? ' · TRIAL' + (r.linkTracked ? ' (TRACKED BY LINK)' : '') : '') + (r.graduated ? ' · GRADUATED ✓' : '') + (r.ts ? ' · POSTED ' + new Date(r.ts).toLocaleDateString() : '') + (r.caption ? ' · ' + r.caption.slice(0, 90).replace(/\s+/g,' ') + (r.caption.length > 90 ? '…' : '') : '');
   const row = (l,v,tag) => '<div class="mrow"><div class="mt"><span class="ml">'+l+'</span><span class="mv">'+(typeof v==='string'?v:fmt(v))+'</span></div>'+(tag?'<div class="mtag">'+tag+'</div>':'')+'</div>';
   const pct = r.views ? Math.round((r.igViews||0)/r.views*100) : 100;
   if (r.source === 'meta') {
-    document.getElementById('rviews').innerHTML = row('VIEWS', r.views, 'META INSIGHTS') + row('REACH', r.reach||0, 'UNIQUE ACCOUNTS') + row('AVG WATCH', r.watch ? (r.watch/1000).toFixed(1)+'s' : '—', 'RETENTION');
+    document.getElementById('rviews').innerHTML = row('VIEWS', r.views, 'META INSIGHTS') + row('REACH', r.reach||0, 'UNIQUE ACCOUNTS') + ((r.type||'reel') === 'reel' ? row('AVG WATCH', r.watch ? (r.watch/1000).toFixed(1)+'s' : '—', 'RETENTION') : row('SAVES', r.saves||0, 'META INSIGHTS'));
     document.getElementById('rsplit').innerHTML = '<div class="sleg"><span class="igk">SOURCE: META API — IG/FB SPLIT NOT EXPOSED · SAVES ARE REAL</span></div>';
     document.getElementById('rmetrics').innerHTML = row('SAVES', r.saves||0, 'META INSIGHTS') + row('SHARES', r.shares||0, 'META INSIGHTS') + row('LIKES', r.likes, 'IG COUNTER') + row('COMMENTS', r.comments, 'IG COUNTER');
   } else {

@@ -44,7 +44,7 @@ from fastapi import FastAPI, HTTPException, Header, Request, Response
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-HUB_VERSION = "1.2.1"
+HUB_VERSION = "1.3.0"
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 BASE = Path(os.environ.get("TRENDING_HUB_DIR", "/opt/trending-hub"))
 DB_PATH = BASE / "hub.db"
@@ -82,6 +82,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS snaps (pk TEXT, t REAL, followers INTEGER, seeded INTEGER DEFAULT 0, PRIMARY KEY (pk, t));
         CREATE TABLE IF NOT EXISTS favs (key TEXT PRIMARY KEY, created REAL);
         CREATE TABLE IF NOT EXISTS log (t REAL, actor TEXT, action TEXT, detail TEXT);
+        CREATE TABLE IF NOT EXISTS trial_links (pk TEXT, code TEXT, media_id TEXT, added REAL, added_by TEXT,
+            graduated_at REAL, last_error TEXT, PRIMARY KEY (pk, code));
         """)
     # Bootstrap admin token from file (deploy.sh writes it).
     if ADMIN_TOKEN_FILE.exists():
@@ -212,6 +214,40 @@ def norm_hiker_clip(it, kind="reel"):
             "trial": (kind == "reel" and not thumb), "source": "hiker",
             "caption": ((m.get("caption") or {}).get("text") if isinstance(m.get("caption"), dict) else m.get("caption_text")) or ""}
 
+TRIAL_LINK_RE = __import__("re").compile(r"instagram\.com/(?:[^/]+/)?(?:reel|reels|p|tv)/([A-Za-z0-9_-]+)")
+def code_from_link(s):
+    s = (s or "").strip()
+    m = TRIAL_LINK_RE.search(s)
+    if m: return m.group(1)
+    return s if s and "/" not in s and " " not in s and len(s) < 40 else ""
+
+def norm_hiker_v1_media(m, trial=True):
+    """/v1/media/by/code returns a flattened shape (image_versions list, caption_text, video_url)."""
+    m = m or {}
+    ivs = m.get("image_versions") or []
+    thumb = m.get("thumbnail_url") or (ivs[0].get("url") if ivs and isinstance(ivs[0], dict) else None)
+    mt = m.get("media_type"); pt = (m.get("product_type") or "").lower()
+    typ = "carousel" if mt == 8 else "post" if mt == 1 else ("reel" if "clip" in pt or "reel" in pt or mt == 2 else "reel")
+    media = []
+    for c in m.get("resources") or []:
+        civ = c.get("image_versions") or []
+        media.append({"img": c.get("thumbnail_url") or (civ[0].get("url") if civ and isinstance(civ[0], dict) else None), "video": c.get("video_url")})
+    ta = m.get("taken_at")
+    ts = 0
+    if isinstance(ta, (int, float)): ts = int(ta * 1000)
+    elif isinstance(ta, str):
+        try:
+            from datetime import datetime
+            ts = int(datetime.fromisoformat(ta.replace("Z", "+00:00")).timestamp() * 1000)
+        except Exception: ts = 0
+    views = m.get("play_count") if m.get("play_count") is not None else (m.get("view_count") or 0)
+    return {"id": str(m.get("pk") or m.get("id") or ""), "code": m.get("code") or "", "type": typ,
+            "ts": ts, "views": views or 0, "igViews": m.get("ig_play_count") if m.get("ig_play_count") is not None else (views or 0),
+            "fb": m.get("fb_play_count") or 0, "likes": m.get("like_count") or 0, "comments": m.get("comment_count") or 0,
+            "shares": m.get("reshare_count") or 0, "saves": m.get("save_count"), "duration": m.get("video_duration") or 0,
+            "thumb": thumb, "videoUrl": m.get("video_url"), "media": media,
+            "trial": bool(trial), "linkTracked": True, "source": "hiker", "caption": (m.get("caption_text") or "")[:300]}
+
 def norm_meta_user(j):
     j = j or {}
     return {"pk": "meta:" + str(j.get("id") or j.get("user_id") or ""), "username": j.get("username") or "",
@@ -311,6 +347,35 @@ def sync_hiker(acc, deep):
         pages += 1
         _status(f"Syncing @{acc['username']} — page {pages} ({len(got)} reels)…")
         if not page_id or pages >= max_pages or not items: break
+    # Tracked trial links (trials never appear in the outsider clips feed — the
+    # admin pastes their share links; we refresh each by code until it graduates
+    # into the clips list). 1 request per active link per sync; links older than
+    # 30 days stop refreshing.
+    clip_ids = {r["id"] for r in got}
+    with _db_lock, db() as c:
+        links = [dict(r) for r in c.execute("SELECT * FROM trial_links WHERE pk=?", (pk,))]
+    for ln in links:
+        if ln.get("media_id") and ln["media_id"] in clip_ids:
+            grad_at = ln.get("graduated_at") or time.time()
+            if not ln.get("graduated_at"):
+                with _db_lock, db() as c:
+                    c.execute("UPDATE trial_links SET graduated_at=? WHERE pk=? AND code=?", (grad_at, pk, ln["code"]))
+            for r in got:
+                if r["id"] == ln["media_id"]: r["graduated"] = True; r["graduatedAt"] = int(grad_at * 1000); r["linkTracked"] = True
+            continue
+        if ln.get("graduated_at"): continue
+        if time.time() - (ln.get("added") or 0) > 30 * 86400: continue
+        try:
+            mj = hiker("/v1/media/by/code", {"code": ln["code"]})
+            r = norm_hiker_v1_media(mj if isinstance(mj, dict) else {}, trial=True)
+            if r["id"]:
+                got.append(r)
+                with _db_lock, db() as c:
+                    c.execute("UPDATE trial_links SET media_id=?, last_error=NULL WHERE pk=? AND code=?", (r["id"], pk, ln["code"]))
+        except Exception as e:
+            with _db_lock, db() as c:
+                c.execute("UPDATE trial_links SET last_error=? WHERE pk=? AND code=?", (str(e)[:200], pk, ln["code"]))
+    _status(f"Syncing @{acc['username']} — {len(links)} tracked trial links…")
     # Posts + carousels from the profile feed. Reels also appear here; the
     # clips pull above stays authoritative for reels (it's the one carrying the
     # trial signal), so reels coming back from /medias are skipped.
@@ -456,8 +521,12 @@ def state(authorization: Optional[str] = Header(default=None)):
     snaps = {a["pk"]: load_snaps(a["pk"]) for a in accounts}
     with _db_lock, db() as c:
         favs = [r["key"] for r in c.execute("SELECT key FROM favs ORDER BY created")]
+    with _db_lock, db() as c:
+        tl = {}
+        for r in c.execute("SELECT pk, code, media_id, added, added_by, graduated_at, last_error FROM trial_links ORDER BY added DESC"):
+            tl.setdefault(r["pk"], []).append(dict(r))
     return {"role": who["role"], "tokenName": who["name"], "accounts": accounts, "reels": reels, "snaps": snaps,
-            "favs": favs, "lastSync": int(get_setting("last_sync", "0") or 0), "cadence": get_setting("cadence", "24h"),
+            "favs": favs, "trialLinks": tl, "lastSync": int(get_setting("last_sync", "0") or 0), "cadence": get_setting("cadence", "24h"),
             "sources": {"hiker": bool(get_setting("hiker_key")), "meta": bool(get_setting("meta_token"))},
             "sync": {"busy": _sync["busy"], "status": _sync["status"], "lastError": _sync["lastError"]},
             "hubVersion": HUB_VERSION}
@@ -508,6 +577,56 @@ async def add_account(req: Request, authorization: Optional[str] = Header(defaul
     log(who["name"], "add_account", f"@{acc['username']} via {source}")
     threading.Thread(target=run_sync, kwargs={"pks": [acc["pk"]], "deep": True, "actor": who["name"]}, daemon=True).start()
     return {"account": acc}
+
+@app.post("/trending/trials")
+async def add_trials(req: Request, authorization: Optional[str] = Header(default=None)):
+    """Admin pastes trial-reel share links. Each is fetched by code now (1 request) and refreshed on every sync until it graduates."""
+    who = auth(authorization, "admin")
+    body = await req.json()
+    pk = str(body.get("pk") or "")
+    if not any(a["pk"] == pk for a in load_accounts()): raise HTTPException(404, "unknown account")
+    codes = []
+    for raw in (body.get("links") or []):
+        for piece in str(raw).replace(",", "\n").split("\n"):
+            c = code_from_link(piece)
+            if c and c not in codes: codes.append(c)
+    if not codes: raise HTTPException(400, "no instagram links/codes found")
+    added, failed = [], []
+    for code in codes:
+        try:
+            mj = hiker("/v1/media/by/code", {"code": code})
+            r = norm_hiker_v1_media(mj if isinstance(mj, dict) else {}, trial=True)
+            if not r["id"]: raise RuntimeError("no media in response")
+            existing = {x["id"]: x for x in load_reels(pk)}
+            if r["id"] in existing and not existing[r["id"]].get("trial"):
+                r["trial"] = False; r["graduated"] = True   # already a normal reel on the profile
+            save_reels(pk, [r])
+            with _db_lock, db() as c:
+                c.execute("INSERT INTO trial_links (pk, code, media_id, added, added_by, graduated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(pk,code) DO UPDATE SET media_id=excluded.media_id, last_error=NULL",
+                          (pk, code, r["id"], time.time(), who["name"], time.time() if r.get("graduated") else None))
+            added.append({"code": code, "id": r["id"], "views": r["views"], "graduated": bool(r.get("graduated"))})
+        except Exception as e:
+            failed.append({"code": code, "error": str(e)[:160]})
+    accs = [a for a in load_accounts() if a["pk"] == pk]
+    if accs:
+        allr = load_reels(pk); accs[0]["trialCount"] = sum(1 for r in allr if r.get("trial")); save_account(accs[0])
+    log(who["name"], "add_trials", f"{len(added)} added, {len(failed)} failed")
+    return {"added": added, "failed": failed}
+
+@app.delete("/trending/trials/{pk}/{code}")
+def del_trial(pk: str, code: str, authorization: Optional[str] = Header(default=None)):
+    who = auth(authorization, "admin")
+    with _db_lock, db() as c:
+        row = c.execute("SELECT media_id, graduated_at FROM trial_links WHERE pk=? AND code=?", (pk, code)).fetchone()
+        if not row: raise HTTPException(404, "unknown trial link")
+        c.execute("DELETE FROM trial_links WHERE pk=? AND code=?", (pk, code))
+        if row["media_id"] and not row["graduated_at"]:
+            c.execute("DELETE FROM reels WHERE pk=? AND id=?", (pk, row["media_id"]))
+    accs = [a for a in load_accounts() if a["pk"] == pk]
+    if accs:
+        allr = load_reels(pk); accs[0]["trialCount"] = sum(1 for r in allr if r.get("trial")); save_account(accs[0])
+    log(who["name"], "del_trial", code)
+    return {"ok": True}
 
 @app.delete("/trending/accounts/{pk}")
 def del_account(pk: str, authorization: Optional[str] = Header(default=None)):

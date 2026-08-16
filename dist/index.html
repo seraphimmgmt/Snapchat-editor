@@ -1640,6 +1640,11 @@ EXPORT TO DRIVE
         <button class="trx-rchip" data-src="fb">FB</button>
       </div>
     </div>
+    <div class="trx-trialbar hidden" id="trxTrialBar">
+      <textarea id="trxTrialLinks" placeholder="paste trial reel share links — one per line (Share → Copy link on the phone)"></textarea>
+      <button class="trx-btn primary" onclick="trxAddTrialLinks()">+ TRACK TRIALS</button>
+      <div class="hint">Trials never appear in the public reels feed, so they're tracked by link: fetched now (1 request each), refreshed on every sync, and auto-marked <b style="color:var(--green)">GRADUATED</b> when they show up on the profile.</div>
+    </div>
     <div class="trx-reels" id="trxReelGrid"></div>
     <div class="trx-export">
       <span class="trx-note" id="trxExportNote"></span><span class="trx-note" id="trxRangeNote" style="color:var(--accent-hi,#9D4EDD);"></span>
@@ -1754,6 +1759,11 @@ EXPORT TO DRIVE
 .trx-igtag{font-size:8px;font-family:'JetBrains Mono',monospace;background:linear-gradient(90deg,#7B2CBF,#C300FF);color:#fff;padding:2px 5px;border-radius:6px;font-weight:700;}
 .trx-fbtag.dim,.trx-igtag.dim{opacity:.55;font-weight:500;}
 .trx-typetag{font-size:8px;font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.25);color:#fff;padding:2px 5px;border-radius:6px;letter-spacing:.08em;}
+.trx-gradtag{font-size:8px;font-family:'JetBrains Mono',monospace;background:var(--green);color:#050507;padding:2px 5px;border-radius:6px;letter-spacing:.08em;font-weight:700;}
+.trx-trialbar{display:flex;gap:8px;align-items:flex-start;padding:10px clamp(20px,3vw,40px);border-bottom:1px solid var(--border);background:rgba(123,44,191,.05);}
+.trx-trialbar textarea{flex:1;min-height:38px;max-height:120px;background:rgba(255,255,255,.04);border:1px solid var(--accent-dim);border-radius:2px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none;resize:vertical;}
+.trx-trialbar textarea:focus{border-color:var(--accent);}
+.trx-trialbar .hint{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.06em;line-height:1.6;max-width:260px;}
 .trx-reel.trx-post,.trx-reel.trx-carousel{padding-bottom:125%;}
 .trx-rprev>video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:block;}
 .trx-rprev .trx-car{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000;}
@@ -1864,6 +1874,7 @@ EXPORT TO DRIVE
       <div class="trx-metrics two" id="trxRMetrics"></div>
       <div class="trx-favrow" id="trxRFav" onclick="trxToggleFavModal()"><span class="s">★</span><span id="trxRFavLabel">ADD TO FAVORITES</span></div>
       <button class="trx-vcreator" onclick="trxViewCreator()">⚡ VIEW CREATOR IN TRENDING</button>
+      <button class="trx-vcreator hidden" id="trxRStopTrial" style="color:var(--red);border-color:rgba(255,59,92,.4);">✕ STOP TRACKING THIS TRIAL</button>
       <div class="trx-ract">
         <button class="trx-btn" id="trxRDownload">⬇ DOWNLOAD</button>
         <button class="trx-btn primary" id="trxROpen">↗ OPEN LINK</button>
@@ -2140,6 +2151,13 @@ async function trxSyncAccount(pk, deep){
       pages++;
       trxStatus('Syncing @' + acc.username + ' — page ' + pages + ' (' + got.length + ' reels)…');
     } while (pageId && pages < maxPages);
+    // link-tracked trials: refresh by code until they show up in the clips feed (= graduated)
+    const clipIds = new Set(got.map(r => r.id));
+    for (const t of (trx.reels[pk] || []).filter(r => r.linkTracked && r.trial && r.code)) {
+      if (clipIds.has(t.id)) { const g = got.find(r => r.id === t.id); if (g) { g.graduated = true; g.graduatedAt = Date.now(); } continue; }
+      if (Date.now() - (t.ts || Date.now()) > 30 * 864e5) { got.push(t); continue; }
+      try { const fresh = trxNormV1Media(await trxApi('/v1/media/by/code', { code: t.code })); if (fresh.id) got.push(fresh); else got.push(t); } catch(e){ got.push(t); }
+    }
     // posts + carousels from the profile feed (reels stay authoritative from clips)
     try {
       const reelIds = new Set(got.map(r => r.id));
@@ -2179,6 +2197,51 @@ window.trxSyncAll = async function(){
   for (const a of [...trx.accounts]) await trxSyncAccount(a.pk, !trx.reels[a.pk] || !trx.reels[a.pk].length);
 };
 window.trxSyncOne = function(){ if (trxSel) trxSyncAccount(trxSel, true); };
+function trxCodeFromLink(s){ s = (s || '').trim(); const m = s.match(/instagram\.com\/(?:[^\/]+\/)?(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/); if (m) return m[1]; return (s && !/[\/\s]/.test(s) && s.length < 40) ? s : ''; }
+function trxNormV1Media(m){
+  m = m || {}; const ivs = m.image_versions || [];
+  const thumb = m.thumbnail_url || (ivs[0] && ivs[0].url) || null;
+  const mt = m.media_type, pt = String(m.product_type || '').toLowerCase();
+  const type = mt === 8 ? 'carousel' : mt === 1 ? 'post' : 'reel';
+  const media = (m.resources || []).map(c => ({ img: c.thumbnail_url || (c.image_versions && c.image_versions[0] && c.image_versions[0].url) || null, video: c.video_url || null }));
+  const ta = m.taken_at; const ts = typeof ta === 'number' ? ta * 1000 : (ta ? Date.parse(ta) || 0 : 0);
+  const views = m.play_count ?? m.view_count ?? 0;
+  return { id: String(m.pk || m.id || ''), code: m.code || '', type, ts, views, igViews: m.ig_play_count ?? views, fb: m.fb_play_count || 0, likes: m.like_count ?? 0, comments: m.comment_count ?? 0, shares: m.reshare_count ?? 0, saves: m.save_count ?? null, duration: m.video_duration || 0, thumb, videoUrl: m.video_url || null, media, trial: true, linkTracked: true, source: 'hiker', caption: (m.caption_text || '').slice(0, 300) };
+}
+window.trxAddTrialLinks = async function(){
+  if (!trxSel) return;
+  const ta = document.getElementById('trxTrialLinks');
+  const links = ta.value.split(/[\n,]/).map(x => x.trim()).filter(Boolean);
+  if (!links.length) return trxToast('Paste at least one trial link');
+  if (trxIsHub()) {
+    if (!trxIsAdmin()) return trxToast('Viewer tokens can\'t add trials');
+    try {
+      trxStatus('Fetching ' + links.length + ' trial link(s)…');
+      const r = await trxHubCall('POST', '/trending/trials', { pk: trxSel, links });
+      ta.value = '';
+      trxToast((r.added || []).length + ' trial(s) tracked' + ((r.failed || []).length ? ' · ' + r.failed.length + ' failed: ' + r.failed.map(f => f.code + ' (' + f.error + ')').join('; ').slice(0, 140) : ''));
+      await trxHubRefresh(); trxRenderAll(); trxStatus(trxHubStatusLine());
+    } catch(e){ trxStatus(''); trxToast(String(e.message || e)); }
+    return;
+  }
+  const acc = trx.accounts.find(a => a.pk === trxSel); if (!acc) return;
+  let n = 0, fails = [];
+  for (const l of links) {
+    const code = trxCodeFromLink(l); if (!code) { fails.push(l); continue; }
+    try {
+      const r = trxNormV1Media(await trxApi('/v1/media/by/code', { code }));
+      if (!r.id) throw new Error('no media');
+      const list = trx.reels[trxSel] || (trx.reels[trxSel] = []);
+      const i = list.findIndex(x => x.id === r.id);
+      if (i >= 0 && !list[i].trial) { r.trial = false; r.graduated = true; }
+      if (i >= 0) list[i] = Object.assign(list[i], r); else list.unshift(r);
+      n++;
+    } catch(e){ fails.push(code); }
+  }
+  acc.trialCount = (trx.reels[trxSel] || []).filter(r => r.trial).length;
+  ta.value = ''; trxSave(); trxRenderAll();
+  trxToast(n + ' trial(s) tracked' + (fails.length ? ' · failed: ' + fails.join(', ').slice(0, 100) : ''));
+};
 
 window.trxSetAddSource = function(src){
   trxAddSource = src;
@@ -2313,14 +2376,14 @@ function trxReelCard(pk, r, opts){
   // Crossposted reels: tag the dominant platform, dim the other. IG-only reels: no tag.
   const platTag = r.fb > 0 ? ((r.igViews || 0) >= r.fb ? '<span class="trx-igtag">IG</span><span class="trx-fbtag dim">FB</span>' : '<span class="trx-fbtag">FB</span><span class="trx-igtag dim">IG</span>') : '';
   const type = r.type || 'reel';
-  const typeTag = type === 'carousel' ? '<span class="trx-typetag">▦ ' + ((r.media || []).length || '') + '</span>' : type === 'post' ? '<span class="trx-typetag">POST</span>' : type === 'video' ? '<span class="trx-typetag">VIDEO</span>' : '';
+  const typeTag = (type === 'carousel' ? '<span class="trx-typetag">▦ ' + ((r.media || []).length || '') + '</span>' : type === 'post' ? '<span class="trx-typetag">POST</span>' : type === 'video' ? '<span class="trx-typetag">VIDEO</span>' : '') + (r.graduated ? '<span class="trx-gradtag">GRADUATED</span>' : (r.linkTracked && r.trial ? '<span class="trx-typetag">LINK</span>' : ''));
   const handle = opts.handle ? '<div class="trx-rhandle">@' + trxEsc(opts.handle) + '</div>' : '';
   const stats = type === 'reel' || type === 'video'
     ? '<div class="trx-rstats"><span>▶ ' + trxFmt(trxVv(r)) + '</span><span>♥ ' + trxFmt(r.likes) + '</span><span>↗ ' + trxFmt(r.shares) + '</span></div>'
-    : '<div class="trx-rstats"><span>♥ ' + trxFmt(r.likes) + '</span><span>💬 ' + trxFmt(r.comments) + '</span>' + (r.saves ? '<span>🔖 ' + trxFmt(r.saves) + '</span>' : '<span></span>') + '</div>';
+    : '<div class="trx-rstats">' + (r.views > 0 ? '<span>▶ ' + trxFmt(r.views) + '</span>' : '') + '<span>♥ ' + trxFmt(r.likes) + '</span><span>💬 ' + trxFmt(r.comments) + '</span>' + (r.saves ? '<span>🔖 ' + trxFmt(r.saves) + '</span>' : (r.views > 0 ? '' : '<span></span>')) + '</div>';
   const top = '<div class="trx-rtop"><span class="lft">' + star + rank + platTag + typeTag + '</span><span class="trx-rdate">' + (r.ts ? trxDate(r.ts) : '') + '</span></div>';
-  if (r.trial) return '<div class="trx-reel trx-trial" onclick="trxOpenReel(\'' + pk + '\',\'' + r.id + '\')"><div class="trx-shade"></div>' + top +
-    '<div class="trx-trialc"><div class="trx-trialb">TRIAL</div><div class="trx-nothumb">NO THUMBNAIL</div></div>' + handle + stats + '</div>';
+  if (r.trial) return '<div class="trx-reel trx-trial" onclick="trxOpenReel(\'' + pk + '\',\'' + r.id + '\')">' + (r.thumb ? '<img loading="lazy" src="' + trxEsc(r.thumb) + '" onerror="this.remove()">' : '') + '<div class="trx-shade"></div>' + top +
+    (r.thumb ? '<div class="trx-trialb" style="position:absolute;top:34px;left:7px;z-index:2;">TRIAL</div>' : '<div class="trx-trialc"><div class="trx-trialb">TRIAL</div><div class="trx-nothumb">NO THUMBNAIL</div></div>') + handle + stats + '</div>';
   return '<div class="trx-reel trx-' + type + '" onclick="trxOpenReel(\'' + pk + '\',\'' + r.id + '\')">' +
     (r.thumb ? '<img loading="lazy" src="' + trxEsc(r.thumb) + '" onerror="this.remove()">' : '') +
     '<div class="trx-shade"></div>' + top + handle + stats + '</div>';
@@ -2352,9 +2415,10 @@ function trxRenderReels(){
     list.sort((a, b) => b.ts - a.ts);
   }
   const rangeNote = document.getElementById('trxRangeNote'); if (rangeNote) rangeNote.textContent = trxDays ? list.length + ' IN LAST ' + trxDays + 'D' : '';
+  const tb = document.getElementById('trxTrialBar'); if (tb) tb.classList.toggle('hidden', !(trxFilter === 'trial' && trxIsAdmin()));
   const acc = trx.accounts.find(a => a.pk === trxSel);
   if (!list.length) {
-    grid.innerHTML = '<div class="trx-empty"><span>' + ((trx.reels[trxSel] || []).length ? (trxDays ? 'NOTHING POSTED IN THE LAST ' + trxDays + ' DAYS FOR THIS FILTER' : 'NOTHING MATCHES THIS FILTER') : 'NO REELS SYNCED YET — HIT ⟳ SYNC NOW') + '</span></div>';
+    grid.innerHTML = '<div class="trx-empty"><span>' + (trxFilter === 'trial' ? 'NO TRIALS TRACKED — PASTE THEIR SHARE LINKS ABOVE (TRIALS AREN\'T IN THE PUBLIC FEED)' : (trx.reels[trxSel] || []).length ? (trxDays ? 'NOTHING POSTED IN THE LAST ' + trxDays + ' DAYS FOR THIS FILTER' : 'NOTHING MATCHES THIS FILTER') : 'NO REELS SYNCED YET — HIT ⟳ SYNC NOW') + '</span></div>';
   } else {
     grid.innerHTML = list.map(r => {
       const rk = ranked.indexOf(r.id) + 1;
@@ -2610,12 +2674,13 @@ window.trxOpenReel = function(pk, id){
   trxCarIdx = 0;
   trxRenderPreview(r);
   document.getElementById('trxRHandle').textContent = '@' + (a ? a.username : '');
-  document.getElementById('trxRDate').textContent = ((r.type || 'reel').toUpperCase()) + (r.ts ? ' · POSTED ' + new Date(r.ts).toLocaleDateString() : '') + (r.caption ? ' · ' + r.caption.slice(0, 90).replace(/\s+/g, ' ') + (r.caption.length > 90 ? '…' : '') : '');
+  document.getElementById('trxRDate').textContent = ((r.type || 'reel').toUpperCase()) + (r.trial ? ' · TRIAL' + (r.linkTracked ? ' (TRACKED BY LINK)' : '') : '') + (r.graduated ? ' · GRADUATED ✓' : '') + (r.ts ? ' · POSTED ' + new Date(r.ts).toLocaleDateString() : '') + (r.caption ? ' · ' + r.caption.slice(0, 90).replace(/\s+/g, ' ') + (r.caption.length > 90 ? '…' : '') : '');
+  const stopBtn = document.getElementById('trxRStopTrial'); if (stopBtn) { stopBtn.classList.toggle('hidden', !(r.linkTracked && r.trial && trxIsAdmin())); stopBtn.onclick = () => trxStopTrial(pk, r); }
   const row = (l, v, tag) => '<div class="trx-mrow"><div class="mt"><span class="ml">' + l + '</span><span class="mv">' + (typeof v === 'string' ? v : trxFmt(v)) + '</span></div>' + (tag ? '<div class="trx-mtag">' + tag + '</div>' : '') + '</div>';
   const isMeta = r.source === 'meta';
   const pct = r.views ? Math.round(r.igViews / r.views * 100) : 100;
   if (isMeta) {
-    document.getElementById('trxRViews').innerHTML = row('VIEWS', r.views, 'META INSIGHTS') + row('REACH', r.reach, 'UNIQUE ACCOUNTS') + row('AVG WATCH', (r.watch ? (r.watch / 1000).toFixed(1) + 's' : '—'), 'RETENTION');
+    document.getElementById('trxRViews').innerHTML = row('VIEWS', r.views, 'META INSIGHTS') + row('REACH', r.reach, 'UNIQUE ACCOUNTS') + ((r.type || 'reel') === 'reel' ? row('AVG WATCH', (r.watch ? (r.watch / 1000).toFixed(1) + 's' : '—'), 'RETENTION') : row('SAVES', r.saves || 0, 'META INSIGHTS'));
     document.getElementById('trxRSplit').innerHTML = '<div class="trx-sleg"><span class="igk">SOURCE: META API — IG/FB SPLIT NOT EXPOSED · SAVES ARE REAL</span></div>';
     document.getElementById('trxRMetrics').innerHTML = row('SAVES', r.saves, 'META INSIGHTS') + row('SHARES', r.shares, 'META INSIGHTS') + row('LIKES', r.likes, 'IG COUNTER') + row('COMMENTS', r.comments, 'IG COUNTER');
   } else {
@@ -2678,6 +2743,11 @@ function trxSyncModalFav(){
   document.getElementById('trxRFavLabel').textContent = faved ? 'IN FAVORITES — CLICK TO REMOVE' : 'ADD TO FAVORITES';
 }
 window.trxToggleFavModal = function(){ if (trxModalRef) trxToggleFav(trxModalRef.pk, trxModalRef.id); };
+window.trxStopTrial = async function(pk, r){
+  if (trxIsHub()) { try { await trxHubCall('DELETE', '/trending/trials/' + encodeURIComponent(pk) + '/' + encodeURIComponent(r.code)); await trxHubRefresh(); } catch(e){ return trxToast(String(e.message || e)); } }
+  else { trx.reels[pk] = (trx.reels[pk] || []).filter(x => x.id !== r.id); const a = trx.accounts.find(x => x.pk === pk); if (a) a.trialCount = trx.reels[pk].filter(x => x.trial).length; trxSave(); }
+  trxCloseReel(); trxRenderAll(); trxToast('Stopped tracking trial');
+};
 window.trxCloseReel = function(){ document.getElementById('trxReelModal').classList.add('hidden'); document.getElementById('trxRPrev').innerHTML = ''; trxModalRef = null; };
 window.trxViewCreator = function(){
   if (!trxModalRef) return;
@@ -2695,7 +2765,7 @@ window.trxCsv = function(){
   const a = trx.accounts.find(x => x.pk === trxSel);
   const rows = [['handle','source','type','reel_id','date','trial','total_views','ig_views','fb_views','likes','fb_likes','comments','fb_comments','shares','saves','reach','avg_watch_s','duration_s','link']];
   [...(trx.reels[trxSel] || [])].sort((x, y) => y.views - x.views).forEach(r => {
-    rows.push(['@' + a.username, r.source || 'hiker', r.type || 'reel', r.id, r.ts ? new Date(r.ts).toISOString().slice(0, 10) : '', r.trial ? 'TRIAL' : '', r.views, r.igViews, r.fb, r.likes, r.fbLikes ?? '', r.comments, r.fbComments ?? '', r.shares, r.saves ?? '', r.reach ?? '', r.watch ? (r.watch / 1000).toFixed(1) : '', r.duration ? r.duration.toFixed(1) : '', r.permalink || (r.code ? 'https://www.instagram.com/' + ((r.type || 'reel') === 'reel' ? 'reel/' : 'p/') + r.code + '/' : '')]);
+    rows.push(['@' + a.username, r.source || 'hiker', r.type || 'reel', r.id, r.ts ? new Date(r.ts).toISOString().slice(0, 10) : '', r.trial ? (r.linkTracked ? 'TRIAL (LINK)' : 'TRIAL') : (r.graduated ? 'GRADUATED' : ''), r.views, r.igViews, r.fb, r.likes, r.fbLikes ?? '', r.comments, r.fbComments ?? '', r.shares, r.saves ?? '', r.reach ?? '', r.watch ? (r.watch / 1000).toFixed(1) : '', r.duration ? r.duration.toFixed(1) : '', r.permalink || (r.code ? 'https://www.instagram.com/' + ((r.type || 'reel') === 'reel' ? 'reel/' : 'p/') + r.code + '/' : '')]);
   });
   const csv = rows.map(r => r.join(',')).join('\n');
   navigator.clipboard.writeText(csv).then(() => trxToast('CSV copied — paste into Sheets for the VAs'), () => trxToast('Clipboard blocked'));
@@ -17594,13 +17664,19 @@ const PATCH_NOTES = [
   {
     version: '4.11.2',
     date: '2026-08-16',
-    title: 'TRENDING — date range filter (7D / 14D / 30D / ALL), smarter controls for posts + carousels',
+    title: 'TRENDING — trial reels tracked by link, date range filter (7D / 14D / 30D / ALL), smarter controls for posts + carousels',
     sections: [
+      { h: '◌ Trial reels — tracked by share link', items: [
+        '🔗 The first real sync proved it: <b>trial reels never appear in the public reels feed</b> (Instagram shows them only to non-followers in-feed, never on the profile), so no third-party API can list them. What every trial does have is a <b>public share link</b>. On the TRIALS tab (admin) paste one or more links (Share → Copy link on the phone) → <b>+ TRACK TRIALS</b>. Each is fetched immediately (1 request) and refreshed on every sync — views, likes, comments, thumbnail, video preview + download.',
+        '🎓 When a tracked trial shows up in the profile feed it\'s auto-marked <b>GRADUATED</b> (green tag) and keeps its history. Stop tracking any trial from its modal. Links older than 30 days stop refreshing to bound cost.',
+        '👁 The old "no thumbnail = trial" rule is retired — real HikerAPI data showed every reel carries a thumbnail.',
+      ]},
       { h: '📅 Date range', items: [
         '🗓 New <b>LAST 7D · 14D · 30D · ALL</b> chips in the filter bar — combine with REELS / POSTS / CAROUSELS / TRIALS and any sort. The export bar shows how many items fall in the range.',
         '📸 <b>Posts + carousels have no view counts</b> in HikerAPI, so on those filters the IG/FB view chips hide and "sort by views" falls back to likes instead of showing an arbitrary order.',
         '📈 Growth chart empty-state now says what it needs: 2+ days of snapshots (one per sync per day) — first bar tomorrow; Meta accounts seed 30 days instantly.',
         '🌐 VA report page is served with no-cache so fixes reach browsers immediately (⌘⇧R once if you had it open).',
+        '👀 <b>Post / carousel views:</b> Instagram doesn\'t expose photo or carousel view counts publicly, so they can\'t come from HikerAPI for any account. For your own account they arrive via the Meta source (owner insights) — cards and the modal show ▶ views whenever a source provides them.',
       ]},
     ],
   },
