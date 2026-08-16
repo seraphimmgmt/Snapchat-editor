@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TRENDING v2 — HikerAPI mockup</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050507;--surface:#0A0A12;--surface-2:#12121C;--surface-3:#1A1A28;
+  --border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.22);
+  --text:#FFFFFF;--text-dim:#A8A8B8;--text-faint:#5A5A6E;
+  --accent:#7B2CBF;--accent-hi:#9D4EDD;--accent-dim:#5A1F8F;
+  --glow:rgba(123,44,191,.50);
+  --green:#00FF88;--red:#FF3B5C;--gold:#FFD86B;
+  --shimmer:linear-gradient(110deg,#7B2CBF 0%,#C300FF 50%,#FFFFFF 100%);
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Manrope',sans-serif;font-size:13px;line-height:1.5;min-height:100vh;display:flex;flex-direction:column;}
+button{font-family:inherit;}
+img{display:block;max-width:100%;}
+
+/* ============ App chrome ============ */
+header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:14px 24px;border-bottom:1px solid var(--border);gap:16px;flex-shrink:0;}
+.logo{display:flex;align-items:center;gap:12px;justify-self:start;}
+.logo-mark{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#7B2CBF,#C300FF);box-shadow:0 0 18px var(--glow);}
+.logo h1{font-family:'Antonio',sans-serif;font-weight:700;font-size:20px;letter-spacing:.1em;margin:0;}
+.header-meta{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-faint);letter-spacing:.08em;text-align:center;}
+.header-cog{width:34px;height:34px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);justify-self:end;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;}
+.header-cog:hover{color:var(--accent-hi);border-color:var(--accent);}
+
+.view-tabs{display:flex;background:var(--bg);border-bottom:1px solid var(--border);padding:0 16px;flex-shrink:0;}
+.view-tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-dim);padding:11px 18px;cursor:pointer;font-family:'Antonio',sans-serif;font-size:12px;font-weight:700;letter-spacing:.16em;display:flex;align-items:center;gap:8px;transition:all .15s;}
+.view-tab:hover{color:var(--text);}
+.view-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+.view-tab .new-badge{font-size:8px;background:var(--shimmer);color:#fff;padding:2px 5px;border-radius:6px;letter-spacing:.1em;font-family:'JetBrains Mono',monospace;}
+
+main{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+.hidden{display:none !important;}
+
+/* ============ Motion ============ */
+@keyframes cardIn{from{opacity:0;transform:translateY(14px);}}
+@keyframes fadeIn{from{opacity:0;}}
+@keyframes modalPop{from{opacity:0;transform:scale(.94) translateY(10px);}}
+@keyframes veilIn{from{opacity:0;}}
+#view-grid,#view-detail,#pane-accounts,#pane-favs{animation:fadeIn .25s ease;}
+.creator-grid>*{animation:cardIn .45s cubic-bezier(.22,1,.36,1) backwards;}
+.creator-grid>*:nth-child(1){animation-delay:.02s;}
+.creator-grid>*:nth-child(2){animation-delay:.07s;}
+.creator-grid>*:nth-child(3){animation-delay:.12s;}
+.creator-grid>*:nth-child(4){animation-delay:.17s;}
+.creator-grid>*:nth-child(5){animation-delay:.22s;}
+.reel-card{animation:cardIn .4s cubic-bezier(.22,1,.36,1) backwards;}
+.modal,.reel-modal{animation:modalPop .28s cubic-bezier(.22,1,.36,1);}
+.modal-veil{animation:veilIn .2s ease;}
+
+/* ============ Toolbar ============ */
+.trending-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px clamp(20px,3vw,40px) 12px;flex-wrap:wrap;}
+.trending-toolbar h2{font-family:'Antonio',sans-serif;font-size:24px;letter-spacing:.18em;margin:0;background:var(--shimmer);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.toolbar-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.search-box{background:var(--surface-2);border:1px solid var(--border);border-radius:2px;padding:7px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);width:220px;outline:none;}
+.search-box:focus{border-color:var(--accent);}
+.sort-select{background:var(--surface-2);border:1px solid var(--border);border-radius:2px;padding:7px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none;cursor:pointer;}
+
+/* HikerAPI status chip */
+.hiker-chip{display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--accent-dim);border-radius:14px;padding:6px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--text-dim);cursor:pointer;transition:all .15s;}
+.hiker-chip:hover{border-color:var(--accent);box-shadow:0 0 12px var(--glow);}
+.hiker-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(0,255,136,.7);}
+.hiker-chip b{color:var(--text);font-weight:700;}
+.hiker-chip .credits{color:var(--accent-hi);}
+
+/* Main sub-tabs (ACCOUNTS / FAVORITES) */
+.main-subtabs{display:flex;gap:0;padding:0 clamp(20px,3vw,40px);border-bottom:1px solid var(--border);flex-shrink:0;}
+.subtab{background:transparent;border:none;padding:12px 18px;font-family:'Antonio',sans-serif;font-size:12px;font-weight:700;letter-spacing:.16em;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .12s;display:flex;align-items:center;gap:7px;}
+.subtab:hover{color:var(--text);}
+.subtab.active{color:var(--text);border-bottom-color:var(--accent);}
+.subtab .count{font-size:9px;background:var(--surface-3);color:var(--text-dim);padding:2px 6px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-weight:500;}
+.subtab .star{color:var(--gold);font-size:13px;}
+
+/* Tag filter row */
+.tag-filter-row{display:flex;align-items:center;gap:8px;padding:12px clamp(20px,3vw,40px) 14px;flex-wrap:wrap;border-bottom:1px solid var(--border);}
+.tag-filter-row .label{font-size:9px;color:var(--text-faint);letter-spacing:.16em;margin-right:4px;font-family:'JetBrains Mono',monospace;}
+.tag-chip{background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:5px 12px;font-size:10px;letter-spacing:.08em;border-radius:14px;cursor:pointer;text-transform:uppercase;font-weight:600;transition:all .12s;}
+.tag-chip:hover{color:var(--text);border-color:var(--accent);}
+.tag-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;box-shadow:0 0 10px var(--glow);}
+.tag-chip .count{margin-left:6px;opacity:.7;font-size:9px;}
+
+/* ============ Account grid ============ */
+.creator-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;padding:18px clamp(20px,3vw,40px) 40px;overflow-y:auto;flex:1;align-content:start;}
+
+.creator-card{background:var(--surface);border:1px solid var(--border);border-radius:4px;cursor:pointer;transition:all .15s;overflow:hidden;display:flex;flex-direction:column;position:relative;}
+.creator-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.5),0 0 16px var(--glow);}
+.creator-card.mine{border-color:var(--accent-dim);}
+.creator-card.mine::before{content:'';position:absolute;inset:0 0 auto 0;height:2px;background:var(--shimmer);}
+.pin-flag{position:absolute;top:10px;right:10px;font-size:12px;color:var(--gold);}
+.creator-card-head{display:flex;align-items:center;gap:12px;padding:14px;}
+.creator-avatar{width:56px;height:56px;border-radius:50%;border:2px solid var(--accent);background:var(--surface-3);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Antonio',sans-serif;font-size:18px;font-weight:700;color:var(--accent-hi);}
+.creator-avatar.av-1{background:linear-gradient(135deg,#2b0a45,#7B2CBF);color:#fff;}
+.creator-avatar.av-2{background:linear-gradient(135deg,#101024,#3b3b6e);}
+.creator-avatar.av-3{background:linear-gradient(135deg,#240a0a,#6e2c3b);}
+.creator-avatar.av-4{background:linear-gradient(135deg,#0a2418,#2c6e50);}
+.creator-handle{font-family:'Antonio',sans-serif;font-size:15px;font-weight:700;letter-spacing:.04em;line-height:1.2;color:var(--text);display:flex;align-items:center;gap:7px;}
+.creator-name{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.mine-pill{font-size:8px;background:var(--shimmer);color:#fff;padding:2px 6px;border-radius:8px;letter-spacing:.1em;font-family:'JetBrains Mono',monospace;font-weight:500;}
+.lock-pill{font-size:8px;background:var(--surface-3);border:1px solid var(--border-strong);color:var(--gold);padding:2px 6px;border-radius:8px;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;}
+.creator-card-stats{padding:0 14px 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.stat-block{background:var(--surface-2);border-radius:2px;padding:10px;}
+.stat-label{font-size:9px;color:var(--text-faint);letter-spacing:.12em;margin-bottom:4px;font-family:'JetBrains Mono',monospace;}
+.stat-value{font-family:'Antonio',sans-serif;font-size:18px;font-weight:700;color:var(--text);line-height:1;}
+.stat-delta{font-size:10px;margin-top:4px;font-weight:600;font-family:'JetBrains Mono',monospace;}
+.stat-delta.up{color:var(--green);}
+.stat-delta.down{color:var(--red);}
+.trial-count{color:var(--accent-hi);}
+.creator-card-tags{display:flex;flex-wrap:wrap;gap:4px;padding:0 14px 10px;}
+.creator-tag{font-size:9px;background:var(--surface-3);color:var(--text-dim);padding:3px 8px;border-radius:10px;letter-spacing:.06em;text-transform:uppercase;}
+.creator-card-sync{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);padding:8px 14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;letter-spacing:.05em;}
+
+.add-creator-card{background:transparent;border:2px dashed var(--border-strong);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-faint);cursor:pointer;min-height:240px;gap:10px;transition:all .15s;}
+.add-creator-card:hover{border-color:var(--accent);color:var(--accent-hi);background:rgba(123,44,191,.05);}
+.add-creator-card .plus{font-size:32px;line-height:1;font-weight:300;}
+.add-creator-card .label{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.18em;}
+.add-creator-card .hint{font-size:10px;color:var(--text-faint);text-align:center;padding:0 18px;line-height:1.6;}
+.add-creator-card .hint b{color:var(--accent-hi);font-weight:600;}
+
+/* ============ Account detail ============ */
+.creator-detail{display:flex;flex-direction:column;height:100%;overflow:hidden;}
+.creator-back{display:flex;align-items:center;gap:6px;background:transparent;border:none;color:var(--text-dim);padding:14px clamp(20px,3vw,40px) 8px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;}
+.creator-back:hover{color:var(--accent-hi);}
+
+.creator-detail-head{display:flex;align-items:center;gap:20px;padding:8px clamp(20px,3vw,40px) 18px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.creator-detail-avatar{width:88px;height:88px;border-radius:50%;border:3px solid var(--accent);background:linear-gradient(135deg,#2b0a45,#7B2CBF);display:flex;align-items:center;justify-content:center;font-family:'Antonio',sans-serif;font-size:28px;font-weight:700;box-shadow:0 0 24px var(--glow);}
+.creator-detail-info{flex:1;min-width:200px;}
+.creator-detail-handle{font-family:'Antonio',sans-serif;font-size:24px;font-weight:700;letter-spacing:.04em;display:flex;align-items:center;gap:10px;}
+.creator-detail-bio{font-size:11px;color:var(--text-dim);max-width:520px;margin-top:6px;line-height:1.5;}
+.creator-detail-stats{display:flex;gap:12px;flex-wrap:wrap;}
+.detail-stat{background:var(--surface-2);border:1px solid var(--border);padding:10px 14px;border-radius:3px;min-width:110px;}
+
+/* Growth chart */
+.growth-section{padding:16px clamp(20px,3vw,40px);border-bottom:1px solid var(--border);flex-shrink:0;}
+.growth-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+.growth-head h3{font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.18em;margin:0;color:var(--text-dim);}
+.growth-head h3 b{color:var(--text);}
+.growth-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.range-chips{display:flex;gap:4px;}
+.range-chip{background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);padding:4px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;border-radius:2px;cursor:pointer;transition:all .12s;}
+.range-chip:hover{color:var(--text);border-color:var(--accent);}
+.range-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 0 10px var(--glow);font-weight:700;}
+.growth-total{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--green);letter-spacing:.06em;font-weight:700;}
+.growth-chart{width:100%;height:150px;display:block;}
+.growth-bar{cursor:pointer;transform-box:fill-box;transform-origin:center bottom;animation:barGrow .45s cubic-bezier(.22,1,.36,1) backwards;}
+.growth-bar:hover{filter:brightness(1.6);}
+@keyframes barGrow{from{transform:scaleY(0);}}
+.chart-tip{position:fixed;pointer-events:none;background:var(--surface-3);border:1px solid var(--accent);color:var(--text);padding:7px 12px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;z-index:60;box-shadow:0 0 14px var(--glow);white-space:nowrap;}
+.chart-tip b{color:var(--accent-hi);}
+.chart-tip .g{color:var(--green);}
+
+/* Filter tabs */
+.filter-tabs{display:flex;gap:0;padding:0 clamp(20px,3vw,40px);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;align-items:center;}
+.filter-tab{background:transparent;border:none;padding:14px 18px;font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .12s;display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.filter-tab:hover{color:var(--text);}
+.filter-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+.filter-tab .count{font-size:9px;background:var(--surface-3);color:var(--text-dim);padding:2px 6px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-weight:500;letter-spacing:.06em;}
+.filter-tab.trial-pill{position:relative;padding-left:26px;}
+.filter-tab.trial-pill::before{content:'';position:absolute;left:12px;top:50%;width:6px;height:6px;border-radius:50%;background:var(--accent-hi);transform:translateY(-50%);box-shadow:0 0 8px var(--glow);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+.legend-strip{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.05em;padding-right:6px;white-space:nowrap;}
+.legend-strip b{color:var(--accent-hi);font-weight:500;}
+
+/* Reel grid */
+.reel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;padding:14px clamp(20px,3vw,40px) 20px;overflow-y:auto;flex:1;align-content:start;}
+.reel-card{position:relative;aspect-ratio:9/16;background:var(--surface);border-radius:3px;overflow:hidden;cursor:pointer;border:1px solid transparent;transition:all .15s;}
+.reel-card:hover{border-color:var(--accent);box-shadow:0 0 14px var(--glow);}
+.reel-thumb{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:38px;}
+.reel-card .shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.75) 0%,rgba(0,0,0,0) 38%,rgba(0,0,0,0) 68%,rgba(0,0,0,.45) 100%);pointer-events:none;}
+.reel-meta-top{position:absolute;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;align-items:center;z-index:2;gap:6px;}
+.reel-meta-top .left{display:flex;align-items:center;gap:6px;}
+.reel-date{font-family:'JetBrains Mono',monospace;font-size:9px;color:rgba(255,255,255,.75);text-shadow:0 1px 3px rgba(0,0,0,.8);letter-spacing:.04em;}
+.rank-badge{font-family:'Antonio',sans-serif;font-size:12px;font-weight:700;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#050507;}
+.rank-1{background:var(--gold);box-shadow:0 0 10px rgba(255,216,107,.6);}
+.rank-2{background:#C8C8D8;}
+.rank-3{background:#B08050;}
+.fav-btn{background:rgba(0,0,0,.45);border:none;color:rgba(255,255,255,.75);width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .15s;text-shadow:0 1px 3px rgba(0,0,0,.8);}
+.fav-btn:hover{color:var(--gold);transform:scale(1.15);}
+.fav-btn.faved{color:var(--gold);text-shadow:0 0 8px rgba(255,216,107,.8);}
+.reel-handle{position:absolute;bottom:26px;left:8px;z-index:2;font-family:'JetBrains Mono',monospace;font-size:8px;color:rgba(255,255,255,.6);letter-spacing:.06em;text-shadow:0 1px 3px rgba(0,0,0,.8);}
+.reel-stats{position:absolute;bottom:8px;left:8px;right:8px;display:flex;justify-content:space-between;color:#fff;font-size:10px;font-weight:600;z-index:2;text-shadow:0 1px 3px rgba(0,0,0,.7);font-family:'JetBrains Mono',monospace;}
+.reel-stat{display:flex;align-items:center;gap:4px;}
+
+/* Trial reel card */
+.reel-card.is-trial{background:var(--surface-2);border:1px dashed var(--accent-dim);}
+.reel-card.is-trial:hover{border-color:var(--accent-hi);border-style:dashed;}
+.reel-card.is-trial .shade{background:radial-gradient(ellipse at center,rgba(123,44,191,.14),transparent 70%),linear-gradient(to top,rgba(0,0,0,.75) 0%,transparent 40%);}
+.trial-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:1;}
+.trial-badge{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.22em;color:#fff;background:var(--accent);padding:4px 10px;border-radius:3px;box-shadow:0 0 14px var(--glow);}
+.trial-nothumb{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-faint);letter-spacing:.14em;}
+.trial-ring{width:44px;height:44px;border-radius:50%;border:2px dashed var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:18px;opacity:.85;animation:spin 14s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Favorites empty state */
+.fav-empty{grid-column:1/-1;border:2px dashed var(--border-strong);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--text-faint);min-height:220px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.06em;}
+.fav-empty .big{font-size:28px;color:var(--gold);opacity:.5;}
+
+/* Export bar */
+.export-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px clamp(20px,3vw,40px);border-top:1px solid var(--border);flex-shrink:0;background:var(--surface);flex-wrap:wrap;}
+.sync-note{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);letter-spacing:.05em;}
+.sync-note b{color:var(--text-dim);font-weight:500;}
+.export-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.btn{border-radius:2px;padding:8px 16px;font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;cursor:pointer;transition:all .15s;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--text-dim);}
+.btn:hover{color:var(--text);border-color:var(--accent);transform:translateY(-1px);}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 14px var(--glow);}
+.btn.primary:hover{background:var(--accent-hi);}
+
+/* ============ Modals ============ */
+.modal-veil{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:50;}
+.modal{width:min(520px,92vw);background:var(--surface);border:1px solid var(--accent-dim);border-radius:6px;box-shadow:0 0 40px var(--glow);overflow:hidden;}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+.modal-head h3{font-family:'Antonio',sans-serif;font-size:14px;letter-spacing:.18em;margin:0;}
+.modal-close{background:transparent;border:none;color:var(--text-faint);font-size:16px;cursor:pointer;}
+.modal-close:hover{color:var(--text);}
+.modal-body{padding:20px;display:flex;flex-direction:column;gap:16px;}
+.field label{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.16em;color:var(--text-faint);margin-bottom:6px;}
+.field input,.field select{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:2px;padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none;}
+.field input:focus,.field select:focus{border-color:var(--accent);}
+.modal-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.endpoint-list{background:var(--surface-2);border:1px solid var(--border);border-radius:3px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);line-height:2;}
+.endpoint-list .ep{display:flex;justify-content:space-between;}
+.endpoint-list .cost{color:var(--accent-hi);}
+.modal-note{font-size:10px;color:var(--text-faint);line-height:1.6;}
+.modal-note b{color:var(--accent-hi);font-weight:600;}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border);}
+
+/* Reel preview modal */
+.reel-modal{width:min(680px,94vw);background:var(--surface);border:1px solid var(--accent-dim);border-radius:6px;box-shadow:0 0 50px var(--glow);overflow:hidden;display:grid;grid-template-columns:minmax(200px,260px) 1fr;}
+@media(max-width:560px){.reel-modal{grid-template-columns:1fr;}}
+.reel-preview{aspect-ratio:9/16;position:relative;background:var(--surface-2);overflow:hidden;}
+.reel-preview .reel-thumb{font-size:64px;}
+.reel-preview .play-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;}
+.reel-preview .play-circle{width:56px;height:56px;border-radius:50%;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;padding-left:4px;}
+.reel-modal-info{display:flex;flex-direction:column;padding:20px;gap:14px;min-width:0;}
+.reel-modal-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.reel-modal-handle{font-family:'Antonio',sans-serif;font-size:16px;font-weight:700;letter-spacing:.05em;}
+.reel-modal-date{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);letter-spacing:.06em;margin-top:3px;}
+.reel-modal-close{background:transparent;border:none;color:var(--text-faint);font-size:16px;cursor:pointer;}
+.reel-modal-close:hover{color:var(--text);}
+.metric-list{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.metric-row{background:var(--surface-2);border:1px solid var(--border);border-radius:3px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;}
+.metric-row .m-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;color:var(--text-faint);}
+.metric-row .m-value{font-family:'Antonio',sans-serif;font-size:16px;font-weight:700;}
+.reel-modal-trial{display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;color:var(--accent-hi);}
+.reel-modal-actions{display:flex;gap:8px;margin-top:auto;}
+.reel-modal-actions .btn{flex:1;padding:11px 16px;font-size:12px;text-align:center;}
+.fav-toggle-row{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);cursor:pointer;user-select:none;letter-spacing:.06em;}
+.fav-toggle-row .star{font-size:15px;color:var(--text-faint);transition:all .15s;}
+.fav-toggle-row.faved .star{color:var(--gold);text-shadow:0 0 8px rgba(255,216,107,.8);}
+.view-creator-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface-2);border:1px solid var(--border-strong);color:var(--text-dim);padding:9px 14px;border-radius:2px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;transition:all .15s;width:100%;}
+.view-creator-btn:hover{color:var(--text);border-color:var(--accent);box-shadow:0 0 10px var(--glow);transform:translateY(-1px);}
+/* creator pin star */
+.pin-btn{position:absolute;top:8px;right:8px;background:transparent;border:none;font-size:15px;color:var(--text-faint);cursor:pointer;z-index:2;transition:all .15s;line-height:1;}
+.pin-btn:hover{color:var(--gold);transform:scale(1.2);}
+.pin-btn.pinned{color:var(--gold);text-shadow:0 0 10px rgba(255,216,107,.7);}
+/* IG vs FB views */
+.fb-pill{font-size:8px;font-family:'JetBrains Mono',monospace;background:#1877F2;color:#fff;padding:2px 5px;border-radius:6px;letter-spacing:.08em;font-weight:700;}
+.metric-list.views-list{grid-template-columns:repeat(3,1fr);}
+.split-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--surface-3);}
+.split-bar span{display:block;}
+.split-bar .ig{background:linear-gradient(90deg,#7B2CBF,#9D4EDD);}
+.split-bar .fb{background:#1877F2;}
+.split-legend{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.08em;margin-top:5px;}
+.split-legend .ig-k{color:var(--accent-hi);}
+.split-legend .fb-k{color:#5c9eff;}
+.metric-row.tagged{flex-direction:column;align-items:stretch;gap:3px;}
+.metric-row .m-top{display:flex;align-items:center;justify-content:space-between;}
+.m-tag{font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:.12em;color:var(--text-faint);}
+.fb-note{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.05em;line-height:1.7;border-left:2px solid var(--accent-dim);padding-left:10px;}
+.fb-note b{color:var(--accent-hi);}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface-3);border:1px solid var(--accent);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;padding:10px 18px;border-radius:3px;box-shadow:0 0 18px var(--glow);transition:transform .25s;z-index:99;letter-spacing:.04em;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-mark"></div><h1>SNAP STUDIO</h1></div>
+  <div class="header-meta">TRENDING v2 — HIKERAPI MOCKUP</div>
+  <button class="header-cog" onclick="openModal()">⚙</button>
+</header>
+
+<div class="view-tabs">
+  <button class="view-tab">✂ EDITOR</button>
+  <button class="view-tab">▤ CAROUSEL</button>
+  <button class="view-tab">☁ DRIVE</button>
+  <button class="view-tab">◎ INSPECTOR</button>
+  <button class="view-tab active">⚡ TRENDING <span class="new-badge">V2</span></button>
+</div>
+
+<main>
+
+<!-- ==================== VIEW 1 · TRENDING HOME ==================== -->
+<section id="view-grid" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+  <div class="trending-toolbar">
+    <h2>TRENDING</h2>
+    <div class="toolbar-controls">
+      <div class="hiker-chip" onclick="openModal()" title="HikerAPI connection">
+        <span class="dot"></span><span><b>HIKERAPI</b> connected · <span class="credits">4,182 credits</span></span>
+      </div>
+      <input class="search-box" placeholder="⌕ search accounts…">
+    </div>
+  </div>
+
+  <div class="main-subtabs">
+    <button class="subtab active" id="subtab-accounts" onclick="showSubtab('accounts')">ACCOUNTS <span class="count">4</span></button>
+    <button class="subtab" id="subtab-favs" onclick="showSubtab('favs')"><span class="star">★</span> FAVORITES <span class="count" id="fav-count">0</span></button>
+  </div>
+
+  <!-- ACCOUNTS pane -->
+  <div id="pane-accounts" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+  <div class="tag-filter-row">
+    <span class="label">FILTER</span>
+    <button class="tag-chip active">ALL <span class="count">4</span></button>
+    <button class="tag-chip">MINE <span class="count">1</span></button>
+    <button class="tag-chip">COMPETITOR <span class="count">2</span></button>
+    <button class="tag-chip">INSPO <span class="count">1</span></button>
+    <button class="tag-chip">RESTRICTED <span class="count">1</span></button>
+  </div>
+
+  <div class="creator-grid" id="creator-grid"></div>
+  </div><!-- /pane-accounts -->
+
+  <!-- FAVORITES pane -->
+  <div id="pane-favs" class="hidden" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+    <div class="reel-grid" id="fav-grid"></div>
+  </div>
+
+</section>
+
+<!-- ==================== VIEW 2 · ACCOUNT DETAIL ==================== -->
+<section id="view-detail" class="creator-detail hidden">
+  <button class="creator-back" onclick="closeDetail()">← TRENDING</button>
+
+  <div class="creator-detail-head">
+    <div class="creator-detail-avatar">AK</div>
+    <div class="creator-detail-info">
+      <div class="creator-detail-handle">@akira.souls <span class="mine-pill">MINE · PINNED</span></div>
+      <div class="creator-detail-bio">Akira — cinematic edits &amp; reels. Data below synced through HikerAPI; reels returned without a thumbnail are auto-tagged <b style="color:var(--accent-hi)">TRIAL</b>.</div>
+    </div>
+    <div class="creator-detail-stats">
+      <div class="detail-stat"><div class="stat-label">FOLLOWERS</div><div class="stat-value">48,214</div><div class="stat-delta up">▲ +2.6% · 30d</div></div>
+      <div class="detail-stat"><div class="stat-label">REELS</div><div class="stat-value">142</div><div class="stat-delta">&nbsp;</div></div>
+      <div class="detail-stat"><div class="stat-label">TRIALS</div><div class="stat-value trial-count">9</div><div class="stat-delta trial-count">3 active</div></div>
+      <div class="detail-stat"><div class="stat-label">AVG VIEWS</div><div class="stat-value">112K</div><div class="stat-delta up">▲ +18%</div></div>
+    </div>
+  </div>
+
+  <div class="growth-section">
+    <div class="growth-head">
+      <h3><b>ACCOUNT GROWTH</b> — DAILY FOLLOWER GAINS · HIKERAPI SNAPSHOTS</h3>
+      <div class="growth-controls">
+        <span class="growth-total" id="growth-total"></span>
+        <div class="range-chips">
+          <button class="range-chip" data-range="7">7D</button>
+          <button class="range-chip" data-range="15">15D</button>
+          <button class="range-chip active" data-range="30">30D</button>
+        </div>
+      </div>
+    </div>
+    <svg class="growth-chart" id="growth-chart" viewBox="0 0 1000 150" preserveAspectRatio="none"></svg>
+  </div>
+
+  <div class="filter-tabs" id="cd-filters">
+    <button class="filter-tab active" data-filter="all">ALL <span class="count">142</span></button>
+    <button class="filter-tab" data-filter="top">TOP ALL-TIME</button>
+    <button class="filter-tab trial-pill" data-filter="trial">TRIAL REELS <span class="count">9</span></button>
+    <select class="sort-select" id="reel-sort" style="margin-left:12px">
+      <option value="recent">SORT: RECENT</option>
+      <option value="views">SORT: VIEWS</option>
+      <option value="shares">SORT: SHARES</option>
+      <option value="likes">SORT: LIKES</option>
+      <option value="comments">SORT: COMMENTS</option>
+      <option value="saves">SORT: SAVES</option>
+    </select>
+    <span class="legend-strip">◌ no thumbnail returned → auto-tagged <b>TRIAL</b> · ★ favorite → FAVORITES tab</span>
+  </div>
+
+  <div class="reel-grid" id="reel-grid"></div>
+
+  <div class="export-bar">
+    <div class="sync-note">LAST SYNC <b>16 AUG 2026 · 04:12</b> · NEXT AUTO-SYNC <b>10:00</b> · 142 reels · 9 trials · 2 credits</div>
+    <div class="export-actions">
+      <button class="btn" onclick="toast('Mockup — copies a text summary for the VA chat')">COPY SUMMARY</button>
+      <button class="btn" onclick="toast('Mockup — exports ranked CSV')">EXPORT CSV</button>
+      <button class="btn primary" onclick="toast('Mockup — generates shareable HTML report for VAs')">VA REPORT</button>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ==================== HikerAPI settings modal ==================== -->
+<div class="modal-veil hidden" id="modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>HIKERAPI CONNECTION</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>API KEY</label>
+        <input type="password" value="hk_••••••••••••••••••••••3f9a">
+      </div>
+      <div class="modal-row">
+        <div class="field">
+          <label>AUTO-SYNC</label>
+          <select><option>Every 6 hours</option><option>Daily</option><option>Manual only</option></select>
+        </div>
+        <div class="field">
+          <label>CREDITS REMAINING</label>
+          <input value="4,182" readonly>
+        </div>
+      </div>
+      <div class="endpoint-list">
+        <div class="ep"><span>GET /v2/user/by/username</span><span class="cost">1 cr</span></div>
+        <div class="ep"><span>GET /v2/user/clips (paginated)</span><span class="cost">1 cr / page</span></div>
+        <div class="ep"><span>followers snapshot → growth series</span><span class="cost">stored locally</span></div>
+      </div>
+      <div class="modal-note">Reels returned with no <b>thumbnail_url</b> are auto-tagged <b>TRIAL</b>. Follower counts are snapshotted on every sync to build the growth chart — history lives in the studio's local DB, not on HikerAPI.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal()">CLOSE</button>
+      <button class="btn primary" onclick="toast('Mockup — would test the key against /v2/user/by/username');closeModal()">TEST CONNECTION</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== Reel preview modal ==================== -->
+<div class="modal-veil hidden" id="reel-modal-veil" onclick="if(event.target===this)closeReelModal()">
+  <div class="reel-modal">
+    <div class="reel-preview" id="rm-preview"></div>
+    <div class="reel-modal-info">
+      <div class="reel-modal-top">
+        <div>
+          <div class="reel-modal-handle" id="rm-handle">@akira.souls</div>
+          <div class="reel-modal-date" id="rm-date"></div>
+        </div>
+        <button class="reel-modal-close" onclick="closeReelModal()">✕</button>
+      </div>
+      <div class="reel-modal-trial hidden" id="rm-trial">◌ TRIAL REEL — NO THUMBNAIL IN RESPONSE</div>
+      <div class="metric-list views-list" id="rm-views"></div>
+      <div id="rm-split"></div>
+      <div class="metric-list" id="rm-metrics"></div>
+      <div class="fb-note">FB SPLIT EXISTS FOR <b>VIEWS ONLY</b> (play_count vs ig_play_count). FB-SIDE LIKES &amp; COMMENTS LIVE ON THE FACEBOOK POST — NOT IN HIKERAPI. SAVES = OWNER-ONLY VIA IG INSIGHTS.</div>
+      <div class="fav-toggle-row" id="rm-fav" onclick="toggleFavFromModal()">
+        <span class="star">★</span><span id="rm-fav-label">ADD TO FAVORITES</span>
+      </div>
+      <button class="view-creator-btn" onclick="viewCreatorFromModal()">⚡ VIEW CREATOR IN TRENDING</button>
+      <div class="reel-modal-actions">
+        <button class="btn" onclick="toast('Mockup — downloads MP4 via HikerAPI video_url')">⬇ DOWNLOAD</button>
+        <button class="btn primary" onclick="toast('Mockup — opens instagram.com/reel/… in browser')">↗ OPEN LINK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="chart-tip hidden" id="chart-tip"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- mock data (shape mirrors HikerAPI clips response) ----------
+// views = play_count (total incl. FB on crossposted reels); fb = play_count − ig_play_count
+const REELS = [
+  {id:1,  emoji:'🌆', grad:['#2b0a45','#7B2CBF'], views:1200000, fb:214000, likes:98400, comments:2410, shares:31200, saves:18700, date:'MAY 02', trial:false},
+  {id:2,  emoji:'⚔️', grad:['#1a0a2e','#4a1f7a'], views:864000,  fb:121000, likes:71200, comments:1980, shares:24800, saves:12400, date:'JUN 14', trial:false},
+  {id:3,  emoji:'🩸', grad:['#240a14','#7a1f3a'], views:540000,  fb:0,      likes:44100, comments:1250, shares:9800,  saves:7300,  date:'MAR 21', trial:false},
+  {id:4,  emoji:'🌙', grad:['#0a1024','#1f3a7a'], views:322000,  fb:48000,  likes:28800, comments:842,  shares:6100,  saves:4900,  date:'JUL 03', trial:false},
+  {id:5,  emoji:'🔥', grad:['#241408','#7a4a1f'], views:281000,  fb:0,      likes:24100, comments:731,  shares:8400,  saves:3800,  date:'AUG 01', trial:false},
+  {id:6,  views:34200, fb:0, likes:3010, comments:122, shares:1490, saves:610, date:'AUG 14', trial:true},
+  {id:7,  emoji:'👁️', grad:['#101024','#3b3b6e'], views:198000,  fb:27000,  likes:17900, comments:512,  shares:3900,  saves:2700,  date:'JUL 22', trial:false},
+  {id:8,  views:21800, fb:0, likes:1840, comments:95,  shares:820,  saves:340, date:'AUG 13', trial:true},
+  {id:9,  emoji:'🕊️', grad:['#0a2418','#2c6e50'], views:154000,  fb:0,      likes:13200, comments:388,  shares:2600,  saves:1900,  date:'JUN 30', trial:false},
+  {id:10, views:9400,  fb:0, likes:812,  comments:41,  shares:305,  saves:120, date:'AUG 15', trial:true},
+  {id:11, emoji:'💜', grad:['#1c0a2e','#5A1F8F'], views:121000,  fb:19000,  likes:11800, comments:301,  shares:2100,  saves:1500,  date:'AUG 08', trial:false},
+  {id:12, emoji:'🗡️', grad:['#0f0f18','#2e2e4a'], views:88000,   fb:0,      likes:7400,  comments:214,  shares:1300,  saves:900,   date:'MAY 28', trial:false},
+];
+
+// daily follower gains, oldest → newest (30 days); spike = trial graduated
+const GAINS = [38,42,35,51,44,39,47,55,49,61,58,52,66,71,64,78,84,72,92,88,96,104,98,112,231,148,132,155,168,177];
+const TRIAL_SPIKE_IDX = 24; // index in GAINS
+// daily profile views alongside gains (same day order)
+const VIEWS_DAILY = [41200,44800,39500,52100,47300,42800,50900,58200,53400,66100,61800,55700,70300,76800,68900,83400,90100,77600,98200,94500,102800,111400,105200,119800,210400,158700,141900,166300,180100,189600];
+const DATES = GAINS.map((_, i) => { const d = new Date(2026, 7, 16); d.setDate(d.getDate() - (GAINS.length - 1 - i)); return d.toLocaleDateString('en-US', {month:'short', day:'2-digit'}).toUpperCase(); });
+
+const fmt = n => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(n<1e4?1:0)+'K' : n;
+let filter = 'all', sortKey = 'recent';
+const FAVS = new Set([1, 6]);
+let modalReelId = null;
+
+// ---------- tracked accounts (pin/favorite with ★) ----------
+const ACCOUNTS = [
+  {id:'akira', handle:'@akira.souls', name:'Akira — pinned', initials:'AK', av:'av-1', mine:true, pinned:true,
+   followers:'48.2K', fd:'▲ +1,240 · 7d', fdir:'up', avg:'112K', vd:'▲ +18% · 30d', vdir:'up',
+   reels:'142', trials:9, tags:['mine','reels','va-report'], sync:'04:12'},
+  {id:'kira', handle:'@kira.aesthetic', name:'Kira · competitor', initials:'KA', av:'av-2', pinned:false,
+   followers:'233K', fd:'▲ +8,910 · 7d', fdir:'up', avg:'540K', vd:'▼ −6% · 30d', vdir:'down',
+   reels:'318', trials:4, tags:['competitor','anime'], sync:'04:14'},
+  {id:'void', handle:'@void.motion', name:'reached via HikerAPI', initials:'VM', av:'av-3', restricted:true, pinned:false,
+   followers:'89.1K', fd:'▲ +2,050 · 7d', fdir:'up', avg:'201K', vd:'▲ +31% · 30d', vdir:'up',
+   reels:'96', trials:2, tags:['competitor','restricted'], sync:'04:15'},
+  {id:'neo', handle:'@neo.edits', name:'Neo · inspo', initials:'NE', av:'av-4', pinned:false,
+   followers:'1.2M', fd:'▲ +14.2K · 7d', fdir:'up', avg:'2.4M', vd:'▲ +4% · 30d', vdir:'up',
+   reels:'764', trials:0, tags:['inspo','motion'], sync:'04:15'},
+];
+function renderAccounts(){
+  const sorted = [...ACCOUNTS].sort((a,b) => (b.pinned?1:0) - (a.pinned?1:0));
+  const cards = sorted.map(a => `
+    <div class="creator-card ${a.mine?'mine':''}" onclick="${a.id==='akira' ? 'openDetail()' : `toast('Mockup — detail view wired for @akira.souls')`}">
+      <button class="pin-btn ${a.pinned?'pinned':''}" onclick="event.stopPropagation();togglePinAccount('${a.id}')" title="Pin / favorite creator">${a.pinned?'★':'☆'}</button>
+      <div class="creator-card-head">
+        <div class="creator-avatar ${a.av}">${a.initials}</div>
+        <div>
+          <div class="creator-handle">${a.handle} ${a.mine?'<span class="mine-pill">MINE</span>':''}${a.restricted?'<span class="lock-pill">🔒 RESTRICTED</span>':''}</div>
+          <div class="creator-name">${a.name}</div>
+        </div>
+      </div>
+      <div class="creator-card-stats">
+        <div class="stat-block"><div class="stat-label">FOLLOWERS</div><div class="stat-value">${a.followers}</div><div class="stat-delta ${a.fdir}">${a.fd}</div></div>
+        <div class="stat-block"><div class="stat-label">AVG REEL VIEWS</div><div class="stat-value">${a.avg}</div><div class="stat-delta ${a.vdir}">${a.vd}</div></div>
+        <div class="stat-block"><div class="stat-label">REELS</div><div class="stat-value">${a.reels}</div><div class="stat-delta">&nbsp;</div></div>
+        <div class="stat-block"><div class="stat-label">TRIALS DETECTED</div><div class="stat-value trial-count">${a.trials}</div><div class="stat-delta ${a.trials?'trial-count':''}">${a.trials?'◌ no-thumb tagged':'—'}</div></div>
+      </div>
+      <div class="creator-card-tags">${a.tags.map(t=>`<span class="creator-tag">${t}</span>`).join('')}</div>
+      <div class="creator-card-sync"><span>LAST SYNC ${a.sync} · TODAY</span><span>2 cr/sync</span></div>
+    </div>`).join('');
+  document.getElementById('creator-grid').innerHTML = cards + `
+    <div class="add-creator-card" onclick="toast('Mockup — add-account flow: handle → HikerAPI lookup → tracked')">
+      <div class="plus">+</div>
+      <div class="label">TRACK ANY ACCOUNT</div>
+      <div class="hint">paste a handle — synced via <b>HikerAPI</b><br>public · restricted · trial reels</div>
+    </div>`;
+}
+function togglePinAccount(id){
+  const a = ACCOUNTS.find(x => x.id === id);
+  a.pinned = !a.pinned;
+  renderAccounts();
+  toast(a.pinned ? `★ ${a.handle} pinned to top` : `${a.handle} unpinned`);
+}
+
+// ---------- reel card rendering ----------
+function reelCardHTML(r, opts = {}){
+  const faved = FAVS.has(r.id) ? 'faved' : '';
+  const star = `<button class="fav-btn ${faved}" onclick="event.stopPropagation();toggleFav(${r.id})" title="Favorite">★</button>`;
+  const badge = opts.rank ? `<div class="rank-badge rank-${opts.rank}">${opts.rank}</div>` : '';
+  const fbPill = r.fb ? '<span class="fb-pill">FB</span>' : '';
+  const handle = opts.showHandle ? `<div class="reel-handle">@akira.souls</div>` : '';
+  const stats = `
+    <div class="reel-stats">
+      <span class="reel-stat">▶ ${fmt(r.views)}</span>
+      <span class="reel-stat">♥ ${fmt(r.likes)}</span>
+      <span class="reel-stat">↗ ${fmt(r.shares)}</span>
+    </div>`;
+  if (r.trial) return `
+    <div class="reel-card is-trial" style="animation-delay:${opts.delay||0}ms" onclick="openReelModal(${r.id})">
+      <div class="shade"></div>
+      <div class="reel-meta-top"><span class="left">${star}${badge}${fbPill}</span><span class="reel-date">${r.date}</span></div>
+      <div class="trial-center">
+        <div class="trial-ring">◌</div>
+        <div class="trial-badge">TRIAL</div>
+        <div class="trial-nothumb">NO THUMBNAIL</div>
+      </div>
+      ${handle}${stats}
+    </div>`;
+  return `
+    <div class="reel-card" style="animation-delay:${opts.delay||0}ms" onclick="openReelModal(${r.id})">
+      <div class="reel-thumb" style="background:linear-gradient(160deg,${r.grad[0]},${r.grad[1]})">${r.emoji}</div>
+      <div class="shade"></div>
+      <div class="reel-meta-top"><span class="left">${star}${badge}${fbPill}</span><span class="reel-date">${r.date}</span></div>
+      ${handle}${stats}
+    </div>`;
+}
+
+function render(){
+  let list = [...REELS];
+  if (filter === 'trial') list = list.filter(r => r.trial);
+  const ranked = [...REELS].filter(r=>!r.trial).sort((a,b)=>b.views-a.views).map(r=>r.id);
+  if (filter === 'top' || sortKey !== 'recent'){
+    const k = sortKey === 'recent' ? 'views' : sortKey;
+    list.sort((a,b)=>b[k]-a[k]);
+  }
+  document.getElementById('reel-grid').innerHTML = list.map((r, i) => {
+    const rank = ranked.indexOf(r.id) + 1;
+    return reelCardHTML(r, { rank: (filter==='top' && rank>=1 && rank<=3) ? rank : 0, delay: i*30 });
+  }).join('');
+}
+
+function renderFavs(){
+  const favReels = REELS.filter(r => FAVS.has(r.id));
+  document.getElementById('fav-count').textContent = favReels.length;
+  const grid = document.getElementById('fav-grid');
+  if (!favReels.length){
+    grid.innerHTML = `<div class="fav-empty"><span class="big">★</span><span>NO FAVORITES YET — HIT ★ ON ANY REEL</span></div>`;
+    return;
+  }
+  grid.innerHTML = favReels.map((r, i) => reelCardHTML(r, { showHandle:true, delay: i*30 })).join('');
+}
+
+function toggleFav(id){
+  FAVS.has(id) ? FAVS.delete(id) : FAVS.add(id);
+  render(); renderFavs();
+  if (modalReelId === id) syncModalFav();
+  toast(FAVS.has(id) ? '★ Added to FAVORITES' : 'Removed from FAVORITES');
+}
+
+// ---------- growth chart (vertical bars) ----------
+let growthRange = 30;
+function renderGrowth(){
+  const data = GAINS.slice(-growthRange);
+  const spikeIdx = TRIAL_SPIKE_IDX - (GAINS.length - data.length);
+  const W = 1000, H = 150, top = 26, bottom = 6;
+  const max = Math.max(...data);
+  const slot = W / data.length, barW = Math.min(slot * .62, 46);
+  let svg = `
+    <line x1="0" y1="${H-bottom}" x2="${W}" y2="${H-bottom}" stroke="rgba(255,255,255,.10)" stroke-width="1"/>
+    <line x1="0" y1="${top + (H-top-bottom)/2}" x2="${W}" y2="${top + (H-top-bottom)/2}" stroke="rgba(255,255,255,.05)" stroke-width="1"/>`;
+  data.forEach((v, i) => {
+    const h = (v / max) * (H - top - bottom);
+    const x = i * slot + (slot - barW) / 2;
+    const y = H - bottom - h;
+    const isSpike = i === spikeIdx;
+    svg += `<rect class="growth-bar" data-i="${i}" x="${x}" y="${y}" width="${barW}" height="${h}" rx="2"
+      style="animation-delay:${i*18}ms" fill="${isSpike ? '#00FF88' : 'url(#barGrad)'}"></rect>`;
+    if (isSpike) svg += `<text x="${x + barW/2}" y="${y - 8}" text-anchor="middle" fill="#00FF88" font-size="9" font-family="JetBrains Mono,monospace" letter-spacing="1">TRIAL GRADUATED +${v}</text>`;
+  });
+  const chartEl = document.getElementById('growth-chart');
+  chartEl.innerHTML = `
+    <defs><linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9D4EDD"/><stop offset="100%" stop-color="#5A1F8F"/>
+    </linearGradient></defs>` + svg;
+  const off = GAINS.length - data.length;
+  chartEl.querySelectorAll('.growth-bar').forEach(b => {
+    b.addEventListener('mousemove', e => showChartTip(e, off + (+b.dataset.i)));
+    b.addEventListener('mouseleave', hideChartTip);
+  });
+  const total = data.reduce((a,b)=>a+b,0);
+  document.getElementById('growth-total').textContent = `▲ +${total.toLocaleString()} FOLLOWERS · ${growthRange}D`;
+}
+function showChartTip(e, gi){
+  const tip = document.getElementById('chart-tip');
+  tip.innerHTML = `${DATES[gi]} — <span class="g">+${GAINS[gi]} followers</span> · <b>${fmt(VIEWS_DAILY[gi])} views</b>`;
+  tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 290) + 'px';
+  tip.style.top = (e.clientY - 42) + 'px';
+  tip.classList.remove('hidden');
+}
+function hideChartTip(){ document.getElementById('chart-tip').classList.add('hidden'); }
+document.querySelectorAll('.range-chip').forEach(c => c.addEventListener('click', () => {
+  document.querySelectorAll('.range-chip').forEach(x => x.classList.remove('active'));
+  c.classList.add('active');
+  growthRange = +c.dataset.range;
+  renderGrowth();
+}));
+
+// ---------- reel preview modal ----------
+let suppressReelModal = false;
+function openReelModal(id){
+  if (suppressReelModal) return;
+  modalReelId = id;
+  const r = REELS.find(x => x.id === id);
+  const prev = document.getElementById('rm-preview');
+  if (r.trial){
+    prev.innerHTML = `
+      <div class="shade" style="background:radial-gradient(ellipse at center,rgba(123,44,191,.16),transparent 70%)"></div>
+      <div class="trial-center">
+        <div class="trial-ring" style="width:64px;height:64px;font-size:24px">◌</div>
+        <div class="trial-badge" style="font-size:11px;padding:6px 14px">TRIAL</div>
+        <div class="trial-nothumb">NO THUMBNAIL RETURNED</div>
+      </div>`;
+  } else {
+    prev.innerHTML = `
+      <div class="reel-thumb" style="background:linear-gradient(160deg,${r.grad[0]},${r.grad[1]})">${r.emoji}</div>
+      <div class="play-hint"><div class="play-circle">▶</div></div>`;
+  }
+  document.getElementById('rm-date').textContent = `POSTED ${r.date} · 2026`;
+  document.getElementById('rm-trial').classList.toggle('hidden', !r.trial);
+  const mRow = ([l,v]) => `<div class="metric-row"><span class="m-label">${l}</span><span class="m-value">${fmt(v)}</span></div>`;
+  const fb = r.fb || 0, ig = r.views - fb;
+  document.getElementById('rm-views').innerHTML = [
+    ['TOTAL VIEWS', r.views], ['IG VIEWS', ig], ['FB VIEWS', fb],
+  ].map(mRow).join('');
+  const igPct = Math.round(ig / r.views * 100);
+  document.getElementById('rm-split').innerHTML = fb ? `
+    <div class="split-bar"><span class="ig" style="flex:${igPct}"></span><span class="fb" style="flex:${100-igPct}"></span></div>
+    <div class="split-legend"><span class="ig-k">IG ${igPct}%</span><span class="fb-k">FB ${100-igPct}%</span></div>`
+    : `<div class="split-legend"><span class="ig-k">IG ONLY — NOT CROSSPOSTED TO FB</span></div>`;
+  document.getElementById('rm-metrics').innerHTML = [
+    ['SHARES', r.shares, 'IG COUNTER'], ['LIKES', r.likes, 'IG COUNTER'],
+    ['COMMENTS', r.comments, 'IG COUNTER'], ['SAVES', r.saves, 'OWNER INSIGHTS ONLY'],
+  ].map(([l,v,t]) => `<div class="metric-row tagged"><div class="m-top"><span class="m-label">${l}</span><span class="m-value">${fmt(v)}</span></div><div class="m-tag">${t}</div></div>`).join('');
+  syncModalFav();
+  document.getElementById('reel-modal-veil').classList.remove('hidden');
+}
+function syncModalFav(){
+  const row = document.getElementById('rm-fav');
+  const faved = FAVS.has(modalReelId);
+  row.classList.toggle('faved', faved);
+  document.getElementById('rm-fav-label').textContent = faved ? 'IN FAVORITES — CLICK TO REMOVE' : 'ADD TO FAVORITES';
+}
+function toggleFavFromModal(){ toggleFav(modalReelId); }
+function closeReelModal(){ document.getElementById('reel-modal-veil').classList.add('hidden'); modalReelId = null; }
+function viewCreatorFromModal(){
+  closeReelModal();
+  suppressReelModal = true;
+  setTimeout(() => { suppressReelModal = false; }, 350);
+  openDetail();
+  toast('Jumped to @akira.souls in TRENDING');
+}
+
+// ---------- navigation ----------
+function showSubtab(which){
+  document.getElementById('subtab-accounts').classList.toggle('active', which==='accounts');
+  document.getElementById('subtab-favs').classList.toggle('active', which==='favs');
+  document.getElementById('pane-accounts').classList.toggle('hidden', which!=='accounts');
+  document.getElementById('pane-favs').classList.toggle('hidden', which!=='favs');
+  if (which==='favs') renderFavs();
+}
+document.querySelectorAll('#cd-filters .filter-tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('#cd-filters .filter-tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  filter = t.dataset.filter;
+  if (filter === 'top') document.getElementById('reel-sort').value = 'views';
+  render();
+}));
+document.getElementById('reel-sort').addEventListener('change', e => { sortKey = e.target.value; render(); });
+
+function openDetail(){ document.getElementById('view-grid').classList.add('hidden'); document.getElementById('view-detail').classList.remove('hidden'); render(); renderGrowth(); }
+function closeDetail(){ document.getElementById('view-detail').classList.add('hidden'); document.getElementById('view-grid').classList.remove('hidden'); renderFavs(); }
+function openModal(){ document.getElementById('modal').classList.remove('hidden'); }
+function closeModal(){ document.getElementById('modal').classList.add('hidden'); }
+
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+render(); renderFavs(); renderAccounts();
+</script>
+</body>
+</html>
