@@ -960,6 +960,7 @@
 <button class="view-tab" data-view="carousel"><span class="tab-icon">▦</span> CAROUSEL EDIT</button>
 <button class="view-tab" data-view="drive"><span class="tab-icon">▲</span> DRIVE</button>
 <button class="view-tab" data-view="inspector"><span class="tab-icon">🔍</span> METADATA INSPECTOR</button>
+<button class="view-tab" data-view="trending"><span class="tab-icon">⚡</span> TRENDING</button>
 </div>
 <main id="editorView">
 <section class="workspace">
@@ -1571,7 +1572,690 @@ EXPORT TO DRIVE
 </div>
 </div>
 </div>
+<div id="trendingView" class="hidden">
+  <div id="trxHome" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+    <div class="trx-toolbar">
+      <h2>TRENDING</h2>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div class="trx-chip" id="trxKeyChip" onclick="trxOpenSettings()"><span class="trx-dot"></span><span><b>HIKERAPI</b> <span id="trxKeyState">no key</span></span></div>
+        <button class="trx-btn" onclick="trxSyncAll()">⟳ SYNC ALL</button>
+        <button class="trx-btn" onclick="trxOpenSettings()">⚙</button>
+      </div>
+    </div>
+    <div class="trx-subtabs">
+      <button class="trx-subtab active" id="trxTabAccounts" onclick="trxSetSubtab('accounts')">ACCOUNTS <span class="trx-count" id="trxAccCount">0</span></button>
+      <button class="trx-subtab" id="trxTabFavs" onclick="trxSetSubtab('favs')"><span style="color:#FFD86B">★</span> FAVORITES <span class="trx-count" id="trxFavCount">0</span></button>
+    </div>
+    <div class="trx-status" id="trxStatusLine"></div>
+    <div class="trx-grid" id="trxAccountGrid"></div>
+    <div class="trx-reels hidden" id="trxFavGrid" style="flex:1;"></div>
+  </div>
+
+  <div id="trxDetail" class="trx-detail hidden">
+    <button class="trx-back" onclick="trxCloseDetail()">← TRENDING</button>
+    <div class="trx-dhead" id="trxDetailHead"></div>
+    <div class="trx-growth">
+      <div class="trx-ghead">
+        <h3><b>ACCOUNT GROWTH</b> — FOLLOWER SNAPSHOTS PER SYNC</h3>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="trx-gtotal" id="trxGrowthTotal"></span>
+          <div class="trx-chips" id="trxRangeChips">
+            <button class="trx-rchip" data-range="7">7D</button>
+            <button class="trx-rchip" data-range="15">15D</button>
+            <button class="trx-rchip active" data-range="30">30D</button>
+          </div>
+        </div>
+      </div>
+      <svg class="trx-chart" id="trxChart" viewBox="0 0 1000 120" preserveAspectRatio="none"></svg>
+      <div class="trx-gempty hidden" id="trxGrowthEmpty">GROWTH CHART BUILDS AS SYNCS ACCUMULATE — EACH SYNC STORES A LOCAL FOLLOWER SNAPSHOT</div>
+    </div>
+    <div class="trx-filters">
+      <button class="trx-ftab active" data-tf="all">ALL <span class="trx-count" id="trxAllCount">0</span></button>
+      <button class="trx-ftab" data-tf="top">TOP ALL-TIME</button>
+      <button class="trx-ftab" data-tf="trial">◌ TRIALS <span class="trx-count" id="trxTrialCount">0</span></button>
+      <select class="trx-select" id="trxSort">
+        <option value="recent">SORT: RECENT</option>
+        <option value="views">SORT: VIEWS</option>
+        <option value="shares">SORT: SHARES</option>
+        <option value="likes">SORT: LIKES</option>
+        <option value="comments">SORT: COMMENTS</option>
+      </select>
+      <span class="trx-flabel">VIEWS</span>
+      <div class="trx-chips" id="trxViewsSrc" style="margin-left:6px;">
+        <button class="trx-rchip active" data-src="total">TOTAL</button>
+        <button class="trx-rchip" data-src="ig">IG</button>
+        <button class="trx-rchip" data-src="fb">FB</button>
+      </div>
+    </div>
+    <div class="trx-reels" id="trxReelGrid"></div>
+    <div class="trx-export">
+      <span class="trx-note" id="trxExportNote"></span>
+      <div style="display:flex;gap:8px;">
+        <button class="trx-btn" onclick="trxSummary()">COPY SUMMARY</button>
+        <button class="trx-btn" onclick="trxCsv()">COPY CSV</button>
+        <button class="trx-btn primary" onclick="trxSyncOne()">⟳ SYNC NOW</button>
+      </div>
+    </div>
+  </div>
 </div>
+
+</div>
+<style>
+/* ============ TRENDING tab (trx-) ============ */
+#trendingView{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
+#trendingView.hidden{display:none;}
+.trx-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px clamp(20px,3vw,40px) 10px;flex-wrap:wrap;}
+.trx-toolbar h2{font-family:'Antonio',sans-serif;font-size:22px;letter-spacing:.18em;margin:0;background:var(--shimmer);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.trx-chip{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--accent-dim);border-radius:14px;padding:6px 14px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--text-dim);cursor:pointer;}
+.trx-chip:hover{border-color:var(--accent);}
+.trx-chip .trx-dot{width:7px;height:7px;border-radius:50%;background:var(--green);}
+.trx-chip.trx-nokey .trx-dot{background:var(--red);}
+.trx-chip b{color:var(--text);font-weight:700;}
+.trx-subtabs{display:flex;gap:0;padding:0 clamp(20px,3vw,40px);border-bottom:1px solid var(--border);}
+.trx-subtab{background:transparent;border:none;padding:11px 16px;font-family:'Antonio',sans-serif;font-size:12px;font-weight:700;letter-spacing:.16em;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;display:flex;align-items:center;gap:7px;}
+.trx-subtab:hover{color:var(--text);}
+.trx-subtab.active{color:var(--text);border-bottom-color:var(--accent);}
+.trx-subtab .trx-count{font-size:9px;background:var(--surface);color:var(--text-dim);padding:2px 6px;border-radius:8px;font-family:'JetBrains Mono',monospace;}
+.trx-status{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);padding:6px clamp(20px,3vw,40px);letter-spacing:.05em;min-height:24px;}
+.trx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;padding:14px clamp(20px,3vw,40px) 30px;overflow-y:auto;flex:1;align-content:start;}
+.trx-card{background:var(--surface);border:1px solid var(--border);border-radius:4px;cursor:pointer;transition:border-color .15s;position:relative;display:flex;flex-direction:column;}
+.trx-card:hover{border-color:var(--accent);}
+.trx-card.trx-mine::before{content:'';position:absolute;inset:0 0 auto 0;height:2px;background:var(--shimmer);}
+.trx-pin{position:absolute;top:8px;right:8px;background:transparent;border:none;font-size:15px;color:var(--text-faint);cursor:pointer;z-index:2;line-height:1;}
+.trx-pin:hover{color:#FFD86B;}
+.trx-pin.pinned{color:#FFD86B;}
+.trx-card-head{display:flex;align-items:center;gap:12px;padding:13px;}
+.trx-av{width:50px;height:50px;border-radius:50%;border:2px solid var(--accent);background:linear-gradient(135deg,#2b0a45,var(--accent));flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Antonio',sans-serif;font-size:16px;font-weight:700;color:#fff;text-transform:uppercase;}
+.trx-handle{font-family:'Antonio',sans-serif;font-size:15px;font-weight:700;letter-spacing:.04em;color:var(--text);display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.trx-name{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.trx-pill{font-size:8px;background:var(--shimmer);color:#fff;padding:2px 6px;border-radius:8px;letter-spacing:.1em;font-family:'JetBrains Mono',monospace;}
+.trx-lock{font-size:8px;background:var(--surface-2,#12121C);border:1px solid var(--border-strong);color:#FFD86B;padding:2px 6px;border-radius:8px;font-family:'JetBrains Mono',monospace;}
+.trx-stats{padding:0 13px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.trx-stat{background:rgba(255,255,255,.03);border-radius:2px;padding:9px;}
+.trx-stat .l{font-size:9px;color:var(--text-faint);letter-spacing:.12em;margin-bottom:3px;font-family:'JetBrains Mono',monospace;}
+.trx-stat .v{font-family:'Antonio',sans-serif;font-size:17px;font-weight:700;color:var(--text);line-height:1;}
+.trx-stat .v.trx-purple{color:var(--accent-hi,#9D4EDD);}
+.trx-sync-row{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);padding:8px 13px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.trx-sync-btn{background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 10px;border-radius:2px;cursor:pointer;letter-spacing:.08em;}
+.trx-sync-btn:hover{border-color:var(--accent);color:var(--text);}
+.trx-add{background:transparent;border:2px dashed var(--border-strong);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-faint);min-height:200px;gap:10px;padding:16px;}
+.trx-add:hover{border-color:var(--accent);}
+.trx-add .trx-plus{font-size:30px;line-height:1;}
+.trx-add input{background:var(--surface);border:1px solid var(--border);border-radius:2px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none;width:200px;text-align:center;}
+.trx-add input:focus{border-color:var(--accent);}
+.trx-btn{border-radius:2px;padding:8px 16px;font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;cursor:pointer;border:1px solid var(--border-strong);background:var(--surface);color:var(--text-dim);transition:all .15s;}
+.trx-btn:hover{color:var(--text);border-color:var(--accent);}
+.trx-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.trx-detail{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
+.trx-back{display:flex;align-items:center;gap:6px;background:transparent;border:none;color:var(--text-dim);padding:12px clamp(20px,3vw,40px) 6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;align-self:flex-start;}
+.trx-back:hover{color:var(--accent-hi,#9D4EDD);}
+.trx-dhead{display:flex;align-items:center;gap:18px;padding:6px clamp(20px,3vw,40px) 14px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.trx-dhead .trx-av{width:72px;height:72px;font-size:22px;}
+.trx-dinfo{flex:1;min-width:180px;}
+.trx-dhandle{font-family:'Antonio',sans-serif;font-size:22px;font-weight:700;letter-spacing:.04em;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.trx-dbio{font-size:11px;color:var(--text-dim);margin-top:4px;max-width:520px;}
+.trx-dstats{display:flex;gap:10px;flex-wrap:wrap;}
+.trx-dstat{background:rgba(255,255,255,.03);border:1px solid var(--border);padding:9px 13px;border-radius:3px;min-width:100px;}
+.trx-growth{padding:12px clamp(20px,3vw,40px);border-bottom:1px solid var(--border);}
+.trx-ghead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;}
+.trx-ghead h3{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.18em;margin:0;color:var(--text-dim);}
+.trx-ghead h3 b{color:var(--text);}
+.trx-gtotal{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--green);letter-spacing:.06em;font-weight:700;}
+.trx-chips{display:flex;gap:4px;}
+.trx-rchip{background:var(--surface);border:1px solid var(--border);color:var(--text-dim);padding:4px 11px;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:2px;cursor:pointer;letter-spacing:.08em;}
+.trx-rchip:hover{color:var(--text);border-color:var(--accent);}
+.trx-rchip.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;}
+.trx-chart{width:100%;height:120px;display:block;}
+.trx-gempty{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);padding:20px 0;text-align:center;letter-spacing:.06em;}
+.trx-bar{cursor:pointer;}
+.trx-bar:hover{filter:brightness(1.5);}
+.trx-tip{position:fixed;pointer-events:none;background:var(--surface);border:1px solid var(--accent);color:var(--text);padding:7px 12px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:10px;z-index:100000;white-space:nowrap;letter-spacing:.05em;}
+.trx-tip b{color:var(--accent-hi,#9D4EDD);}
+.trx-tip .g{color:var(--green);}
+.trx-filters{display:flex;gap:0;padding:0 clamp(20px,3vw,40px);border-bottom:1px solid var(--border);overflow-x:auto;align-items:center;}
+.trx-ftab{background:transparent;border:none;padding:12px 15px;font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:6px;}
+.trx-ftab:hover{color:var(--text);}
+.trx-ftab.active{color:var(--text);border-bottom-color:var(--accent);}
+.trx-flabel{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.16em;margin-left:12px;}
+.trx-select{background:var(--surface);border:1px solid var(--border);border-radius:2px;padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text);outline:none;cursor:pointer;margin-left:10px;}
+.trx-reels{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;padding:12px clamp(20px,3vw,40px) 16px;overflow-y:auto;flex:1;align-content:start;}
+.trx-reel{position:relative;aspect-ratio:9/16;background:var(--surface);border-radius:3px;overflow:hidden;cursor:pointer;border:1px solid transparent;}
+.trx-reel:hover{border-color:var(--accent);}
+.trx-reel img{width:100%;height:100%;object-fit:cover;display:block;}
+.trx-shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.78) 0%,transparent 38%,transparent 68%,rgba(0,0,0,.45) 100%);pointer-events:none;}
+.trx-rtop{position:absolute;top:7px;left:7px;right:7px;display:flex;justify-content:space-between;align-items:center;z-index:2;gap:6px;}
+.trx-rtop .lft{display:flex;align-items:center;gap:5px;}
+.trx-rdate{font-family:'JetBrains Mono',monospace;font-size:9px;color:rgba(255,255,255,.75);text-shadow:0 1px 3px rgba(0,0,0,.8);}
+.trx-rank{font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#050507;}
+.trx-rank.r1{background:#FFD86B;}.trx-rank.r2{background:#C8C8D8;}.trx-rank.r3{background:#B08050;}
+.trx-fav{background:rgba(0,0,0,.45);border:none;color:rgba(255,255,255,.75);width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;}
+.trx-fav:hover{color:#FFD86B;}
+.trx-fav.faved{color:#FFD86B;}
+.trx-fbtag{font-size:8px;font-family:'JetBrains Mono',monospace;background:#1877F2;color:#fff;padding:2px 5px;border-radius:6px;font-weight:700;}
+.trx-rhandle{position:absolute;bottom:24px;left:7px;z-index:2;font-family:'JetBrains Mono',monospace;font-size:8px;color:rgba(255,255,255,.6);text-shadow:0 1px 3px rgba(0,0,0,.8);}
+.trx-rstats{position:absolute;bottom:7px;left:7px;right:7px;display:flex;justify-content:space-between;color:#fff;font-size:9px;font-weight:600;z-index:2;text-shadow:0 1px 3px rgba(0,0,0,.7);font-family:'JetBrains Mono',monospace;}
+.trx-reel.trx-trial{border:1px dashed var(--accent-dim);background:rgba(123,44,191,.06);}
+.trx-trialc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;z-index:1;}
+.trx-trialb{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.22em;color:#fff;background:var(--accent);padding:4px 10px;border-radius:3px;}
+.trx-nothumb{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-faint);letter-spacing:.14em;}
+.trx-empty{grid-column:1/-1;border:2px dashed var(--border-strong);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--text-faint);min-height:180px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.06em;text-align:center;padding:16px;}
+.trx-export{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px clamp(20px,3vw,40px);border-top:1px solid var(--border);flex-wrap:wrap;}
+.trx-note{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.05em;}
+.trx-veil{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:99999;}
+.trx-veil.hidden{display:none;}
+.trx-modal{width:min(520px,92vw);background:var(--surface);border:1px solid var(--accent-dim);border-radius:6px;overflow:hidden;}
+.trx-mhead{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);}
+.trx-mhead h3{font-family:'Antonio',sans-serif;font-size:13px;letter-spacing:.18em;margin:0;color:var(--text);}
+.trx-x{background:transparent;border:none;color:var(--text-faint);font-size:16px;cursor:pointer;}
+.trx-x:hover{color:var(--text);}
+.trx-mbody{padding:18px;display:flex;flex-direction:column;gap:14px;}
+.trx-field label{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.16em;color:var(--text-faint);margin-bottom:5px;}
+.trx-field input,.trx-field select{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:2px;padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none;box-sizing:border-box;}
+.trx-field input:focus{border-color:var(--accent);}
+.trx-mnote{font-size:10px;color:var(--text-faint);line-height:1.6;}
+.trx-mnote b{color:var(--accent-hi,#9D4EDD);}
+.trx-mfoot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border);}
+.trx-rmodal{width:min(660px,94vw);background:var(--surface);border:1px solid var(--accent-dim);border-radius:6px;overflow:hidden;display:grid;grid-template-columns:minmax(180px,240px) 1fr;}
+.trx-rprev{aspect-ratio:9/16;position:relative;background:rgba(255,255,255,.03);overflow:hidden;}
+.trx-rprev img{width:100%;height:100%;object-fit:cover;}
+.trx-rinfo{display:flex;flex-direction:column;padding:18px;gap:12px;min-width:0;}
+.trx-rmtop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.trx-rmhandle{font-family:'Antonio',sans-serif;font-size:16px;font-weight:700;color:var(--text);}
+.trx-rmdate{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);margin-top:3px;}
+.trx-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+.trx-metrics.two{grid-template-columns:1fr 1fr;}
+.trx-mrow{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:3px;padding:8px 11px;}
+.trx-mrow .mt{display:flex;justify-content:space-between;align-items:center;}
+.trx-mrow .ml{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--text-faint);}
+.trx-mrow .mv{font-family:'Antonio',sans-serif;font-size:15px;font-weight:700;color:var(--text);}
+.trx-mtag{font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:.1em;color:var(--text-faint);margin-top:2px;}
+.trx-split{display:flex;height:6px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.06);}
+.trx-split span{display:block;}
+.trx-split .ig{background:linear-gradient(90deg,var(--accent),var(--accent-hi,#9D4EDD));}
+.trx-split .fb{background:#1877F2;}
+.trx-sleg{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);margin-top:4px;}
+.trx-sleg .igk{color:var(--accent-hi,#9D4EDD);}
+.trx-sleg .fbk{color:#5c9eff;}
+.trx-ract{display:flex;gap:8px;margin-top:auto;}
+.trx-ract .trx-btn{flex:1;text-align:center;}
+.trx-favrow{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);cursor:pointer;user-select:none;}
+.trx-favrow .s{font-size:15px;color:var(--text-faint);}
+.trx-favrow.faved .s{color:#FFD86B;}
+.trx-vcreator{display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(255,255,255,.04);border:1px solid var(--border-strong);color:var(--text-dim);padding:9px 14px;border-radius:2px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;width:100%;box-sizing:border-box;}
+.trx-vcreator:hover{color:var(--text);border-color:var(--accent);}
+.trx-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);border:1px solid var(--accent);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;padding:10px 18px;border-radius:3px;transition:transform .25s;z-index:100001;letter-spacing:.04em;}
+.trx-toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+
+<div class="trx-veil hidden" id="trxSettings">
+  <div class="trx-modal">
+    <div class="trx-mhead"><h3>HIKERAPI CONNECTION</h3><button class="trx-x" onclick="trxCloseSettings()">✕</button></div>
+    <div class="trx-mbody">
+      <div class="trx-field"><label>API KEY — hikerapi.com dashboard</label><input type="password" id="trxKeyInput" placeholder="paste access key"></div>
+      <div class="trx-field"><label>AUTO-SYNC ON TAB OPEN</label><select id="trxCadence"><option value="manual">Manual only</option><option value="6h">If older than 6 hours</option><option value="24h">If older than 24 hours</option></select></div>
+      <div class="trx-mnote">Requests go through the app's Rust side (webview CORS can't reach HikerAPI directly). Reels returned with <b>no thumbnail</b> are auto-tagged <b>TRIAL</b>. Follower counts are snapshotted locally on every sync to build the growth chart. ~1 credit per request; a full first sync of one account ≈ 7 requests.</div>
+    </div>
+    <div class="trx-mfoot">
+      <button class="trx-btn" onclick="trxTestKey()">TEST KEY</button>
+      <button class="trx-btn primary" onclick="trxSaveSettings()">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<div class="trx-veil hidden" id="trxReelModal" onclick="if(event.target===this)trxCloseReel()">
+  <div class="trx-rmodal">
+    <div class="trx-rprev" id="trxRPrev"></div>
+    <div class="trx-rinfo">
+      <div class="trx-rmtop">
+        <div><div class="trx-rmhandle" id="trxRHandle"></div><div class="trx-rmdate" id="trxRDate"></div></div>
+        <button class="trx-x" onclick="trxCloseReel()">✕</button>
+      </div>
+      <div class="trx-metrics" id="trxRViews"></div>
+      <div id="trxRSplit"></div>
+      <div class="trx-metrics two" id="trxRMetrics"></div>
+      <div class="trx-favrow" id="trxRFav" onclick="trxToggleFavModal()"><span class="s">★</span><span id="trxRFavLabel">ADD TO FAVORITES</span></div>
+      <button class="trx-vcreator" onclick="trxViewCreator()">⚡ VIEW CREATOR IN TRENDING</button>
+      <div class="trx-ract">
+        <button class="trx-btn" id="trxRDownload">⬇ DOWNLOAD</button>
+        <button class="trx-btn primary" id="trxROpen">↗ OPEN LINK</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="trx-tip hidden" id="trxTip"></div>
+<div class="trx-toast" id="trxToast"></div>
+
+<script>
+(function(){
+'use strict';
+const LS = 'trx_state_v1';
+let trx = { key:'', cadence:'manual', accounts:[], reels:{}, snaps:{}, favs:[] };
+let trxSel = null, trxFilter = 'all', trxSortKey = 'recent', trxViewMode = 'total', trxRange = 30, trxSubtab = 'accounts', trxModalRef = null, trxSuppress = false, trxBusy = false;
+
+function trxLoad(){ try { const s = JSON.parse(localStorage.getItem(LS)); if (s && typeof s === 'object') trx = Object.assign(trx, s); } catch(e){} }
+function trxSave(){ try { localStorage.setItem(LS, JSON.stringify(trx)); } catch(e){} }
+const trxFmt = n => { n = +n || 0; return n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(n<1e4?1:0)+'K' : String(n); };
+const trxVv = r => trxViewMode === 'ig' ? r.igViews : trxViewMode === 'fb' ? r.fb : r.views;
+const trxDate = ts => new Date(ts).toLocaleDateString('en-US',{month:'short',day:'2-digit'}).toUpperCase();
+const trxEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+let toastT;
+function trxToast(msg){ const t = document.getElementById('trxToast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+function trxStatus(msg){ document.getElementById('trxStatusLine').textContent = msg || ''; }
+
+async function trxApi(path, params){
+  if (!trx.key) throw new Error('No HikerAPI key — open ⚙ settings');
+  const inv = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+  if (!inv) throw new Error('Syncing needs the desktop app');
+  const p = {}; Object.keys(params || {}).forEach(k => { if (params[k] != null) p[k] = String(params[k]); });
+  const body = await inv('hiker_fetch', { path, key: trx.key, params: p });
+  try { return JSON.parse(body); } catch(e){ throw new Error('Unparseable HikerAPI response'); }
+}
+
+function trxNormUser(j){
+  const u = (j && (j.user || (j.response && j.response.user))) || j || {};
+  return {
+    pk: String(u.pk || u.pk_id || u.id || ''),
+    username: u.username || '',
+    fullName: u.full_name || '',
+    followers: u.follower_count ?? 0,
+    following: u.following_count ?? 0,
+    mediaCount: u.media_count ?? 0,
+    isPrivate: !!u.is_private,
+  };
+}
+function trxItems(j){
+  if (!j) return [];
+  if (Array.isArray(j)) return j;
+  return j.items || (j.response && j.response.items) || j.medias || [];
+}
+function trxNormClip(it){
+  const m = (it && (it.media || it)) || {};
+  const cand = m.image_versions2 && m.image_versions2.candidates && m.image_versions2.candidates[0];
+  const thumb = m.thumbnail_url || (cand && cand.url) || m.display_url || null;
+  const views = m.play_count ?? m.view_count ?? 0;
+  const igViews = m.ig_play_count ?? views;
+  return {
+    id: String(m.pk || m.id || ''),
+    code: m.code || '',
+    ts: m.taken_at ? m.taken_at * 1000 : 0,
+    views, igViews,
+    fb: Math.max(0, views - igViews),
+    likes: m.like_count ?? 0,
+    comments: m.comment_count ?? 0,
+    shares: m.reshare_count ?? m.share_count ?? 0,
+    thumb,
+    videoUrl: m.video_url || (m.video_versions && m.video_versions[0] && m.video_versions[0].url) || null,
+    trial: !thumb,
+  };
+}
+
+async function trxSyncAccount(pk, deep){
+  const acc = trx.accounts.find(a => a.pk === pk); if (!acc || trxBusy) return;
+  trxBusy = true;
+  try {
+    trxStatus('Syncing @' + acc.username + '…');
+    const u = trxNormUser(await trxApi('/v2/user/by/username', { username: acc.username }));
+    if (u.followers) {
+      Object.assign(acc, { followers: u.followers, following: u.following, mediaCount: u.mediaCount, isPrivate: u.isPrivate, fullName: u.fullName });
+      const snaps = trx.snaps[pk] = trx.snaps[pk] || [];
+      const last = snaps[snaps.length - 1];
+      if (!last || Date.now() - last.t > 3600e3) snaps.push({ t: Date.now(), followers: u.followers });
+      if (snaps.length > 400) snaps.splice(0, snaps.length - 400);
+    }
+    let pageId = null, got = [], pages = 0;
+    const maxPages = deep ? 6 : 2;
+    do {
+      const params = { user_id: pk }; if (pageId) params.page_id = pageId;
+      const cj = await trxApi('/v2/user/clips', params);
+      const items = trxItems(cj);
+      got.push(...items.map(trxNormClip).filter(r => r.id));
+      pageId = (cj && (cj.next_page_id || (cj.response && cj.response.next_page_id))) || null;
+      pages++;
+      trxStatus('Syncing @' + acc.username + ' — page ' + pages + ' (' + got.length + ' reels)…');
+    } while (pageId && pages < maxPages);
+    const seen = new Set(got.map(r => r.id));
+    trx.reels[pk] = [...got, ...(trx.reels[pk] || []).filter(r => !seen.has(r.id))];
+    acc.trialCount = trx.reels[pk].filter(r => r.trial).length;
+    const solid = trx.reels[pk].filter(r => !r.trial);
+    acc.avgViews = solid.length ? Math.round(solid.reduce((s, r) => s + r.views, 0) / solid.length) : 0;
+    acc.lastSync = Date.now();
+    trxSave(); trxRenderAll();
+    trxStatus('');
+    trxToast('@' + acc.username + ' synced — ' + trx.reels[pk].length + ' reels, ' + acc.trialCount + ' trials');
+  } catch(e){
+    trxStatus(''); trxToast(String(e.message || e));
+  } finally { trxBusy = false; }
+}
+
+window.trxSyncAll = async function(){
+  for (const a of [...trx.accounts]) await trxSyncAccount(a.pk, !trx.reels[a.pk] || !trx.reels[a.pk].length);
+};
+window.trxSyncOne = function(){ if (trxSel) trxSyncAccount(trxSel, true); };
+
+window.trxAddAccount = async function(){
+  const inp = document.getElementById('trxAddInput');
+  const handle = (inp.value || '').trim().replace(/^@/, '');
+  if (!handle) return trxToast('Type a handle first');
+  if (trx.accounts.some(a => a.username.toLowerCase() === handle.toLowerCase())) return trxToast('Already tracked');
+  try {
+    trxStatus('Looking up @' + handle + '…');
+    const u = trxNormUser(await trxApi('/v2/user/by/username', { username: handle }));
+    if (!u.pk) throw new Error('Account not found');
+    trx.accounts.push({ pk: u.pk, username: u.username || handle, fullName: u.fullName, followers: u.followers, following: u.following, mediaCount: u.mediaCount, isPrivate: u.isPrivate, pinned: trx.accounts.length === 0, mine: trx.accounts.length === 0, addedAt: Date.now(), lastSync: 0, avgViews: 0, trialCount: 0 });
+    inp.value = '';
+    trxSave(); trxRenderAll();
+    trxToast('@' + (u.username || handle) + ' added — first sync running…');
+    await trxSyncAccount(u.pk, true);
+  } catch(e){ trxStatus(''); trxToast(String(e.message || e)); }
+};
+
+window.trxTogglePin = function(pk){
+  const a = trx.accounts.find(x => x.pk === pk); if (!a) return;
+  a.pinned = !a.pinned; trxSave(); trxRenderAccounts();
+  trxToast(a.pinned ? '★ @' + a.username + ' pinned' : '@' + a.username + ' unpinned');
+};
+window.trxToggleFav = function(pk, id){
+  const k = pk + ':' + id;
+  const i = trx.favs.indexOf(k);
+  if (i >= 0) trx.favs.splice(i, 1); else trx.favs.push(k);
+  trxSave(); trxRenderAll();
+  if (trxModalRef && trxModalRef.pk === pk && trxModalRef.id === id) trxSyncModalFav();
+  trxToast(i >= 0 ? 'Removed from FAVORITES' : '★ Added to FAVORITES');
+};
+
+function trxAccCard(a){
+  const reels = trx.reels[a.pk] || [];
+  return '<div class="trx-card' + (a.mine ? ' trx-mine' : '') + '" onclick="trxOpenDetail(\'' + a.pk + '\')">' +
+    '<button class="trx-pin' + (a.pinned ? ' pinned' : '') + '" onclick="event.stopPropagation();trxTogglePin(\'' + a.pk + '\')">' + (a.pinned ? '★' : '☆') + '</button>' +
+    '<div class="trx-card-head"><div class="trx-av">' + trxEsc((a.username || '?').slice(0, 2)) + '</div><div>' +
+    '<div class="trx-handle">@' + trxEsc(a.username) + (a.mine ? ' <span class="trx-pill">MINE</span>' : '') + (a.isPrivate ? ' <span class="trx-lock">🔒 PRIVATE</span>' : '') + '</div>' +
+    '<div class="trx-name">' + trxEsc(a.fullName || '') + '</div></div></div>' +
+    '<div class="trx-stats">' +
+    '<div class="trx-stat"><div class="l">FOLLOWERS</div><div class="v">' + trxFmt(a.followers) + '</div></div>' +
+    '<div class="trx-stat"><div class="l">AVG REEL VIEWS</div><div class="v">' + trxFmt(a.avgViews) + '</div></div>' +
+    '<div class="trx-stat"><div class="l">REELS SYNCED</div><div class="v">' + reels.length + '</div></div>' +
+    '<div class="trx-stat"><div class="l">TRIALS</div><div class="v trx-purple">' + (a.trialCount || 0) + '</div></div>' +
+    '</div>' +
+    '<div class="trx-sync-row"><span>' + (a.lastSync ? 'SYNCED ' + trxDate(a.lastSync) : 'NEVER SYNCED') + '</span>' +
+    '<button class="trx-sync-btn" onclick="event.stopPropagation();trxSyncAccount(\'' + a.pk + '\', false)">⟳ SYNC</button></div></div>';
+}
+
+function trxRenderAccounts(){
+  const grid = document.getElementById('trxAccountGrid');
+  const sorted = [...trx.accounts].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+  grid.innerHTML = sorted.map(trxAccCard).join('') +
+    '<div class="trx-add"><div class="trx-plus">+</div>' +
+    '<div style="font-family:\'Antonio\',sans-serif;font-size:12px;letter-spacing:.18em;">TRACK ANY ACCOUNT</div>' +
+    '<input id="trxAddInput" placeholder="@handle" onkeydown="if(event.key===\'Enter\')trxAddAccount()">' +
+    '<button class="trx-btn" onclick="trxAddAccount()">ADD + SYNC</button>' +
+    '<div style="font-size:10px;color:var(--text-faint);text-align:center;">synced via HikerAPI · trials auto-tagged</div></div>';
+  document.getElementById('trxAccCount').textContent = trx.accounts.length;
+  document.getElementById('trxFavCount').textContent = trx.favs.length;
+  const chip = document.getElementById('trxKeyChip');
+  chip.classList.toggle('trx-nokey', !trx.key);
+  document.getElementById('trxKeyState').textContent = trx.key ? 'connected' : 'no key — click to set up';
+}
+
+function trxReelCard(pk, r, opts){
+  opts = opts || {};
+  const faved = trx.favs.includes(pk + ':' + r.id);
+  const star = '<button class="trx-fav' + (faved ? ' faved' : '') + '" onclick="event.stopPropagation();trxToggleFav(\'' + pk + '\',\'' + r.id + '\')">★</button>';
+  const rank = opts.rank ? '<div class="trx-rank r' + opts.rank + '">' + opts.rank + '</div>' : '';
+  const fbTag = r.fb > 0 ? '<span class="trx-fbtag">FB</span>' : '';
+  const handle = opts.handle ? '<div class="trx-rhandle">@' + trxEsc(opts.handle) + '</div>' : '';
+  const stats = '<div class="trx-rstats"><span>▶ ' + trxFmt(trxVv(r)) + '</span><span>♥ ' + trxFmt(r.likes) + '</span><span>↗ ' + trxFmt(r.shares) + '</span></div>';
+  const top = '<div class="trx-rtop"><span class="lft">' + star + rank + fbTag + '</span><span class="trx-rdate">' + (r.ts ? trxDate(r.ts) : '') + '</span></div>';
+  if (r.trial) return '<div class="trx-reel trx-trial" onclick="trxOpenReel(\'' + pk + '\',\'' + r.id + '\')"><div class="trx-shade"></div>' + top +
+    '<div class="trx-trialc"><div class="trx-trialb">TRIAL</div><div class="trx-nothumb">NO THUMBNAIL</div></div>' + handle + stats + '</div>';
+  return '<div class="trx-reel" onclick="trxOpenReel(\'' + pk + '\',\'' + r.id + '\')">' +
+    (r.thumb ? '<img loading="lazy" src="' + trxEsc(r.thumb) + '" onerror="this.remove()">' : '') +
+    '<div class="trx-shade"></div>' + top + handle + stats + '</div>';
+}
+
+function trxRenderReels(){
+  if (!trxSel) return;
+  const grid = document.getElementById('trxReelGrid');
+  let list = [...(trx.reels[trxSel] || [])];
+  document.getElementById('trxAllCount').textContent = list.length;
+  document.getElementById('trxTrialCount').textContent = list.filter(r => r.trial).length;
+  if (trxFilter === 'trial') list = list.filter(r => r.trial);
+  if (trxViewMode === 'fb') list = list.filter(r => r.fb > 0);
+  const ranked = [...(trx.reels[trxSel] || [])].filter(r => !r.trial).sort((a, b) => trxVv(b) - trxVv(a)).map(r => r.id);
+  if (trxFilter === 'top' || trxSortKey !== 'recent') {
+    const k = trxSortKey === 'recent' ? 'views' : trxSortKey;
+    list.sort((a, b) => k === 'views' ? trxVv(b) - trxVv(a) : (b[k] || 0) - (a[k] || 0));
+  } else {
+    list.sort((a, b) => b.ts - a.ts);
+  }
+  const acc = trx.accounts.find(a => a.pk === trxSel);
+  if (!list.length) {
+    grid.innerHTML = '<div class="trx-empty"><span>' + ((trx.reels[trxSel] || []).length ? 'NOTHING MATCHES THIS FILTER' : 'NO REELS SYNCED YET — HIT ⟳ SYNC NOW') + '</span></div>';
+  } else {
+    grid.innerHTML = list.map(r => {
+      const rk = ranked.indexOf(r.id) + 1;
+      return trxReelCard(trxSel, r, { rank: (trxFilter === 'top' && rk >= 1 && rk <= 3) ? rk : 0 });
+    }).join('');
+  }
+  document.getElementById('trxExportNote').textContent = acc && acc.lastSync ? 'LAST SYNC ' + new Date(acc.lastSync).toLocaleString() + ' · ' + (trx.reels[trxSel] || []).length + ' REELS · DATA VIA HIKERAPI' : 'DATA VIA HIKERAPI';
+}
+
+function trxRenderFavs(){
+  const grid = document.getElementById('trxFavGrid');
+  const items = [];
+  trx.favs.forEach(k => {
+    const i = k.indexOf(':');
+    const pk = k.slice(0, i), id = k.slice(i + 1);
+    const r = (trx.reels[pk] || []).find(x => x.id === id);
+    const a = trx.accounts.find(x => x.pk === pk);
+    if (r) items.push({ pk, r, handle: a ? a.username : '' });
+  });
+  grid.innerHTML = items.length
+    ? items.map(x => trxReelCard(x.pk, x.r, { handle: x.handle })).join('')
+    : '<div class="trx-empty"><span style="font-size:26px;color:#FFD86B;opacity:.5;">★</span><span>NO FAVORITES YET — HIT ★ ON ANY REEL</span></div>';
+}
+
+function trxRenderGrowth(){
+  const svg = document.getElementById('trxChart'), empty = document.getElementById('trxGrowthEmpty');
+  const snaps = (trx.snaps[trxSel] || []).filter(s => Date.now() - s.t < trxRange * 864e5);
+  const byDay = {};
+  snaps.forEach(s => { byDay[Math.floor(s.t / 864e5)] = s; });
+  const days = Object.keys(byDay).sort((a, b) => a - b).map(d => byDay[d]);
+  if (days.length < 2) {
+    svg.innerHTML = ''; svg.classList.add('hidden'); empty.classList.remove('hidden');
+    document.getElementById('trxGrowthTotal').textContent = '';
+    return;
+  }
+  svg.classList.remove('hidden'); empty.classList.add('hidden');
+  const W = 1000, H = 120, top = 22, bottom = 5;
+  const min = Math.min(...days.map(d => d.followers)), max = Math.max(...days.map(d => d.followers));
+  const span = Math.max(1, max - min);
+  const slot = W / days.length, barW = Math.min(slot * .62, 46);
+  let out = '<defs><linearGradient id="trxBarG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9D4EDD"/><stop offset="100%" stop-color="#5A1F8F"/></linearGradient></defs>';
+  days.forEach((d, i) => {
+    const h = 14 + ((d.followers - min) / span) * (H - top - bottom - 14);
+    const x = i * slot + (slot - barW) / 2, y = H - bottom - h;
+    out += '<rect class="trx-bar" data-i="' + i + '" x="' + x + '" y="' + y + '" width="' + barW + '" height="' + h + '" rx="2" fill="url(#trxBarG)"></rect>';
+  });
+  svg.innerHTML = out;
+  svg.querySelectorAll('.trx-bar').forEach(b => {
+    b.addEventListener('mousemove', e => {
+      const d = days[+b.dataset.i], prev = days[+b.dataset.i - 1];
+      const delta = prev ? d.followers - prev.followers : 0;
+      const tip = document.getElementById('trxTip');
+      tip.innerHTML = trxDate(d.t) + ' — <b>' + trxFmt(d.followers) + ' followers</b>' + (prev ? ' · <span class="g">' + (delta >= 0 ? '+' : '') + delta + '</span>' : '');
+      tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 260) + 'px';
+      tip.style.top = (e.clientY - 42) + 'px';
+      tip.classList.remove('hidden');
+    });
+    b.addEventListener('mouseleave', () => document.getElementById('trxTip').classList.add('hidden'));
+  });
+  const total = days[days.length - 1].followers - days[0].followers;
+  document.getElementById('trxGrowthTotal').textContent = (total >= 0 ? '▲ +' : '▼ ') + total.toLocaleString() + ' FOLLOWERS · ' + trxRange + 'D';
+}
+
+function trxRenderDetail(){
+  const a = trx.accounts.find(x => x.pk === trxSel); if (!a) return;
+  document.getElementById('trxDetailHead').innerHTML =
+    '<div class="trx-av">' + trxEsc((a.username || '?').slice(0, 2)) + '</div>' +
+    '<div class="trx-dinfo"><div class="trx-dhandle">@' + trxEsc(a.username) + (a.mine ? ' <span class="trx-pill">MINE</span>' : '') + (a.isPrivate ? ' <span class="trx-lock">🔒 PRIVATE</span>' : '') + '</div>' +
+    '<div class="trx-dbio">' + trxEsc(a.fullName || '') + ' — reels with no thumbnail in the HikerAPI response are auto-tagged TRIAL.</div></div>' +
+    '<div class="trx-dstats">' +
+    '<div class="trx-dstat"><div class="l" style="font-size:9px;color:var(--text-faint);font-family:\'JetBrains Mono\',monospace;letter-spacing:.12em;">FOLLOWERS</div><div class="v" style="font-family:\'Antonio\',sans-serif;font-size:17px;font-weight:700;">' + (a.followers || 0).toLocaleString() + '</div></div>' +
+    '<div class="trx-dstat"><div class="l" style="font-size:9px;color:var(--text-faint);font-family:\'JetBrains Mono\',monospace;letter-spacing:.12em;">REELS</div><div class="v" style="font-family:\'Antonio\',sans-serif;font-size:17px;font-weight:700;">' + (trx.reels[trxSel] || []).length + '</div></div>' +
+    '<div class="trx-dstat"><div class="l" style="font-size:9px;color:var(--text-faint);font-family:\'JetBrains Mono\',monospace;letter-spacing:.12em;">TRIALS</div><div class="v trx-purple" style="font-family:\'Antonio\',sans-serif;font-size:17px;font-weight:700;color:var(--accent-hi,#9D4EDD);">' + (a.trialCount || 0) + '</div></div>' +
+    '<div class="trx-dstat"><div class="l" style="font-size:9px;color:var(--text-faint);font-family:\'JetBrains Mono\',monospace;letter-spacing:.12em;">AVG VIEWS</div><div class="v" style="font-family:\'Antonio\',sans-serif;font-size:17px;font-weight:700;">' + trxFmt(a.avgViews) + '</div></div></div>';
+  trxRenderGrowth();
+  trxRenderReels();
+}
+
+function trxRenderAll(){ trxRenderAccounts(); if (trxSubtab === 'favs') trxRenderFavs(); if (trxSel) trxRenderDetail(); }
+
+window.trxOpenDetail = function(pk){
+  if (trxSuppress) return;
+  trxSel = pk;
+  document.getElementById('trxHome').classList.add('hidden');
+  document.getElementById('trxDetail').classList.remove('hidden');
+  trxRenderDetail();
+};
+window.trxCloseDetail = function(){
+  trxSel = null;
+  document.getElementById('trxDetail').classList.add('hidden');
+  document.getElementById('trxHome').classList.remove('hidden');
+  trxRenderAccounts(); if (trxSubtab === 'favs') trxRenderFavs();
+};
+window.trxSetSubtab = function(which){
+  trxSubtab = which;
+  document.getElementById('trxTabAccounts').classList.toggle('active', which === 'accounts');
+  document.getElementById('trxTabFavs').classList.toggle('active', which === 'favs');
+  document.getElementById('trxAccountGrid').classList.toggle('hidden', which !== 'accounts');
+  document.getElementById('trxFavGrid').classList.toggle('hidden', which !== 'favs');
+  if (which === 'favs') trxRenderFavs();
+};
+
+window.trxOpenSettings = function(){
+  document.getElementById('trxKeyInput').value = trx.key || '';
+  document.getElementById('trxCadence').value = trx.cadence || 'manual';
+  document.getElementById('trxSettings').classList.remove('hidden');
+};
+window.trxCloseSettings = function(){ document.getElementById('trxSettings').classList.add('hidden'); };
+window.trxSaveSettings = function(){
+  trx.key = document.getElementById('trxKeyInput').value.trim();
+  trx.cadence = document.getElementById('trxCadence').value;
+  trxSave(); trxRenderAccounts(); trxCloseSettings();
+  trxToast(trx.key ? 'HikerAPI key saved' : 'Key cleared');
+};
+window.trxTestKey = async function(){
+  const k = document.getElementById('trxKeyInput').value.trim();
+  if (!k) return trxToast('Paste a key first');
+  const old = trx.key; trx.key = k;
+  try {
+    const u = trxNormUser(await trxApi('/v2/user/by/username', { username: 'instagram' }));
+    trxToast(u.pk ? 'Key works — HikerAPI reachable' : 'Reachable, unexpected payload');
+  } catch(e){ trxToast('Key test failed: ' + String(e.message || e)); }
+  finally { trx.key = old; }
+};
+
+function trxFindReel(pk, id){ return (trx.reels[pk] || []).find(r => r.id === id); }
+window.trxOpenReel = function(pk, id){
+  if (trxSuppress) return;
+  const r = trxFindReel(pk, id); if (!r) return;
+  trxModalRef = { pk, id };
+  const a = trx.accounts.find(x => x.pk === pk);
+  document.getElementById('trxRPrev').innerHTML = r.trial
+    ? '<div class="trx-trialc"><div class="trx-trialb" style="font-size:11px;padding:6px 14px;">TRIAL</div><div class="trx-nothumb">NO THUMBNAIL RETURNED</div></div>'
+    : (r.thumb ? '<img src="' + trxEsc(r.thumb) + '" onerror="this.remove()">' : '');
+  document.getElementById('trxRHandle').textContent = '@' + (a ? a.username : '');
+  document.getElementById('trxRDate').textContent = r.ts ? 'POSTED ' + new Date(r.ts).toLocaleDateString() : '';
+  const row = (l, v, tag) => '<div class="trx-mrow"><div class="mt"><span class="ml">' + l + '</span><span class="mv">' + trxFmt(v) + '</span></div>' + (tag ? '<div class="trx-mtag">' + tag + '</div>' : '') + '</div>';
+  document.getElementById('trxRViews').innerHTML = row('TOTAL VIEWS', r.views) + row('IG VIEWS', r.igViews) + row('FB VIEWS', r.fb);
+  const pct = r.views ? Math.round(r.igViews / r.views * 100) : 100;
+  document.getElementById('trxRSplit').innerHTML = r.fb > 0
+    ? '<div class="trx-split"><span class="ig" style="flex:' + pct + '"></span><span class="fb" style="flex:' + (100 - pct) + '"></span></div><div class="trx-sleg"><span class="igk">IG ' + pct + '%</span><span class="fbk">FB ' + (100 - pct) + '%</span></div>'
+    : '<div class="trx-sleg"><span class="igk">IG ONLY — NOT CROSSPOSTED TO FB</span></div>';
+  document.getElementById('trxRMetrics').innerHTML = row('SHARES', r.shares, 'IG COUNTER') + row('LIKES', r.likes, 'IG COUNTER') + row('COMMENTS', r.comments, 'IG COUNTER') + row('SAVES', 0, 'OWNER INSIGHTS ONLY');
+  const openUrl = u => { const inv = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke; if (inv) inv('open_url', { url: u }); else window.open(u, '_blank'); };
+  document.getElementById('trxROpen').onclick = () => r.code ? openUrl('https://www.instagram.com/reel/' + r.code + '/') : trxToast('No permalink code in response');
+  document.getElementById('trxRDownload').onclick = () => r.videoUrl ? openUrl(r.videoUrl) : trxToast('No video URL in response — sync again or open the link');
+  trxSyncModalFav();
+  document.getElementById('trxReelModal').classList.remove('hidden');
+};
+function trxSyncModalFav(){
+  if (!trxModalRef) return;
+  const faved = trx.favs.includes(trxModalRef.pk + ':' + trxModalRef.id);
+  document.getElementById('trxRFav').classList.toggle('faved', faved);
+  document.getElementById('trxRFavLabel').textContent = faved ? 'IN FAVORITES — CLICK TO REMOVE' : 'ADD TO FAVORITES';
+}
+window.trxToggleFavModal = function(){ if (trxModalRef) trxToggleFav(trxModalRef.pk, trxModalRef.id); };
+window.trxCloseReel = function(){ document.getElementById('trxReelModal').classList.add('hidden'); trxModalRef = null; };
+window.trxViewCreator = function(){
+  if (!trxModalRef) return;
+  const pk = trxModalRef.pk;
+  trxCloseReel();
+  trxSuppress = true; setTimeout(() => { trxSuppress = false; }, 350);
+  trxSel = pk;
+  document.getElementById('trxHome').classList.add('hidden');
+  document.getElementById('trxDetail').classList.remove('hidden');
+  trxRenderDetail();
+};
+
+window.trxCsv = function(){
+  if (!trxSel) return;
+  const a = trx.accounts.find(x => x.pk === trxSel);
+  const rows = [['handle','reel_id','date','trial','total_views','ig_views','fb_views','likes','comments','shares','link']];
+  [...(trx.reels[trxSel] || [])].sort((x, y) => y.views - x.views).forEach(r => {
+    rows.push(['@' + a.username, r.id, r.ts ? new Date(r.ts).toISOString().slice(0, 10) : '', r.trial ? 'TRIAL' : '', r.views, r.igViews, r.fb, r.likes, r.comments, r.shares, r.code ? 'https://www.instagram.com/reel/' + r.code + '/' : '']);
+  });
+  const csv = rows.map(r => r.join(',')).join('\n');
+  navigator.clipboard.writeText(csv).then(() => trxToast('CSV copied — paste into Sheets for the VAs'), () => trxToast('Clipboard blocked'));
+};
+window.trxSummary = function(){
+  if (!trxSel) return;
+  const a = trx.accounts.find(x => x.pk === trxSel);
+  const reels = trx.reels[trxSel] || [];
+  const top = [...reels].filter(r => !r.trial).sort((x, y) => y.views - x.views).slice(0, 5);
+  const trials = reels.filter(r => r.trial);
+  let s = '@' + a.username + ' — ' + (a.followers || 0).toLocaleString() + ' followers\nTOP REELS ALL-TIME:\n';
+  top.forEach((r, i) => { s += (i + 1) + '. ' + trxFmt(r.views) + ' views · ' + trxFmt(r.likes) + ' likes · ' + (r.ts ? trxDate(r.ts) : '') + (r.code ? ' · instagram.com/reel/' + r.code : '') + '\n'; });
+  s += 'ACTIVE TRIALS: ' + trials.length + '\n';
+  trials.slice(0, 10).forEach(r => { s += '  ◌ ' + trxFmt(r.views) + ' views · ' + trxFmt(r.likes) + ' likes · ' + (r.ts ? trxDate(r.ts) : '') + '\n'; });
+  navigator.clipboard.writeText(s).then(() => trxToast('Summary copied for the VA chat'), () => trxToast('Clipboard blocked'));
+};
+
+document.querySelectorAll('#trendingView .trx-ftab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('#trendingView .trx-ftab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  trxFilter = t.dataset.tf;
+  if (trxFilter === 'top') document.getElementById('trxSort').value = 'views';
+  trxRenderReels();
+}));
+document.getElementById('trxSort').addEventListener('change', e => { trxSortKey = e.target.value; trxRenderReels(); });
+document.querySelectorAll('#trxViewsSrc .trx-rchip').forEach(c => c.addEventListener('click', () => {
+  document.querySelectorAll('#trxViewsSrc .trx-rchip').forEach(x => x.classList.remove('active'));
+  c.classList.add('active');
+  trxViewMode = c.dataset.src;
+  trxRenderReels();
+}));
+document.querySelectorAll('#trxRangeChips .trx-rchip').forEach(c => c.addEventListener('click', () => {
+  document.querySelectorAll('#trxRangeChips .trx-rchip').forEach(x => x.classList.remove('active'));
+  c.classList.add('active');
+  trxRange = +c.dataset.range;
+  trxRenderGrowth();
+}));
+
+window.trxSyncAccount = trxSyncAccount;
+window.trxOnEnterTab = function(){
+  trxLoad(); trxRenderAll();
+  if (trx.key && trx.cadence !== 'manual' && trx.accounts.length) {
+    const iv = trx.cadence === '6h' ? 6 * 3600e3 : 24 * 3600e3;
+    const stale = trx.accounts.filter(a => Date.now() - (a.lastSync || 0) > iv);
+    if (stale.length && !trxBusy) (async () => { for (const a of stale) await trxSyncAccount(a.pk, false); })();
+  }
+};
+trxLoad();
+})();
+</script>
+
 <script>
 // ============================================================================
 // DEBUG: forward console output to Rust so we can read it from outside the app
@@ -7522,7 +8206,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.8.0';
+const APP_VERSION = '4.9.0';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -7562,6 +8246,9 @@ function switchView(view) {
   const driveViewEl = document.getElementById('driveView');
   if (driveViewEl) driveViewEl.classList.toggle('hidden', view !== 'drive');
   document.getElementById('inspectorView').classList.toggle('hidden', view !== 'inspector');
+  const trendingViewEl = document.getElementById('trendingView');
+  if (trendingViewEl) trendingViewEl.classList.toggle('hidden', view !== 'trending');
+  if (view === 'trending' && typeof trxOnEnterTab === 'function') trxOnEnterTab();
   // Pause video preview when leaving editor
   if (view !== 'editor' && !video.paused) video.pause();
   // Show or hide carousel drop/edit state

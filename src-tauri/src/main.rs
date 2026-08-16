@@ -43,6 +43,7 @@ fn main() {
             get_cloud_config,
             cloud_test,
             cloud_render,
+            hiker_fetch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -970,4 +971,42 @@ async fn cloud_render(
         .map_err(|e| format!("write output: {}", e))?;
 
     Ok(out_path.to_string_lossy().to_string())
+}
+
+// ---------- HikerAPI proxy (TRENDING tab) ----------
+//
+// Same story as cloud_render: webview fetch() can't reach third-party APIs
+// that don't send CORS headers, so the JS invokes this and reqwest does the
+// request. Host is hardcoded — this is a proxy for HikerAPI only, not a
+// general HTTP escape hatch.
+
+#[tauri::command]
+async fn hiker_fetch(
+    path: String,
+    key: String,
+    params: std::collections::HashMap<String, String>,
+) -> Result<String, String> {
+    if !(path.starts_with("/v1/") || path.starts_with("/v2/") || path.starts_with("/a2/")) {
+        return Err("invalid HikerAPI path".into());
+    }
+    let url = format!("https://api.hikerapi.com{}", path);
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client
+        .get(&url)
+        .header("x-access-key", key)
+        .header("accept", "application/json")
+        .query(&params)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let status = resp.status().as_u16();
+    let body = resp.text().await.map_err(|e| e.to_string())?;
+    if status >= 400 {
+        let snippet: String = body.chars().take(300).collect();
+        return Err(format!("HTTP {}: {}", status, snippet));
+    }
+    Ok(body)
 }
