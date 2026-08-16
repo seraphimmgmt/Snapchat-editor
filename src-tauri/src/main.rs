@@ -44,6 +44,7 @@ fn main() {
             cloud_test,
             cloud_render,
             hiker_fetch,
+            meta_fetch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1007,6 +1008,47 @@ async fn hiker_fetch(
     if status >= 400 {
         let snippet: String = body.chars().take(300).collect();
         return Err(format!("HTTP {}: {}", status, snippet));
+    }
+    Ok(body)
+}
+
+// ---------- Meta / Instagram Graph API proxy (TRENDING tab, "Meta" source) ----------
+//
+// Owner-account insights via the Instagram API with Instagram Login. Token
+// travels in the Authorization header (never the URL) so it can't leak into
+// logs. Host is hardcoded to graph.instagram.com; GET only.
+
+#[tauri::command]
+async fn meta_fetch(
+    path: String,
+    token: String,
+    params: std::collections::HashMap<String, String>,
+) -> Result<String, String> {
+    if !path.starts_with('/') || path.contains("..") {
+        return Err("invalid Graph API path".into());
+    }
+    let url = format!("https://graph.instagram.com{}", path);
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client
+        .get(&url)
+        .bearer_auth(token)
+        .header("accept", "application/json")
+        .query(&params)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let status = resp.status().as_u16();
+    let body = resp.text().await.map_err(|e| e.to_string())?;
+    if status >= 400 {
+        // Graph API errors are JSON: {"error":{"message":..,"code":..}} — pass the message through.
+        let msg = serde_json::from_str::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|v| v.get("error")?.get("message")?.as_str().map(|s| s.to_string()))
+            .unwrap_or_else(|| body.chars().take(300).collect());
+        return Err(format!("HTTP {}: {}", status, msg));
     }
     Ok(body)
 }

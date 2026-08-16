@@ -1578,6 +1578,7 @@ EXPORT TO DRIVE
       <h2>TRENDING</h2>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <div class="trx-chip" id="trxKeyChip" onclick="trxOpenSettings()"><span class="trx-dot"></span><span><b>HIKERAPI</b> <span id="trxKeyState">no key</span></span></div>
+        <div class="trx-chip" id="trxMetaChip" onclick="trxOpenSettings()"><span class="trx-dot"></span><span><b>META</b> <span id="trxMetaState">no token</span></span></div>
         <button class="trx-btn" onclick="trxSyncAll()">⟳ SYNC ALL</button>
         <button class="trx-btn" onclick="trxOpenSettings()">⚙</button>
       </div>
@@ -1619,6 +1620,7 @@ EXPORT TO DRIVE
         <option value="shares">SORT: SHARES</option>
         <option value="likes">SORT: LIKES</option>
         <option value="comments">SORT: COMMENTS</option>
+        <option value="saves">SORT: SAVES (META)</option>
       </select>
       <span class="trx-flabel">VIEWS</span>
       <div class="trx-chips" id="trxViewsSrc" style="margin-left:6px;">
@@ -1670,6 +1672,8 @@ EXPORT TO DRIVE
 .trx-name{font-size:11px;color:var(--text-dim);margin-top:2px;}
 .trx-pill{font-size:8px;background:var(--shimmer);color:#fff;padding:2px 6px;border-radius:8px;letter-spacing:.1em;font-family:'JetBrains Mono',monospace;}
 .trx-lock{font-size:8px;background:var(--surface-2,#12121C);border:1px solid var(--border-strong);color:#FFD86B;padding:2px 6px;border-radius:8px;font-family:'JetBrains Mono',monospace;}
+.trx-src{font-size:7px;font-family:'JetBrains Mono',monospace;letter-spacing:.14em;padding:1px 5px;border-radius:6px;border:1px solid var(--border-strong);color:var(--text-faint);vertical-align:middle;}
+.trx-src.meta{border-color:#1877F2;color:#5c9eff;}
 .trx-stats{padding:0 13px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .trx-stat{background:rgba(255,255,255,.03);border-radius:2px;padding:9px;}
 .trx-stat .l{font-size:9px;color:var(--text-faint);letter-spacing:.12em;margin-bottom:3px;font-family:'JetBrains Mono',monospace;}
@@ -1789,14 +1793,20 @@ EXPORT TO DRIVE
 
 <div class="trx-veil hidden" id="trxSettings">
   <div class="trx-modal">
-    <div class="trx-mhead"><h3>HIKERAPI CONNECTION</h3><button class="trx-x" onclick="trxCloseSettings()">✕</button></div>
+    <div class="trx-mhead"><h3>DATA SOURCES</h3><button class="trx-x" onclick="trxCloseSettings()">✕</button></div>
     <div class="trx-mbody">
-      <div class="trx-field"><label>API KEY — hikerapi.com dashboard</label><input type="password" id="trxKeyInput" placeholder="paste access key"></div>
+      <div style="font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.18em;color:var(--text-dim);">HIKERAPI — <span style="color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;">ANY ACCOUNT · TRIAL REELS · IG/FB VIEWS</span></div>
+      <div class="trx-field"><label>ACCESS KEY — hikerapi.com dashboard</label><div style="display:flex;gap:6px;"><input type="password" id="trxKeyInput" placeholder="paste access key" style="flex:1;"><button class="trx-btn" onclick="trxTestKey()">TEST</button></div></div>
+      <div style="border-top:1px solid var(--border);"></div>
+      <div style="font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.18em;color:var(--text-dim);">META API — <span style="color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;">YOUR OWN ACCOUNT · SAVES · REACH · WATCH TIME</span></div>
+      <div class="trx-field"><label>INSTAGRAM ACCESS TOKEN — developers.facebook.com → your app → Instagram → generate token</label><div style="display:flex;gap:6px;"><input type="password" id="trxMetaInput" placeholder="paste long-lived token (IGAA…)" style="flex:1;"><button class="trx-btn" onclick="trxTestMeta()">TEST</button></div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><span class="trx-mnote" id="trxMetaExpiry">Long-lived tokens last 60 days.</span><button class="trx-btn" onclick="trxRefreshMeta()">↻ REFRESH TOKEN</button></div>
+      <div style="border-top:1px solid var(--border);"></div>
       <div class="trx-field"><label>AUTO-SYNC ON TAB OPEN</label><select id="trxCadence"><option value="manual">Manual only</option><option value="6h">If older than 6 hours</option><option value="24h">If older than 24 hours</option></select></div>
-      <div class="trx-mnote">Requests go through the app's Rust side (webview CORS can't reach HikerAPI directly). Reels returned with <b>no thumbnail</b> are auto-tagged <b>TRIAL</b>. Follower counts are snapshotted locally on every sync to build the growth chart. ~1 credit per request; a full first sync of one account ≈ 7 requests.</div>
+      <div class="trx-mnote">Both sources go through the app's Rust side. <b>HikerAPI</b> reaches any account; reels with <b>no thumbnail</b> are auto-tagged <b>TRIAL</b>. <b>Meta</b> only sees the account that owns the token, can't see active trials, but returns owner-only insights (saves, reach, avg watch time) and seeds 30 days of follower history instantly.</div>
     </div>
     <div class="trx-mfoot">
-      <button class="trx-btn" onclick="trxTestKey()">TEST KEY</button>
+      <button class="trx-btn" onclick="trxCloseSettings()">CLOSE</button>
       <button class="trx-btn primary" onclick="trxSaveSettings()">SAVE</button>
     </div>
   </div>
@@ -1829,7 +1839,8 @@ EXPORT TO DRIVE
 (function(){
 'use strict';
 const LS = 'trx_state_v1';
-let trx = { key:'', cadence:'manual', accounts:[], reels:{}, snaps:{}, favs:[] };
+let trx = { key:'', metaToken:'', metaExpires:0, cadence:'manual', accounts:[], reels:{}, snaps:{}, favs:[] };
+let trxAddSource = 'hiker';
 let trxSel = null, trxFilter = 'all', trxSortKey = 'recent', trxViewMode = 'total', trxRange = 30, trxSubtab = 'accounts', trxModalRef = null, trxSuppress = false, trxBusy = false;
 
 function trxLoad(){ try { const s = JSON.parse(localStorage.getItem(LS)); if (s && typeof s === 'object') trx = Object.assign(trx, s); } catch(e){} }
@@ -1852,6 +1863,44 @@ async function trxApi(path, params){
   try { return JSON.parse(body); } catch(e){ throw new Error('Unparseable HikerAPI response'); }
 }
 
+async function trxMeta(path, params){
+  if (!trx.metaToken) throw new Error('No Meta token — open ⚙ settings');
+  const inv = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+  if (!inv) throw new Error('Syncing needs the desktop app');
+  const p = {}; Object.keys(params || {}).forEach(k => { if (params[k] != null) p[k] = String(params[k]); });
+  const body = await inv('meta_fetch', { path, token: trx.metaToken, params: p });
+  try { return JSON.parse(body); } catch(e){ throw new Error('Unparseable Graph API response'); }
+}
+const META_V = '/v23.0';
+function trxNormMetaUser(j){
+  j = j || {};
+  return { pk: 'meta:' + String(j.id || j.user_id || ''), username: j.username || '', fullName: j.name || '', followers: j.followers_count ?? 0, following: j.follows_count ?? 0, mediaCount: j.media_count ?? 0, isPrivate: false };
+}
+function trxNormMetaMedia(m){
+  m = m || {};
+  return {
+    id: String(m.id || ''), code: (m.permalink || '').split('/').filter(Boolean).pop() || '', permalink: m.permalink || '',
+    ts: m.timestamp ? Date.parse(m.timestamp) : 0,
+    views: 0, igViews: 0, fb: 0,
+    likes: m.like_count ?? 0, comments: m.comments_count ?? 0, shares: 0, saves: 0, reach: 0, watch: 0,
+    thumb: m.thumbnail_url || m.media_url || null, videoUrl: m.media_url || null,
+    trial: false, source: 'meta',
+  };
+}
+function trxApplyInsights(r, ins){
+  const data = (ins && ins.data) || [];
+  data.forEach(d => {
+    const v = d.values && d.values[0] ? d.values[0].value : d.total_value ? d.total_value.value : 0;
+    if (d.name === 'views') { r.views = v; r.igViews = v; }
+    else if (d.name === 'saved') r.saves = v;
+    else if (d.name === 'shares') r.shares = v;
+    else if (d.name === 'reach') r.reach = v;
+    else if (d.name === 'ig_reels_avg_watch_time') r.watch = v;
+    else if (d.name === 'likes' && !r.likes) r.likes = v;
+    else if (d.name === 'comments' && !r.comments) r.comments = v;
+  });
+  return r;
+}
 function trxNormUser(j){
   const u = (j && (j.user || (j.response && j.response.user))) || j || {};
   return {
@@ -1890,10 +1939,70 @@ function trxNormClip(it){
   };
 }
 
+async function trxSyncMeta(acc, deep){
+  const pk = acc.pk;
+  trxStatus('Syncing @' + acc.username + ' via Meta…');
+  const u = trxNormMetaUser(await trxMeta(META_V + '/me', { fields: 'id,username,name,followers_count,follows_count,media_count' }));
+  if (u.username) Object.assign(acc, { username: u.username, fullName: u.fullName, followers: u.followers, following: u.following, mediaCount: u.mediaCount });
+  const snaps = trx.snaps[pk] = trx.snaps[pk] || [];
+  const last = snaps[snaps.length - 1];
+  if (u.followers && (!last || Date.now() - last.t > 3600e3)) snaps.push({ t: Date.now(), followers: u.followers });
+  // Seed history: follower_count/day = new followers per day (≤30d). Walk backwards from today's total.
+  try {
+    const fi = await trxMeta(META_V + '/me/insights', { metric: 'follower_count', period: 'day' });
+    const vals = ((fi.data && fi.data[0] && fi.data[0].values) || []).slice().sort((a, b) => Date.parse(a.end_time) - Date.parse(b.end_time));
+    if (vals.length && u.followers) {
+      let running = u.followers;
+      const have = new Set(snaps.map(s => Math.floor(s.t / 864e5)));
+      for (let i = vals.length - 1; i >= 0; i--) {
+        const t = Date.parse(vals[i].end_time) - 1;
+        const day = Math.floor(t / 864e5);
+        if (!have.has(day)) { snaps.push({ t, followers: running, seeded: true }); have.add(day); }
+        running -= (vals[i].value || 0);
+      }
+      snaps.sort((a, b) => a.t - b.t);
+    }
+  } catch(e){ /* follower_count needs ≥100 followers; non-fatal */ }
+  let after = null, got = [], pages = 0;
+  const maxPages = deep ? 4 : 1;
+  do {
+    const params = { fields: 'id,caption,media_product_type,media_type,permalink,timestamp,like_count,comments_count,thumbnail_url,media_url', limit: 50 };
+    if (after) params.after = after;
+    const mj = await trxMeta(META_V + '/me/media', params);
+    const items = (mj.data || []).filter(m => m.media_product_type === 'REELS' || m.media_type === 'VIDEO');
+    got.push(...items.map(trxNormMetaMedia).filter(r => r.id));
+    after = mj.paging && mj.paging.cursors && mj.paging.next ? mj.paging.cursors.after : null;
+    pages++;
+    trxStatus('Syncing @' + acc.username + ' via Meta — page ' + pages + ' (' + got.length + ' reels)…');
+  } while (after && pages < maxPages);
+  // Insights per reel — one call each; cap so a deep sync stays under Meta's hourly budget.
+  const prev = trx.reels[pk] || [];
+  const cap = deep ? 120 : 40;
+  for (let i = 0; i < Math.min(got.length, cap); i++) {
+    const r = got[i];
+    try {
+      trxApplyInsights(r, await trxMeta(META_V + '/' + r.id + '/insights', { metric: 'views,reach,saved,shares,ig_reels_avg_watch_time' }));
+    } catch(e){
+      const old = prev.find(x => x.id === r.id); if (old) Object.assign(r, { views: old.views, igViews: old.igViews, saves: old.saves, shares: old.shares, reach: old.reach, watch: old.watch });
+    }
+    if (i % 5 === 4) trxStatus('Insights @' + acc.username + ' — ' + (i + 1) + '/' + Math.min(got.length, cap) + '…');
+  }
+  for (let i = cap; i < got.length; i++) { const old = prev.find(x => x.id === got[i].id); if (old) Object.assign(got[i], { views: old.views, igViews: old.igViews, saves: old.saves, shares: old.shares, reach: old.reach, watch: old.watch }); }
+  const seen = new Set(got.map(r => r.id));
+  trx.reels[pk] = [...got, ...prev.filter(r => !seen.has(r.id))];
+  acc.trialCount = 0;
+  const solid = trx.reels[pk];
+  acc.avgViews = solid.length ? Math.round(solid.reduce((s, r) => s + (r.views || 0), 0) / solid.length) : 0;
+  acc.lastSync = Date.now();
+  trxSave(); trxRenderAll(); trxStatus('');
+  trxToast('@' + acc.username + ' synced via Meta — ' + trx.reels[pk].length + ' reels');
+}
+
 async function trxSyncAccount(pk, deep){
   const acc = trx.accounts.find(a => a.pk === pk); if (!acc || trxBusy) return;
   trxBusy = true;
   try {
+    if (acc.source === 'meta') { await trxSyncMeta(acc, deep); return; }
     trxStatus('Syncing @' + acc.username + '…');
     const u = trxNormUser(await trxApi('/v2/user/by/username', { username: acc.username }));
     if (u.followers) {
@@ -1933,8 +2042,27 @@ window.trxSyncAll = async function(){
 };
 window.trxSyncOne = function(){ if (trxSel) trxSyncAccount(trxSel, true); };
 
+window.trxSetAddSource = function(src){
+  trxAddSource = src;
+  document.querySelectorAll('#trxAddSrc .trx-rchip').forEach(c => c.classList.toggle('active', c.dataset.src === src));
+  const inp = document.getElementById('trxAddInput');
+  if (inp) { inp.disabled = src === 'meta'; inp.placeholder = src === 'meta' ? 'uses the token owner' : '@handle'; if (src === 'meta') inp.value = ''; }
+};
 window.trxAddAccount = async function(){
   const inp = document.getElementById('trxAddInput');
+  if (trxAddSource === 'meta') {
+    if (trx.accounts.some(a => a.source === 'meta')) return trxToast('Meta account already tracked');
+    try {
+      trxStatus('Looking up token owner via Meta…');
+      const u = trxNormMetaUser(await trxMeta(META_V + '/me', { fields: 'id,username,name,followers_count,follows_count,media_count' }));
+      if (!u.username) throw new Error('Token has no Instagram account attached');
+      trx.accounts.push({ pk: u.pk, source: 'meta', username: u.username, fullName: u.fullName, followers: u.followers, following: u.following, mediaCount: u.mediaCount, isPrivate: false, pinned: true, mine: true, addedAt: Date.now(), lastSync: 0, avgViews: 0, trialCount: 0 });
+      trxSave(); trxRenderAll();
+      trxToast('@' + u.username + ' added via Meta — first sync running…');
+      await trxSyncAccount(u.pk, true);
+    } catch(e){ trxStatus(''); trxToast(String(e.message || e)); }
+    return;
+  }
   const handle = (inp.value || '').trim().replace(/^@/, '');
   if (!handle) return trxToast('Type a handle first');
   if (trx.accounts.some(a => a.username.toLowerCase() === handle.toLowerCase())) return trxToast('Already tracked');
@@ -1942,7 +2070,7 @@ window.trxAddAccount = async function(){
     trxStatus('Looking up @' + handle + '…');
     const u = trxNormUser(await trxApi('/v2/user/by/username', { username: handle }));
     if (!u.pk) throw new Error('Account not found');
-    trx.accounts.push({ pk: u.pk, username: u.username || handle, fullName: u.fullName, followers: u.followers, following: u.following, mediaCount: u.mediaCount, isPrivate: u.isPrivate, pinned: trx.accounts.length === 0, mine: trx.accounts.length === 0, addedAt: Date.now(), lastSync: 0, avgViews: 0, trialCount: 0 });
+    trx.accounts.push({ pk: u.pk, source: 'hiker', username: u.username || handle, fullName: u.fullName, followers: u.followers, following: u.following, mediaCount: u.mediaCount, isPrivate: u.isPrivate, pinned: trx.accounts.length === 0, mine: trx.accounts.length === 0, addedAt: Date.now(), lastSync: 0, avgViews: 0, trialCount: 0 });
     inp.value = '';
     trxSave(); trxRenderAll();
     trxToast('@' + (u.username || handle) + ' added — first sync running…');
@@ -1970,7 +2098,7 @@ function trxAccCard(a){
     '<button class="trx-pin' + (a.pinned ? ' pinned' : '') + '" onclick="event.stopPropagation();trxTogglePin(\'' + a.pk + '\')">' + (a.pinned ? '★' : '☆') + '</button>' +
     '<div class="trx-card-head"><div class="trx-av">' + trxEsc((a.username || '?').slice(0, 2)) + '</div><div>' +
     '<div class="trx-handle">@' + trxEsc(a.username) + (a.mine ? ' <span class="trx-pill">MINE</span>' : '') + (a.isPrivate ? ' <span class="trx-lock">🔒 PRIVATE</span>' : '') + '</div>' +
-    '<div class="trx-name">' + trxEsc(a.fullName || '') + '</div></div></div>' +
+    '<div class="trx-name">' + trxEsc(a.fullName || '') + ' <span class="trx-src ' + (a.source === 'meta' ? 'meta' : 'hiker') + '">' + (a.source === 'meta' ? 'META' : 'HIKER') + '</span></div></div></div>' +
     '<div class="trx-stats">' +
     '<div class="trx-stat"><div class="l">FOLLOWERS</div><div class="v">' + trxFmt(a.followers) + '</div></div>' +
     '<div class="trx-stat"><div class="l">AVG REEL VIEWS</div><div class="v">' + trxFmt(a.avgViews) + '</div></div>' +
@@ -1986,15 +2114,19 @@ function trxRenderAccounts(){
   const sorted = [...trx.accounts].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
   grid.innerHTML = sorted.map(trxAccCard).join('') +
     '<div class="trx-add"><div class="trx-plus">+</div>' +
-    '<div style="font-family:\'Antonio\',sans-serif;font-size:12px;letter-spacing:.18em;">TRACK ANY ACCOUNT</div>' +
-    '<input id="trxAddInput" placeholder="@handle" onkeydown="if(event.key===\'Enter\')trxAddAccount()">' +
+    '<div style="font-family:\'Antonio\',sans-serif;font-size:12px;letter-spacing:.18em;">TRACK AN ACCOUNT</div>' +
+    '<div class="trx-chips" id="trxAddSrc"><button class="trx-rchip' + (trxAddSource === 'hiker' ? ' active' : '') + '" data-src="hiker" onclick="trxSetAddSource(\'hiker\')">HIKERAPI · ANY</button><button class="trx-rchip' + (trxAddSource === 'meta' ? ' active' : '') + '" data-src="meta" onclick="trxSetAddSource(\'meta\')">META · MINE</button></div>' +
+    '<input id="trxAddInput" placeholder="' + (trxAddSource === 'meta' ? 'uses the token owner' : '@handle') + '"' + (trxAddSource === 'meta' ? ' disabled' : '') + ' onkeydown="if(event.key===\'Enter\')trxAddAccount()">' +
     '<button class="trx-btn" onclick="trxAddAccount()">ADD + SYNC</button>' +
-    '<div style="font-size:10px;color:var(--text-faint);text-align:center;">synced via HikerAPI · trials auto-tagged</div></div>';
+    '<div style="font-size:10px;color:var(--text-faint);text-align:center;">' + (trxAddSource === 'meta' ? 'owner insights: saves · reach · watch time' : 'any account · trials auto-tagged · IG/FB views') + '</div></div>';
   document.getElementById('trxAccCount').textContent = trx.accounts.length;
   document.getElementById('trxFavCount').textContent = trx.favs.length;
   const chip = document.getElementById('trxKeyChip');
   chip.classList.toggle('trx-nokey', !trx.key);
-  document.getElementById('trxKeyState').textContent = trx.key ? 'connected' : 'no key — click to set up';
+  document.getElementById('trxKeyState').textContent = trx.key ? 'connected' : 'no key';
+  const mchip = document.getElementById('trxMetaChip');
+  mchip.classList.toggle('trx-nokey', !trx.metaToken);
+  document.getElementById('trxMetaState').textContent = trx.metaToken ? 'connected' : 'no token';
 }
 
 function trxReelCard(pk, r, opts){
@@ -2037,7 +2169,7 @@ function trxRenderReels(){
       return trxReelCard(trxSel, r, { rank: (trxFilter === 'top' && rk >= 1 && rk <= 3) ? rk : 0 });
     }).join('');
   }
-  document.getElementById('trxExportNote').textContent = acc && acc.lastSync ? 'LAST SYNC ' + new Date(acc.lastSync).toLocaleString() + ' · ' + (trx.reels[trxSel] || []).length + ' REELS · DATA VIA HIKERAPI' : 'DATA VIA HIKERAPI';
+  document.getElementById('trxExportNote').textContent = acc && acc.lastSync ? 'LAST SYNC ' + new Date(acc.lastSync).toLocaleString() + ' · ' + (trx.reels[trxSel] || []).length + ' REELS · VIA ' + (acc.source === 'meta' ? 'META API' : 'HIKERAPI') : 'VIA ' + (acc && acc.source === 'meta' ? 'META API' : 'HIKERAPI');
 }
 
 function trxRenderFavs(){
@@ -2099,7 +2231,7 @@ function trxRenderDetail(){
   document.getElementById('trxDetailHead').innerHTML =
     '<div class="trx-av">' + trxEsc((a.username || '?').slice(0, 2)) + '</div>' +
     '<div class="trx-dinfo"><div class="trx-dhandle">@' + trxEsc(a.username) + (a.mine ? ' <span class="trx-pill">MINE</span>' : '') + (a.isPrivate ? ' <span class="trx-lock">🔒 PRIVATE</span>' : '') + '</div>' +
-    '<div class="trx-dbio">' + trxEsc(a.fullName || '') + ' — reels with no thumbnail in the HikerAPI response are auto-tagged TRIAL.</div></div>' +
+    '<div class="trx-dbio">' + trxEsc(a.fullName || '') + (a.source === 'meta' ? ' — via Meta API: owner insights (saves · reach · watch time). Active trials aren\'t exposed by Meta.' : ' — via HikerAPI: reels with no thumbnail are auto-tagged TRIAL.') + '</div></div>' +
     '<div class="trx-dstats">' +
     '<div class="trx-dstat"><div class="l" style="font-size:9px;color:var(--text-faint);font-family:\'JetBrains Mono\',monospace;letter-spacing:.12em;">FOLLOWERS</div><div class="v" style="font-family:\'Antonio\',sans-serif;font-size:17px;font-weight:700;">' + (a.followers || 0).toLocaleString() + '</div></div>' +
     '<div class="trx-dstat"><div class="l" style="font-size:9px;color:var(--text-faint);font-family:\'JetBrains Mono\',monospace;letter-spacing:.12em;">REELS</div><div class="v" style="font-family:\'Antonio\',sans-serif;font-size:17px;font-weight:700;">' + (trx.reels[trxSel] || []).length + '</div></div>' +
@@ -2133,17 +2265,51 @@ window.trxSetSubtab = function(which){
   if (which === 'favs') trxRenderFavs();
 };
 
+function trxMetaExpiryText(){
+  if (!trx.metaToken) return 'Long-lived tokens last 60 days.';
+  if (!trx.metaExpires) return 'Token saved — expiry unknown until first refresh.';
+  const d = Math.round((trx.metaExpires - Date.now()) / 864e5);
+  return d > 0 ? 'Token expires in ~' + d + ' days.' : 'Token expired — generate a new one.';
+}
 window.trxOpenSettings = function(){
   document.getElementById('trxKeyInput').value = trx.key || '';
+  document.getElementById('trxMetaInput').value = trx.metaToken || '';
   document.getElementById('trxCadence').value = trx.cadence || 'manual';
+  document.getElementById('trxMetaExpiry').textContent = trxMetaExpiryText();
   document.getElementById('trxSettings').classList.remove('hidden');
 };
 window.trxCloseSettings = function(){ document.getElementById('trxSettings').classList.add('hidden'); };
 window.trxSaveSettings = function(){
   trx.key = document.getElementById('trxKeyInput').value.trim();
+  const mt = document.getElementById('trxMetaInput').value.trim();
+  if (mt !== trx.metaToken) { trx.metaToken = mt; trx.metaExpires = 0; }
   trx.cadence = document.getElementById('trxCadence').value;
   trxSave(); trxRenderAccounts(); trxCloseSettings();
-  trxToast(trx.key ? 'HikerAPI key saved' : 'Key cleared');
+  trxToast('Sources saved' + (trx.key ? ' · HikerAPI' : '') + (trx.metaToken ? ' · Meta' : ''));
+};
+window.trxTestMeta = async function(){
+  const t = document.getElementById('trxMetaInput').value.trim();
+  if (!t) return trxToast('Paste a Meta token first');
+  const old = trx.metaToken; trx.metaToken = t;
+  try {
+    const u = trxNormMetaUser(await trxMeta(META_V + '/me', { fields: 'id,username,account_type,followers_count' }));
+    trxToast(u.username ? 'Meta token works — @' + u.username + ' · ' + trxFmt(u.followers) + ' followers' : 'Reachable, unexpected payload');
+  } catch(e){ trxToast('Meta test failed: ' + String(e.message || e)); }
+  finally { trx.metaToken = old; }
+};
+window.trxRefreshMeta = async function(){
+  const t = document.getElementById('trxMetaInput').value.trim() || trx.metaToken;
+  if (!t) return trxToast('No Meta token to refresh');
+  const old = trx.metaToken; trx.metaToken = t;
+  try {
+    const j = await trxMeta('/refresh_access_token', { grant_type: 'ig_refresh_token', access_token: t });
+    if (!j.access_token) throw new Error('No token in refresh response');
+    trx.metaToken = j.access_token; trx.metaExpires = Date.now() + (j.expires_in || 60 * 86400) * 1000;
+    document.getElementById('trxMetaInput').value = trx.metaToken;
+    document.getElementById('trxMetaExpiry').textContent = trxMetaExpiryText();
+    trxSave(); trxRenderAccounts();
+    trxToast('Meta token refreshed — good for ~' + Math.round((j.expires_in || 5184000) / 86400) + ' days');
+  } catch(e){ trx.metaToken = old; trxToast('Refresh failed: ' + String(e.message || e)); }
 };
 window.trxTestKey = async function(){
   const k = document.getElementById('trxKeyInput').value.trim();
@@ -2167,15 +2333,22 @@ window.trxOpenReel = function(pk, id){
     : (r.thumb ? '<img src="' + trxEsc(r.thumb) + '" onerror="this.remove()">' : '');
   document.getElementById('trxRHandle').textContent = '@' + (a ? a.username : '');
   document.getElementById('trxRDate').textContent = r.ts ? 'POSTED ' + new Date(r.ts).toLocaleDateString() : '';
-  const row = (l, v, tag) => '<div class="trx-mrow"><div class="mt"><span class="ml">' + l + '</span><span class="mv">' + trxFmt(v) + '</span></div>' + (tag ? '<div class="trx-mtag">' + tag + '</div>' : '') + '</div>';
-  document.getElementById('trxRViews').innerHTML = row('TOTAL VIEWS', r.views) + row('IG VIEWS', r.igViews) + row('FB VIEWS', r.fb);
+  const row = (l, v, tag) => '<div class="trx-mrow"><div class="mt"><span class="ml">' + l + '</span><span class="mv">' + (typeof v === 'string' ? v : trxFmt(v)) + '</span></div>' + (tag ? '<div class="trx-mtag">' + tag + '</div>' : '') + '</div>';
+  const isMeta = r.source === 'meta';
   const pct = r.views ? Math.round(r.igViews / r.views * 100) : 100;
-  document.getElementById('trxRSplit').innerHTML = r.fb > 0
-    ? '<div class="trx-split"><span class="ig" style="flex:' + pct + '"></span><span class="fb" style="flex:' + (100 - pct) + '"></span></div><div class="trx-sleg"><span class="igk">IG ' + pct + '%</span><span class="fbk">FB ' + (100 - pct) + '%</span></div>'
-    : '<div class="trx-sleg"><span class="igk">IG ONLY — NOT CROSSPOSTED TO FB</span></div>';
-  document.getElementById('trxRMetrics').innerHTML = row('SHARES', r.shares, 'IG COUNTER') + row('LIKES', r.likes, 'IG COUNTER') + row('COMMENTS', r.comments, 'IG COUNTER') + row('SAVES', 0, 'OWNER INSIGHTS ONLY');
+  if (isMeta) {
+    document.getElementById('trxRViews').innerHTML = row('VIEWS', r.views, 'META INSIGHTS') + row('REACH', r.reach, 'UNIQUE ACCOUNTS') + row('AVG WATCH', (r.watch ? (r.watch / 1000).toFixed(1) + 's' : '—'), 'RETENTION');
+    document.getElementById('trxRSplit').innerHTML = '<div class="trx-sleg"><span class="igk">SOURCE: META API — IG/FB SPLIT NOT EXPOSED · SAVES ARE REAL</span></div>';
+    document.getElementById('trxRMetrics').innerHTML = row('SAVES', r.saves, 'META INSIGHTS') + row('SHARES', r.shares, 'META INSIGHTS') + row('LIKES', r.likes, 'IG COUNTER') + row('COMMENTS', r.comments, 'IG COUNTER');
+  } else {
+    document.getElementById('trxRViews').innerHTML = row('TOTAL VIEWS', r.views) + row('IG VIEWS', r.igViews) + row('FB VIEWS', r.fb);
+    document.getElementById('trxRSplit').innerHTML = r.fb > 0
+      ? '<div class="trx-split"><span class="ig" style="flex:' + pct + '"></span><span class="fb" style="flex:' + (100 - pct) + '"></span></div><div class="trx-sleg"><span class="igk">IG ' + pct + '%</span><span class="fbk">FB ' + (100 - pct) + '%</span></div>'
+      : '<div class="trx-sleg"><span class="igk">IG ONLY — NOT CROSSPOSTED TO FB</span></div>';
+    document.getElementById('trxRMetrics').innerHTML = row('SHARES', r.shares, 'IG COUNTER') + row('LIKES', r.likes, 'IG COUNTER') + row('COMMENTS', r.comments, 'IG COUNTER') + row('SAVES', 0, 'OWNER INSIGHTS ONLY — USE META SOURCE');
+  }
   const openUrl = u => { const inv = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke; if (inv) inv('open_url', { url: u }); else window.open(u, '_blank'); };
-  document.getElementById('trxROpen').onclick = () => r.code ? openUrl('https://www.instagram.com/reel/' + r.code + '/') : trxToast('No permalink code in response');
+  document.getElementById('trxROpen').onclick = () => (r.permalink || r.code) ? openUrl(r.permalink || ('https://www.instagram.com/reel/' + r.code + '/')) : trxToast('No permalink code in response');
   document.getElementById('trxRDownload').onclick = () => r.videoUrl ? openUrl(r.videoUrl) : trxToast('No video URL in response — sync again or open the link');
   trxSyncModalFav();
   document.getElementById('trxReelModal').classList.remove('hidden');
@@ -2202,9 +2375,9 @@ window.trxViewCreator = function(){
 window.trxCsv = function(){
   if (!trxSel) return;
   const a = trx.accounts.find(x => x.pk === trxSel);
-  const rows = [['handle','reel_id','date','trial','total_views','ig_views','fb_views','likes','comments','shares','link']];
+  const rows = [['handle','source','reel_id','date','trial','total_views','ig_views','fb_views','likes','comments','shares','saves','reach','avg_watch_s','link']];
   [...(trx.reels[trxSel] || [])].sort((x, y) => y.views - x.views).forEach(r => {
-    rows.push(['@' + a.username, r.id, r.ts ? new Date(r.ts).toISOString().slice(0, 10) : '', r.trial ? 'TRIAL' : '', r.views, r.igViews, r.fb, r.likes, r.comments, r.shares, r.code ? 'https://www.instagram.com/reel/' + r.code + '/' : '']);
+    rows.push(['@' + a.username, r.source || 'hiker', r.id, r.ts ? new Date(r.ts).toISOString().slice(0, 10) : '', r.trial ? 'TRIAL' : '', r.views, r.igViews, r.fb, r.likes, r.comments, r.shares, r.saves ?? '', r.reach ?? '', r.watch ? (r.watch / 1000).toFixed(1) : '', r.permalink || (r.code ? 'https://www.instagram.com/reel/' + r.code + '/' : '')]);
   });
   const csv = rows.map(r => r.join(',')).join('\n');
   navigator.clipboard.writeText(csv).then(() => trxToast('CSV copied — paste into Sheets for the VAs'), () => trxToast('Clipboard blocked'));
@@ -8206,7 +8379,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.9.0';
+const APP_VERSION = '4.10.0';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
