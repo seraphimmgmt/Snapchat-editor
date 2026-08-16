@@ -1609,7 +1609,7 @@ EXPORT TO DRIVE
         </div>
       </div>
       <svg class="trx-chart" id="trxChart" viewBox="0 0 1000 120" preserveAspectRatio="none"></svg>
-      <div class="trx-gempty hidden" id="trxGrowthEmpty">GROWTH CHART BUILDS AS SYNCS ACCUMULATE — EACH SYNC STORES A LOCAL FOLLOWER SNAPSHOT</div>
+      <div class="trx-gempty hidden" id="trxGrowthEmpty">GROWTH CHART NEEDS 2+ DAYS OF FOLLOWER SNAPSHOTS — ONE IS STORED PER SYNC PER DAY, SO THE FIRST BAR APPEARS TOMORROW (META ACCOUNTS SEED 30 DAYS INSTANTLY)</div>
     </div>
     <div class="trx-filters">
       <button class="trx-ftab active" data-tf="all">ALL <span class="trx-count" id="trxAllCount">0</span></button>
@@ -1618,6 +1618,13 @@ EXPORT TO DRIVE
       <button class="trx-ftab" data-tf="reels">REELS</button>
       <button class="trx-ftab" data-tf="posts">POSTS</button>
       <button class="trx-ftab" data-tf="carousels">CAROUSELS</button>
+      <span class="trx-flabel">LAST</span>
+      <div class="trx-chips" id="trxDaysChips" style="margin-left:6px;">
+        <button class="trx-rchip" data-d="7">7D</button>
+        <button class="trx-rchip" data-d="14">14D</button>
+        <button class="trx-rchip" data-d="30">30D</button>
+        <button class="trx-rchip active" data-d="0">ALL</button>
+      </div>
       <select class="trx-select" id="trxSort">
         <option value="recent">SORT: RECENT</option>
         <option value="views">SORT: VIEWS</option>
@@ -1635,7 +1642,7 @@ EXPORT TO DRIVE
     </div>
     <div class="trx-reels" id="trxReelGrid"></div>
     <div class="trx-export">
-      <span class="trx-note" id="trxExportNote"></span>
+      <span class="trx-note" id="trxExportNote"></span><span class="trx-note" id="trxRangeNote" style="color:var(--accent-hi,#9D4EDD);"></span>
       <div style="display:flex;gap:8px;">
         <button class="trx-btn" onclick="trxSummary()">COPY SUMMARY</button>
         <button class="trx-btn" onclick="trxCsv()">COPY CSV</button>
@@ -1880,7 +1887,7 @@ const TRX_DEFAULT_HUB = 'http://137.184.47.65:8790';
 let trxHub = { role: '', name: '', state: null, lastErr: '' };
 const trxIsHub = () => !!(trx.hubUrl && trx.hubToken && trxHub.role);
 const trxIsAdmin = () => !trxIsHub() || trxHub.role === 'admin';
-let trxSel = null, trxFilter = 'all', trxSortKey = 'recent', trxViewMode = 'total', trxRange = 30, trxSubtab = 'accounts', trxModalRef = null, trxSuppress = false, trxBusy = false;
+let trxSel = null, trxFilter = 'all', trxSortKey = 'recent', trxViewMode = 'total', trxRange = 30, trxDays = 0, trxSubtab = 'accounts', trxModalRef = null, trxSuppress = false, trxBusy = false;
 
 function trxLoad(){ try { const s = JSON.parse(localStorage.getItem(LS)); if (s && typeof s === 'object') trx = Object.assign(trx, s); } catch(e){} }
 function trxSave(){
@@ -2331,17 +2338,23 @@ function trxRenderReels(){
   else if (trxFilter === 'posts') list = list.filter(r => tOf(r) === 'post');
   else if (trxFilter === 'carousels') list = list.filter(r => tOf(r) === 'carousel');
   else if (trxFilter === 'top') list = list.filter(r => !r.trial && (tOf(r) === 'reel' || tOf(r) === 'video'));
-  if (trxViewMode === 'fb') list = list.filter(r => r.fb > 0);
+  if (trxDays) { const cut = Date.now() - trxDays * 864e5; list = list.filter(r => (r.ts || 0) >= cut); }
+  const nonVideo = trxFilter === 'posts' || trxFilter === 'carousels';
+  // posts/carousels have no view counts — hide the IG/FB view chips and sort by likes when "views" is chosen
+  const vs = document.getElementById('trxViewsSrc'); if (vs) { vs.classList.toggle('hidden', nonVideo); vs.previousElementSibling.classList.toggle('hidden', nonVideo); }
+  if (!nonVideo && trxViewMode === 'fb') list = list.filter(r => r.fb > 0);
   const ranked = [...(trx.reels[trxSel] || [])].filter(r => !r.trial && (tOf(r) === 'reel' || tOf(r) === 'video')).sort((a, b) => trxVv(b) - trxVv(a)).map(r => r.id);
   if (trxFilter === 'top' || trxSortKey !== 'recent') {
-    const k = trxSortKey === 'recent' ? 'views' : trxSortKey;
+    let k = trxSortKey === 'recent' ? 'views' : trxSortKey;
+    if (nonVideo && k === 'views') k = 'likes';
     list.sort((a, b) => k === 'views' ? trxVv(b) - trxVv(a) : (b[k] || 0) - (a[k] || 0));
   } else {
     list.sort((a, b) => b.ts - a.ts);
   }
+  const rangeNote = document.getElementById('trxRangeNote'); if (rangeNote) rangeNote.textContent = trxDays ? list.length + ' IN LAST ' + trxDays + 'D' : '';
   const acc = trx.accounts.find(a => a.pk === trxSel);
   if (!list.length) {
-    grid.innerHTML = '<div class="trx-empty"><span>' + ((trx.reels[trxSel] || []).length ? 'NOTHING MATCHES THIS FILTER' : 'NO REELS SYNCED YET — HIT ⟳ SYNC NOW') + '</span></div>';
+    grid.innerHTML = '<div class="trx-empty"><span>' + ((trx.reels[trxSel] || []).length ? (trxDays ? 'NOTHING POSTED IN THE LAST ' + trxDays + ' DAYS FOR THIS FILTER' : 'NOTHING MATCHES THIS FILTER') : 'NO REELS SYNCED YET — HIT ⟳ SYNC NOW') + '</span></div>';
   } else {
     grid.innerHTML = list.map(r => {
       const rk = ranked.indexOf(r.id) + 1;
@@ -2712,6 +2725,12 @@ document.querySelectorAll('#trxViewsSrc .trx-rchip').forEach(c => c.addEventList
   document.querySelectorAll('#trxViewsSrc .trx-rchip').forEach(x => x.classList.remove('active'));
   c.classList.add('active');
   trxViewMode = c.dataset.src;
+  trxRenderReels();
+}));
+document.querySelectorAll('#trxDaysChips .trx-rchip').forEach(c => c.addEventListener('click', () => {
+  document.querySelectorAll('#trxDaysChips .trx-rchip').forEach(x => x.classList.remove('active'));
+  c.classList.add('active');
+  trxDays = +c.dataset.d;
   trxRenderReels();
 }));
 document.querySelectorAll('#trxRangeChips .trx-rchip').forEach(c => c.addEventListener('click', () => {
@@ -8692,7 +8711,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.11.1';
+const APP_VERSION = '4.11.2';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -17572,6 +17591,19 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.11.2',
+    date: '2026-08-16',
+    title: 'TRENDING — date range filter (7D / 14D / 30D / ALL), smarter controls for posts + carousels',
+    sections: [
+      { h: '📅 Date range', items: [
+        '🗓 New <b>LAST 7D · 14D · 30D · ALL</b> chips in the filter bar — combine with REELS / POSTS / CAROUSELS / TRIALS and any sort. The export bar shows how many items fall in the range.',
+        '📸 <b>Posts + carousels have no view counts</b> in HikerAPI, so on those filters the IG/FB view chips hide and "sort by views" falls back to likes instead of showing an arbitrary order.',
+        '📈 Growth chart empty-state now says what it needs: 2+ days of snapshots (one per sync per day) — first bar tomorrow; Meta accounts seed 30 days instantly.',
+        '🌐 VA report page is served with no-cache so fixes reach browsers immediately (⌘⇧R once if you had it open).',
+      ]},
+    ],
+  },
   {
     version: '4.11.1',
     date: '2026-08-16',

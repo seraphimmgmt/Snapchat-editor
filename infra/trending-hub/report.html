@@ -180,7 +180,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
         </div>
       </div>
       <svg class="chart" id="chart" viewBox="0 0 1000 110" preserveAspectRatio="none"></svg>
-      <div class="gempty hidden" id="gempty">GROWTH CHART BUILDS AS SYNCS ACCUMULATE</div>
+      <div class="gempty hidden" id="gempty">GROWTH CHART NEEDS 2+ DAYS OF SNAPSHOTS — FIRST BAR APPEARS TOMORROW</div>
     </div>
     <div class="filters">
       <button class="ftab active" data-f="all">ALL <span class="count" id="allCount">0</span></button>
@@ -189,6 +189,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
       <button class="ftab" data-f="reels">REELS</button>
       <button class="ftab" data-f="posts">POSTS</button>
       <button class="ftab" data-f="carousels">CAROUSELS</button>
+      <span class="flabel">LAST</span>
+      <div class="chips" id="daysChips" style="margin-left:6px"><button class="chip" data-d="7">7D</button><button class="chip" data-d="14">14D</button><button class="chip" data-d="30">30D</button><button class="chip active" data-d="0">ALL</button></div>
       <select class="sel" id="sort"><option value="recent">SORT: RECENT</option><option value="views">SORT: VIEWS</option><option value="shares">SORT: SHARES</option><option value="likes">SORT: LIKES</option><option value="comments">SORT: COMMENTS</option><option value="saves">SORT: SAVES (META)</option></select>
       <span class="flabel">VIEWS</span>
       <div class="chips" id="viewsSrc" style="margin-left:6px"><button class="chip active" data-s="total">TOTAL</button><button class="chip" data-s="ig">IG</button><button class="chip" data-s="fb">FB</button></div>
@@ -222,7 +224,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 'use strict';
 const HUB = location.origin;
 const LS_TOK = 'trx_report_token';
-let TOKEN = '', S = null, sel = null, filter = 'all', sortKey = 'recent', viewMode = 'total', range = 30, tab = 'accounts', modalRef = null;
+let TOKEN = '', S = null, sel = null, filter = 'all', sortKey = 'recent', viewMode = 'total', range = 30, days = 0, tab = 'accounts', modalRef = null;
 
 // magic link: #t=<token> → store, strip from URL
 (function(){ const m = location.hash.match(/[#&]t=([^&]+)/); if (m) { localStorage.setItem(LS_TOK, decodeURIComponent(m[1])); history.replaceState(null, '', location.pathname); } TOKEN = localStorage.getItem(LS_TOK) || ''; })();
@@ -299,11 +301,14 @@ function renderReels(){
   else if (filter === 'posts') list = list.filter(r => tOf(r) === 'post');
   else if (filter === 'carousels') list = list.filter(r => tOf(r) === 'carousel');
   else if (filter === 'top') list = list.filter(r => !r.trial && (tOf(r) === 'reel' || tOf(r) === 'video'));
-  if (viewMode === 'fb') list = list.filter(r => r.fb > 0);
+  if (days) { const cut = Date.now() - days * 864e5; list = list.filter(r => (r.ts||0) >= cut); }
+  const nonVideo = filter === 'posts' || filter === 'carousels';
+  const vs = document.getElementById('viewsSrc'); vs.classList.toggle('hidden', nonVideo); vs.previousElementSibling.classList.toggle('hidden', nonVideo);
+  if (!nonVideo && viewMode === 'fb') list = list.filter(r => r.fb > 0);
   const ranked = all.filter(r => !r.trial && (tOf(r) === 'reel' || tOf(r) === 'video')).sort((a,b) => vv(b) - vv(a)).map(r => r.id);
-  if (filter === 'top' || sortKey !== 'recent') { const k = sortKey === 'recent' ? 'views' : sortKey; list.sort((a,b) => k === 'views' ? vv(b) - vv(a) : (b[k]||0) - (a[k]||0)); }
+  if (filter === 'top' || sortKey !== 'recent') { let k = sortKey === 'recent' ? 'views' : sortKey; if (nonVideo && k === 'views') k = 'likes'; list.sort((a,b) => k === 'views' ? vv(b) - vv(a) : (b[k]||0) - (a[k]||0)); }
   else list.sort((a,b) => (b.ts||0) - (a.ts||0));
-  document.getElementById('reelGrid').innerHTML = list.length ? list.map(r => { const rk = ranked.indexOf(r.id) + 1; return reelCard(sel, r, { rank: (filter === 'top' && rk >= 1 && rk <= 3) ? rk : 0 }); }).join('') : '<div class="empty"><span>' + (all.length ? 'NOTHING MATCHES THIS FILTER' : 'NO REELS SYNCED YET') + '</span></div>';
+  document.getElementById('reelGrid').innerHTML = list.length ? list.map(r => { const rk = ranked.indexOf(r.id) + 1; return reelCard(sel, r, { rank: (filter === 'top' && rk >= 1 && rk <= 3) ? rk : 0 }); }).join('') : '<div class="empty"><span>' + (all.length ? (days ? 'NOTHING POSTED IN THE LAST ' + days + ' DAYS FOR THIS FILTER' : 'NOTHING MATCHES THIS FILTER') : 'NO REELS SYNCED YET') + '</span></div>';
   const a = S.accounts.find(x => x.pk === sel);
   document.getElementById('exportNote').textContent = a && a.lastSync ? 'LAST SYNC ' + new Date(a.lastSync).toLocaleString() + ' · ' + all.length + ' REELS · VIA ' + (a.source === 'meta' ? 'META API' : 'HIKERAPI') : '';
 }
@@ -392,6 +397,7 @@ window.downloadCsv = function(){ if (!sel) return false; fetch(HUB+'/trending/ex
 document.querySelectorAll('.ftab').forEach(t => t.addEventListener('click', () => { document.querySelectorAll('.ftab').forEach(x=>x.classList.remove('active')); t.classList.add('active'); filter = t.dataset.f; if (filter==='top') document.getElementById('sort').value='views'; renderReels(); }));
 document.getElementById('sort').addEventListener('change', e => { sortKey = e.target.value; renderReels(); });
 document.querySelectorAll('#viewsSrc .chip').forEach(c => c.addEventListener('click', () => { document.querySelectorAll('#viewsSrc .chip').forEach(x=>x.classList.remove('active')); c.classList.add('active'); viewMode = c.dataset.s; renderReels(); }));
+document.querySelectorAll('#daysChips .chip').forEach(c => c.addEventListener('click', () => { document.querySelectorAll('#daysChips .chip').forEach(x=>x.classList.remove('active')); c.classList.add('active'); days = +c.dataset.d; renderReels(); }));
 document.querySelectorAll('#rangeChips .chip').forEach(c => c.addEventListener('click', () => { document.querySelectorAll('#rangeChips .chip').forEach(x=>x.classList.remove('active')); c.classList.add('active'); range = +c.dataset.r; renderGrowth(); }));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReel(); });
 setInterval(() => { if (TOKEN && S && !modalRef) api('/trending/state').then(s => { S = s; renderAll(); }).catch(()=>{}); }, 120000);

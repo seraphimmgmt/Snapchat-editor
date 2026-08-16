@@ -44,7 +44,7 @@ from fastapi import FastAPI, HTTPException, Header, Request, Response
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-HUB_VERSION = "1.2.0"
+HUB_VERSION = "1.2.1"
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 BASE = Path(os.environ.get("TRENDING_HUB_DIR", "/opt/trending-hub"))
 DB_PATH = BASE / "hub.db"
@@ -724,7 +724,7 @@ def download(pk: str, mid: str, idx: int = 0, exp: int = 0, sig: str = ""):
 @app.get("/trending/report.html", response_class=HTMLResponse)
 def report():
     if REPORT_HTML.exists():
-        return REPORT_HTML.read_text(encoding="utf-8")
+        return HTMLResponse(REPORT_HTML.read_text(encoding="utf-8"), headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"})
     return HTMLResponse("<h1>report.html not deployed</h1>", status_code=404)
 
 @app.get("/trending/log")
