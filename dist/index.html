@@ -1579,6 +1579,7 @@ EXPORT TO DRIVE
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <div class="trx-chip" id="trxKeyChip" onclick="trxOpenSettings()"><span class="trx-dot"></span><span><b>HIKERAPI</b> <span id="trxKeyState">no key</span></span></div>
         <div class="trx-chip" id="trxMetaChip" onclick="trxOpenSettings()"><span class="trx-dot"></span><span><b>META</b> <span id="trxMetaState">no token</span></span></div>
+        <div class="trx-chip" id="trxHubChip" onclick="trxOpenSettings()"><span class="trx-dot"></span><span><b>HUB</b> <span id="trxHubState">local</span></span></div>
         <button class="trx-btn" onclick="trxSyncAll()">⟳ SYNC ALL</button>
         <button class="trx-btn" onclick="trxOpenSettings()">⚙</button>
       </div>
@@ -1614,6 +1615,9 @@ EXPORT TO DRIVE
       <button class="trx-ftab active" data-tf="all">ALL <span class="trx-count" id="trxAllCount">0</span></button>
       <button class="trx-ftab" data-tf="top">TOP ALL-TIME</button>
       <button class="trx-ftab" data-tf="trial">◌ TRIALS <span class="trx-count" id="trxTrialCount">0</span></button>
+      <button class="trx-ftab" data-tf="reels">REELS</button>
+      <button class="trx-ftab" data-tf="posts">POSTS</button>
+      <button class="trx-ftab" data-tf="carousels">CAROUSELS</button>
       <select class="trx-select" id="trxSort">
         <option value="recent">SORT: RECENT</option>
         <option value="views">SORT: VIEWS</option>
@@ -1736,6 +1740,18 @@ EXPORT TO DRIVE
 .trx-fav:hover{color:#FFD86B;}
 .trx-fav.faved{color:#FFD86B;}
 .trx-fbtag{font-size:8px;font-family:'JetBrains Mono',monospace;background:#1877F2;color:#fff;padding:2px 5px;border-radius:6px;font-weight:700;}
+.trx-igtag{font-size:8px;font-family:'JetBrains Mono',monospace;background:linear-gradient(90deg,#7B2CBF,#C300FF);color:#fff;padding:2px 5px;border-radius:6px;font-weight:700;}
+.trx-fbtag.dim,.trx-igtag.dim{opacity:.55;font-weight:500;}
+.trx-typetag{font-size:8px;font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.25);color:#fff;padding:2px 5px;border-radius:6px;letter-spacing:.08em;}
+.trx-reel.trx-post,.trx-reel.trx-carousel{aspect-ratio:4/5;}
+.trx-rprev video{width:100%;height:100%;object-fit:contain;background:#000;display:block;}
+.trx-rprev .trx-car{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000;}
+.trx-rprev .trx-car img,.trx-rprev .trx-car video{width:100%;height:100%;object-fit:contain;}
+.trx-carnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.3);color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;z-index:3;}
+.trx-carnav.l{left:8px;}.trx-carnav.r{right:8px;}
+.trx-cardots{position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:5px;z-index:3;}
+.trx-cardots span{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.35);}
+.trx-cardots span.on{background:#fff;}
 .trx-rhandle{position:absolute;bottom:24px;left:7px;z-index:2;font-family:'JetBrains Mono',monospace;font-size:8px;color:rgba(255,255,255,.6);text-shadow:0 1px 3px rgba(0,0,0,.8);}
 .trx-rstats{position:absolute;bottom:7px;left:7px;right:7px;display:flex;justify-content:space-between;color:#fff;font-size:9px;font-weight:600;z-index:2;text-shadow:0 1px 3px rgba(0,0,0,.7);font-family:'JetBrains Mono',monospace;}
 .trx-reel.trx-trial{border:1px dashed var(--accent-dim);background:rgba(123,44,191,.06);}
@@ -1794,7 +1810,19 @@ EXPORT TO DRIVE
 <div class="trx-veil hidden" id="trxSettings">
   <div class="trx-modal">
     <div class="trx-mhead"><h3>DATA SOURCES</h3><button class="trx-x" onclick="trxCloseSettings()">✕</button></div>
-    <div class="trx-mbody">
+    <div class="trx-mbody" style="max-height:72vh;overflow-y:auto;">
+      <div style="font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.18em;color:var(--text-dim);">HUB — <span style="color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;">ONE SHARED SYNC · KEYS STAY ON THE SERVER · VAs READ FOR FREE</span></div>
+      <div class="trx-field"><label>HUB URL</label><input id="trxHubUrl" placeholder="http://137.184.47.65:8790"></div>
+      <div class="trx-field"><label>YOUR HUB TOKEN — admin (you) or viewer (VA)</label><div style="display:flex;gap:6px;"><input type="password" id="trxHubTok" placeholder="sa_… or sv_…" style="flex:1;"><button class="trx-btn" onclick="trxHubTest()">TEST</button></div></div>
+      <div class="trx-mnote" id="trxHubNote">Not connected — the tab syncs locally on this machine only.</div>
+      <div id="trxHubAdmin" class="hidden" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="trx-btn" onclick="trxHubPushLocal()">⬆ PUSH LOCAL DATA TO HUB</button><button class="trx-btn" onclick="trxHubSaveKeys()">SAVE KEYS BELOW TO HUB</button></div>
+        <div style="font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.18em;color:var(--text-dim);">TEAM — <span style="color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;">VIEWER TOKENS FOR VAs · READ + FAVORITE ONLY</span></div>
+        <div id="trxTokenList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <div style="display:flex;gap:6px;"><input id="trxNewTokName" placeholder="VA name (e.g. Maria)" style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:2px;padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none;"><button class="trx-btn primary" onclick="trxMintToken()">+ VIEWER TOKEN</button></div>
+        <div id="trxMintResult" class="hidden" style="background:rgba(123,44,191,.10);border:1px solid var(--accent-dim);border-radius:3px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.7;word-break:break-all;"></div>
+      </div>
+      <div style="border-top:1px solid var(--border);"></div>
       <div style="font-family:'Antonio',sans-serif;font-size:11px;letter-spacing:.18em;color:var(--text-dim);">HIKERAPI — <span style="color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;">ANY ACCOUNT · TRIAL REELS · IG/FB VIEWS</span></div>
       <div class="trx-field"><label>ACCESS KEY — hikerapi.com dashboard</label><div style="display:flex;gap:6px;"><input type="password" id="trxKeyInput" placeholder="paste access key" style="flex:1;"><button class="trx-btn" onclick="trxTestKey()">TEST</button></div></div>
       <div style="border-top:1px solid var(--border);"></div>
@@ -1839,12 +1867,31 @@ EXPORT TO DRIVE
 (function(){
 'use strict';
 const LS = 'trx_state_v1';
-let trx = { key:'', metaToken:'', metaExpires:0, cadence:'manual', accounts:[], reels:{}, snaps:{}, favs:[] };
+let trx = { key:'', metaToken:'', metaExpires:0, cadence:'manual', accounts:[], reels:{}, snaps:{}, favs:[], hubUrl:'', hubToken:'' };
 let trxAddSource = 'hiker';
+// HUB mode: when hubUrl+hubToken are set, all data comes from the shared hub
+// (infra/trending-hub) and every action is a hub call. `trxHub.role` is
+// 'admin' | 'viewer' from the hub, or '' when local.
+const TRX_DEFAULT_HUB = 'http://137.184.47.65:8790';
+let trxHub = { role: '', name: '', state: null, lastErr: '' };
+const trxIsHub = () => !!(trx.hubUrl && trx.hubToken && trxHub.role);
+const trxIsAdmin = () => !trxIsHub() || trxHub.role === 'admin';
 let trxSel = null, trxFilter = 'all', trxSortKey = 'recent', trxViewMode = 'total', trxRange = 30, trxSubtab = 'accounts', trxModalRef = null, trxSuppress = false, trxBusy = false;
 
 function trxLoad(){ try { const s = JSON.parse(localStorage.getItem(LS)); if (s && typeof s === 'object') trx = Object.assign(trx, s); } catch(e){} }
-function trxSave(){ try { localStorage.setItem(LS, JSON.stringify(trx)); } catch(e){} }
+function trxSave(){
+  try {
+    // In hub mode the in-memory accounts/reels are the hub's; keep the last
+    // locally-synced dataset aside so PUSH LOCAL DATA TO HUB still has it.
+    if (trxIsHub()) {
+      const { accounts, reels, snaps, favs, ...rest } = trx;
+      localStorage.setItem(LS, JSON.stringify(rest));
+    } else {
+      localStorage.setItem(LS, JSON.stringify(trx));
+      if (trx.accounts.length) localStorage.setItem(LS + '_local_backup', JSON.stringify({ accounts: trx.accounts, reels: trx.reels, snaps: trx.snaps, favs: trx.favs }));
+    }
+  } catch(e){}
+}
 const trxFmt = n => { n = +n || 0; return n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(n<1e4?1:0)+'K' : String(n); };
 const trxVv = r => trxViewMode === 'ig' ? r.igViews : trxViewMode === 'fb' ? r.fb : r.views;
 const trxDate = ts => new Date(ts).toLocaleDateString('en-US',{month:'short',day:'2-digit'}).toUpperCase();
@@ -1863,6 +1910,36 @@ async function trxApi(path, params){
   try { return JSON.parse(body); } catch(e){ throw new Error('Unparseable HikerAPI response'); }
 }
 
+// ---------- hub client ----------
+async function trxHubCall(method, path, body){
+  const inv = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+  if (!inv) throw new Error('Hub needs the desktop app');
+  const text = await inv('hub_request', { base: trx.hubUrl, method, path, token: trx.hubToken, body: body == null ? null : body });
+  try { return JSON.parse(text); } catch(e){ return text; }
+}
+// Pull the hub snapshot into the same in-memory shape the local mode uses, so
+// every renderer stays untouched.
+async function trxHubRefresh(){
+  const s = await trxHubCall('GET', '/trending/state');
+  trxHub.role = s.role; trxHub.name = s.tokenName || ''; trxHub.state = s; trxHub.lastErr = '';
+  trx.accounts = s.accounts || []; trx.reels = s.reels || {}; trx.snaps = s.snaps || {}; trx.favs = s.favs || [];
+  return s;
+}
+function trxHubStatusLine(){
+  const s = trxHub.state; if (!s) return '';
+  if (s.sync && s.sync.busy) return 'HUB SYNCING — ' + (s.sync.status || '…');
+  if (s.sync && s.sync.lastError) return 'HUB LAST ERROR: ' + s.sync.lastError;
+  return s.lastSync ? 'HUB · LAST SYNC ' + new Date(s.lastSync).toLocaleString() + ' · every ' + s.cadence : 'HUB · NO SYNC YET';
+}
+let trxHubPoll = null;
+function trxHubStartPoll(){
+  clearInterval(trxHubPoll);
+  trxHubPoll = setInterval(async () => {
+    if (!trx.hubUrl || !trx.hubToken) return;
+    if (document.getElementById('trendingView').classList.contains('hidden')) return;
+    try { await trxHubRefresh(); trxRenderAll(); trxStatus(trxHubStatusLine()); } catch(e){}
+  }, 15000);
+}
 async function trxMeta(path, params){
   if (!trx.metaToken) throw new Error('No Meta token — open ⚙ settings');
   const inv = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
@@ -1878,13 +1955,16 @@ function trxNormMetaUser(j){
 }
 function trxNormMetaMedia(m){
   m = m || {};
+  const type = m.media_product_type === 'REELS' ? 'reel' : m.media_type === 'CAROUSEL_ALBUM' ? 'carousel' : m.media_type === 'VIDEO' ? 'video' : 'post';
+  const media = type === 'carousel' ? (((m.children || {}).data) || []).map(c => ({ img: c.thumbnail_url || c.media_url, video: c.media_type === 'VIDEO' ? c.media_url : null })) : [];
+  const isVideo = type === 'reel' || type === 'video';
   return {
-    id: String(m.id || ''), code: (m.permalink || '').split('/').filter(Boolean).pop() || '', permalink: m.permalink || '',
+    id: String(m.id || ''), code: (m.permalink || '').split('/').filter(Boolean).pop() || '', permalink: m.permalink || '', type,
     ts: m.timestamp ? Date.parse(m.timestamp) : 0,
     views: 0, igViews: 0, fb: 0,
     likes: m.like_count ?? 0, comments: m.comments_count ?? 0, shares: 0, saves: 0, reach: 0, watch: 0,
-    thumb: m.thumbnail_url || m.media_url || null, videoUrl: m.media_url || null,
-    trial: false, source: 'meta',
+    thumb: m.thumbnail_url || (media[0] && media[0].img) || (isVideo ? null : m.media_url) || null, videoUrl: isVideo ? (m.media_url || null) : null, media,
+    trial: false, source: 'meta', caption: (m.caption || '').slice(0, 300),
   };
 }
 function trxApplyInsights(r, ins){
@@ -1918,24 +1998,31 @@ function trxItems(j){
   if (Array.isArray(j)) return j;
   return j.items || (j.response && j.response.items) || j.medias || [];
 }
-function trxNormClip(it){
-  const m = (it && (it.media || it)) || {};
+function trxHikerUrls(m){
   const cand = m.image_versions2 && m.image_versions2.candidates && m.image_versions2.candidates[0];
-  const thumb = m.thumbnail_url || (cand && cand.url) || m.display_url || null;
+  const img = m.thumbnail_url || (cand && cand.url) || m.display_url || null;
+  const vid = m.video_url || (m.video_versions && m.video_versions[0] && m.video_versions[0].url) || null;
+  return { img, vid };
+}
+function trxNormClip(it, kind){
+  kind = kind || 'reel';
+  const m = (it && (it.media || it)) || {};
+  const mt = m.media_type, pt = String(m.product_type || '').toLowerCase();
+  let { img: thumb, vid } = trxHikerUrls(m);
+  let type = 'reel';
+  if (kind === 'media') { if (mt === 8) type = 'carousel'; else if (mt === 1) type = 'post'; else if (mt === 2 && !/clip|reel/.test(pt)) type = 'video'; }
+  const media = [];
+  if (type === 'carousel') { (m.carousel_media || []).forEach(c => { const u = trxHikerUrls(c); media.push({ img: u.img, video: u.vid }); }); if (!thumb && media.length) thumb = media[0].img; }
   const views = m.play_count ?? m.view_count ?? 0;
   const igViews = m.ig_play_count ?? views;
   return {
-    id: String(m.pk || m.id || ''),
-    code: m.code || '',
+    id: String(m.pk || m.id || ''), code: m.code || '', type,
     ts: m.taken_at ? m.taken_at * 1000 : 0,
-    views, igViews,
-    fb: Math.max(0, views - igViews),
-    likes: m.like_count ?? 0,
-    comments: m.comment_count ?? 0,
-    shares: m.reshare_count ?? m.share_count ?? 0,
-    thumb,
-    videoUrl: m.video_url || (m.video_versions && m.video_versions[0] && m.video_versions[0].url) || null,
-    trial: !thumb,
+    views, igViews, fb: Math.max(0, views - igViews),
+    likes: m.like_count ?? 0, comments: m.comment_count ?? 0, shares: m.reshare_count ?? m.share_count ?? 0,
+    thumb, videoUrl: vid, media,
+    trial: kind === 'reel' && !thumb, source: 'hiker',
+    caption: (m.caption && m.caption.text) || m.caption_text || '',
   };
 }
 
@@ -1966,10 +2053,10 @@ async function trxSyncMeta(acc, deep){
   let after = null, got = [], pages = 0;
   const maxPages = deep ? 4 : 1;
   do {
-    const params = { fields: 'id,caption,media_product_type,media_type,permalink,timestamp,like_count,comments_count,thumbnail_url,media_url', limit: 50 };
+    const params = { fields: 'id,caption,media_product_type,media_type,permalink,timestamp,like_count,comments_count,thumbnail_url,media_url,children{media_type,media_url,thumbnail_url}', limit: 50 };
     if (after) params.after = after;
     const mj = await trxMeta(META_V + '/me/media', params);
-    const items = (mj.data || []).filter(m => m.media_product_type === 'REELS' || m.media_type === 'VIDEO');
+    const items = mj.data || [];
     got.push(...items.map(trxNormMetaMedia).filter(r => r.id));
     after = mj.paging && mj.paging.cursors && mj.paging.next ? mj.paging.cursors.after : null;
     pages++;
@@ -1981,7 +2068,7 @@ async function trxSyncMeta(acc, deep){
   for (let i = 0; i < Math.min(got.length, cap); i++) {
     const r = got[i];
     try {
-      trxApplyInsights(r, await trxMeta(META_V + '/' + r.id + '/insights', { metric: 'views,reach,saved,shares,ig_reels_avg_watch_time' }));
+      trxApplyInsights(r, await trxMeta(META_V + '/' + r.id + '/insights', { metric: r.type === 'reel' ? 'views,reach,saved,shares,ig_reels_avg_watch_time' : 'views,reach,saved,shares' }));
     } catch(e){
       const old = prev.find(x => x.id === r.id); if (old) Object.assign(r, { views: old.views, igViews: old.igViews, saves: old.saves, shares: old.shares, reach: old.reach, watch: old.watch });
     }
@@ -1991,7 +2078,7 @@ async function trxSyncMeta(acc, deep){
   const seen = new Set(got.map(r => r.id));
   trx.reels[pk] = [...got, ...prev.filter(r => !seen.has(r.id))];
   acc.trialCount = 0;
-  const solid = trx.reels[pk];
+  const solid = trx.reels[pk].filter(r => (r.type || 'reel') === 'reel');
   acc.avgViews = solid.length ? Math.round(solid.reduce((s, r) => s + (r.views || 0), 0) / solid.length) : 0;
   acc.lastSync = Date.now();
   trxSave(); trxRenderAll(); trxStatus('');
@@ -1999,6 +2086,15 @@ async function trxSyncMeta(acc, deep){
 }
 
 async function trxSyncAccount(pk, deep){
+  if (trxIsHub()) {
+    if (!trxIsAdmin()) return trxToast('Viewer tokens can\'t trigger a sync');
+    try {
+      await trxHubCall('POST', '/trending/sync', { pk, deep: !!deep, force: true });
+      trxToast('Hub sync started'); trxStatus('HUB SYNCING…');
+      setTimeout(async () => { try { await trxHubRefresh(); trxRenderAll(); trxStatus(trxHubStatusLine()); } catch(e){} }, 4000);
+    } catch(e){ trxToast(String(e.message || e)); }
+    return;
+  }
   const acc = trx.accounts.find(a => a.pk === pk); if (!acc || trxBusy) return;
   trxBusy = true;
   try {
@@ -2023,10 +2119,25 @@ async function trxSyncAccount(pk, deep){
       pages++;
       trxStatus('Syncing @' + acc.username + ' — page ' + pages + ' (' + got.length + ' reels)…');
     } while (pageId && pages < maxPages);
+    // posts + carousels from the profile feed (reels stay authoritative from clips)
+    try {
+      const reelIds = new Set(got.map(r => r.id));
+      let mp = null, mpages = 0; const maxM = deep ? 30 : 1;
+      do {
+        const params = { user_id: pk }; if (mp) params.page_id = mp;
+        const mj = await trxApi('/v2/user/medias', params);
+        const items = trxItems(mj);
+        items.map(i => trxNormClip(i, 'media')).forEach(r => { if (r.id && !reelIds.has(r.id) && r.type !== 'reel') got.push(r); });
+        mp = (mj && (mj.next_page_id || (mj.response && mj.response.next_page_id))) || null;
+        mpages++;
+        trxStatus('Syncing @' + acc.username + ' — posts page ' + mpages + '…');
+        if (!items.length) break;
+      } while (mp && mpages < maxM);
+    } catch(e){ /* posts are best-effort */ }
     const seen = new Set(got.map(r => r.id));
     trx.reels[pk] = [...got, ...(trx.reels[pk] || []).filter(r => !seen.has(r.id))];
     acc.trialCount = trx.reels[pk].filter(r => r.trial).length;
-    const solid = trx.reels[pk].filter(r => !r.trial);
+    const solid = trx.reels[pk].filter(r => !r.trial && (r.type || 'reel') === 'reel');
     acc.avgViews = solid.length ? Math.round(solid.reduce((s, r) => s + r.views, 0) / solid.length) : 0;
     acc.lastSync = Date.now();
     trxSave(); trxRenderAll();
@@ -2038,6 +2149,12 @@ async function trxSyncAccount(pk, deep){
 }
 
 window.trxSyncAll = async function(){
+  if (trxIsHub()) {
+    if (!trxIsAdmin()) return trxToast('Viewer tokens can\'t trigger a sync');
+    try { await trxHubCall('POST', '/trending/sync', { force: true }); trxToast('Hub sync-all started'); trxStatus('HUB SYNCING…'); }
+    catch(e){ trxToast(String(e.message || e)); }
+    return;
+  }
   for (const a of [...trx.accounts]) await trxSyncAccount(a.pk, !trx.reels[a.pk] || !trx.reels[a.pk].length);
 };
 window.trxSyncOne = function(){ if (trxSel) trxSyncAccount(trxSel, true); };
@@ -2050,6 +2167,19 @@ window.trxSetAddSource = function(src){
 };
 window.trxAddAccount = async function(){
   const inp = document.getElementById('trxAddInput');
+  if (trxIsHub()) {
+    if (!trxIsAdmin()) return trxToast('Viewer tokens can\'t add accounts');
+    const handle = (inp.value || '').trim().replace(/^@/, '');
+    if (trxAddSource !== 'meta' && !handle) return trxToast('Type a handle first');
+    try {
+      trxStatus('Hub: adding ' + (trxAddSource === 'meta' ? 'Meta account' : '@' + handle) + '…');
+      const r = await trxHubCall('POST', '/trending/accounts', { handle, source: trxAddSource });
+      inp.value = '';
+      trxToast('@' + r.account.username + ' added on hub — backfill running');
+      await trxHubRefresh(); trxRenderAll(); trxStatus(trxHubStatusLine());
+    } catch(e){ trxStatus(''); trxToast(String(e.message || e)); }
+    return;
+  }
   if (trxAddSource === 'meta') {
     if (trx.accounts.some(a => a.source === 'meta')) return trxToast('Meta account already tracked');
     try {
@@ -2078,16 +2208,26 @@ window.trxAddAccount = async function(){
   } catch(e){ trxStatus(''); trxToast(String(e.message || e)); }
 };
 
-window.trxTogglePin = function(pk){
+window.trxTogglePin = async function(pk){
   const a = trx.accounts.find(x => x.pk === pk); if (!a) return;
-  a.pinned = !a.pinned; trxSave(); trxRenderAccounts();
+  if (trxIsHub()) {
+    try { const r = await trxHubCall('POST', '/trending/accounts/' + encodeURIComponent(pk) + '/pin', { on: !a.pinned }); a.pinned = r.pinned; }
+    catch(e){ return trxToast(String(e.message || e)); }
+  } else { a.pinned = !a.pinned; trxSave(); }
+  trxRenderAccounts();
   trxToast(a.pinned ? '★ @' + a.username + ' pinned' : '@' + a.username + ' unpinned');
 };
-window.trxToggleFav = function(pk, id){
+window.trxToggleFav = async function(pk, id){
   const k = pk + ':' + id;
   const i = trx.favs.indexOf(k);
-  if (i >= 0) trx.favs.splice(i, 1); else trx.favs.push(k);
-  trxSave(); trxRenderAll();
+  if (trxIsHub()) {
+    try { const r = await trxHubCall('POST', '/trending/favorites', { key: k, on: i < 0 }); trx.favs = r.favs || []; }
+    catch(e){ return trxToast(String(e.message || e)); }
+  } else {
+    if (i >= 0) trx.favs.splice(i, 1); else trx.favs.push(k);
+    trxSave();
+  }
+  trxRenderAll();
   if (trxModalRef && trxModalRef.pk === pk && trxModalRef.id === id) trxSyncModalFav();
   trxToast(i >= 0 ? 'Removed from FAVORITES' : '★ Added to FAVORITES');
 };
@@ -2125,8 +2265,19 @@ function trxRenderAccounts(){
   chip.classList.toggle('trx-nokey', !trx.key);
   document.getElementById('trxKeyState').textContent = trx.key ? 'connected' : 'no key';
   const mchip = document.getElementById('trxMetaChip');
-  mchip.classList.toggle('trx-nokey', !trx.metaToken);
-  document.getElementById('trxMetaState').textContent = trx.metaToken ? 'connected' : 'no token';
+  const hub = trxIsHub(), src = hub && trxHub.state ? trxHub.state.sources : null;
+  chip.classList.toggle('trx-nokey', hub ? !(src && src.hiker) : !trx.key);
+  document.getElementById('trxKeyState').textContent = hub ? (src && src.hiker ? 'on hub' : 'not on hub') : (trx.key ? 'connected' : 'no key');
+  mchip.classList.toggle('trx-nokey', hub ? !(src && src.meta) : !trx.metaToken);
+  document.getElementById('trxMetaState').textContent = hub ? (src && src.meta ? 'on hub' : 'not on hub') : (trx.metaToken ? 'connected' : 'no token');
+  const hchip = document.getElementById('trxHubChip');
+  hchip.classList.toggle('trx-nokey', !hub);
+  document.getElementById('trxHubState').textContent = hub ? (trxHub.role + (trxHub.name && trxHub.role !== 'admin' ? ' · ' + trxHub.name : '')) : (trx.hubUrl && trx.hubToken ? 'offline' : 'local');
+  // Viewer tokens: hide anything that spends requests
+  const viewer = hub && !trxIsAdmin();
+  document.querySelectorAll('#trendingView .trx-add, #trendingView .trx-sync-btn').forEach(el => el.classList.toggle('hidden', viewer));
+  const sa = document.querySelector('#trendingView .trx-toolbar .trx-btn'); if (sa) sa.classList.toggle('hidden', viewer);
+  const sn = document.querySelector('#trxDetail .trx-export .primary'); if (sn) sn.classList.toggle('hidden', viewer);
 }
 
 function trxReelCard(pk, r, opts){
@@ -2134,13 +2285,18 @@ function trxReelCard(pk, r, opts){
   const faved = trx.favs.includes(pk + ':' + r.id);
   const star = '<button class="trx-fav' + (faved ? ' faved' : '') + '" onclick="event.stopPropagation();trxToggleFav(\'' + pk + '\',\'' + r.id + '\')">★</button>';
   const rank = opts.rank ? '<div class="trx-rank r' + opts.rank + '">' + opts.rank + '</div>' : '';
-  const fbTag = r.fb > 0 ? '<span class="trx-fbtag">FB</span>' : '';
+  // Crossposted reels: tag the dominant platform, dim the other. IG-only reels: no tag.
+  const platTag = r.fb > 0 ? ((r.igViews || 0) >= r.fb ? '<span class="trx-igtag">IG</span><span class="trx-fbtag dim">FB</span>' : '<span class="trx-fbtag">FB</span><span class="trx-igtag dim">IG</span>') : '';
+  const type = r.type || 'reel';
+  const typeTag = type === 'carousel' ? '<span class="trx-typetag">▦ ' + ((r.media || []).length || '') + '</span>' : type === 'post' ? '<span class="trx-typetag">POST</span>' : type === 'video' ? '<span class="trx-typetag">VIDEO</span>' : '';
   const handle = opts.handle ? '<div class="trx-rhandle">@' + trxEsc(opts.handle) + '</div>' : '';
-  const stats = '<div class="trx-rstats"><span>▶ ' + trxFmt(trxVv(r)) + '</span><span>♥ ' + trxFmt(r.likes) + '</span><span>↗ ' + trxFmt(r.shares) + '</span></div>';
-  const top = '<div class="trx-rtop"><span class="lft">' + star + rank + fbTag + '</span><span class="trx-rdate">' + (r.ts ? trxDate(r.ts) : '') + '</span></div>';
+  const stats = type === 'reel' || type === 'video'
+    ? '<div class="trx-rstats"><span>▶ ' + trxFmt(trxVv(r)) + '</span><span>♥ ' + trxFmt(r.likes) + '</span><span>↗ ' + trxFmt(r.shares) + '</span></div>'
+    : '<div class="trx-rstats"><span>♥ ' + trxFmt(r.likes) + '</span><span>💬 ' + trxFmt(r.comments) + '</span>' + (r.saves ? '<span>🔖 ' + trxFmt(r.saves) + '</span>' : '<span></span>') + '</div>';
+  const top = '<div class="trx-rtop"><span class="lft">' + star + rank + platTag + typeTag + '</span><span class="trx-rdate">' + (r.ts ? trxDate(r.ts) : '') + '</span></div>';
   if (r.trial) return '<div class="trx-reel trx-trial" onclick="trxOpenReel(\'' + pk + '\',\'' + r.id + '\')"><div class="trx-shade"></div>' + top +
     '<div class="trx-trialc"><div class="trx-trialb">TRIAL</div><div class="trx-nothumb">NO THUMBNAIL</div></div>' + handle + stats + '</div>';
-  return '<div class="trx-reel" onclick="trxOpenReel(\'' + pk + '\',\'' + r.id + '\')">' +
+  return '<div class="trx-reel trx-' + type + '" onclick="trxOpenReel(\'' + pk + '\',\'' + r.id + '\')">' +
     (r.thumb ? '<img loading="lazy" src="' + trxEsc(r.thumb) + '" onerror="this.remove()">' : '') +
     '<div class="trx-shade"></div>' + top + handle + stats + '</div>';
 }
@@ -2151,9 +2307,14 @@ function trxRenderReels(){
   let list = [...(trx.reels[trxSel] || [])];
   document.getElementById('trxAllCount').textContent = list.length;
   document.getElementById('trxTrialCount').textContent = list.filter(r => r.trial).length;
+  const tOf = r => r.type || 'reel';
   if (trxFilter === 'trial') list = list.filter(r => r.trial);
+  else if (trxFilter === 'reels') list = list.filter(r => tOf(r) === 'reel' || tOf(r) === 'video');
+  else if (trxFilter === 'posts') list = list.filter(r => tOf(r) === 'post');
+  else if (trxFilter === 'carousels') list = list.filter(r => tOf(r) === 'carousel');
+  else if (trxFilter === 'top') list = list.filter(r => !r.trial && (tOf(r) === 'reel' || tOf(r) === 'video'));
   if (trxViewMode === 'fb') list = list.filter(r => r.fb > 0);
-  const ranked = [...(trx.reels[trxSel] || [])].filter(r => !r.trial).sort((a, b) => trxVv(b) - trxVv(a)).map(r => r.id);
+  const ranked = [...(trx.reels[trxSel] || [])].filter(r => !r.trial && (tOf(r) === 'reel' || tOf(r) === 'video')).sort((a, b) => trxVv(b) - trxVv(a)).map(r => r.id);
   if (trxFilter === 'top' || trxSortKey !== 'recent') {
     const k = trxSortKey === 'recent' ? 'views' : trxSortKey;
     list.sort((a, b) => k === 'views' ? trxVv(b) - trxVv(a) : (b[k] || 0) - (a[k] || 0));
@@ -2271,21 +2432,101 @@ function trxMetaExpiryText(){
   const d = Math.round((trx.metaExpires - Date.now()) / 864e5);
   return d > 0 ? 'Token expires in ~' + d + ' days.' : 'Token expired — generate a new one.';
 }
+function trxHubNoteText(){
+  if (!trx.hubUrl || !trx.hubToken) return 'Not connected — the tab syncs locally on this machine only.';
+  if (!trxHub.role) return trxHub.lastErr ? 'Hub unreachable: ' + trxHub.lastErr : 'Saved — hit TEST to connect.';
+  return 'Connected as ' + trxHub.role.toUpperCase() + (trxHub.name ? ' (' + trxHub.name + ')' : '') + ' · ' + trxHubStatusLine();
+}
+async function trxRenderTokens(){
+  const list = document.getElementById('trxTokenList');
+  if (!trxIsHub() || !trxIsAdmin()) { list.innerHTML = ''; return; }
+  try {
+    const r = await trxHubCall('GET', '/trending/tokens');
+    const rows = (r.tokens || []).filter(t => t.role !== 'admin');
+    list.innerHTML = rows.length ? rows.map(t => '<div style="display:flex;align-items:center;gap:8px;font-family:\'JetBrains Mono\',monospace;font-size:10px;padding:6px 10px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:2px;' + (t.revoked ? 'opacity:.45;' : '') + '">' +
+      '<span style="color:var(--text);font-weight:700;">' + trxEsc(t.name) + '</span><span style="color:var(--text-faint);">viewer' + (t.revoked ? ' · REVOKED' : '') + '</span>' +
+      '<span style="margin-left:auto;color:var(--text-faint);">' + (t.last_used ? 'last used ' + new Date(t.last_used * 1000).toLocaleDateString() : 'never used') + '</span>' +
+      (t.revoked ? '' : '<button class="trx-sync-btn" onclick="trxRevokeToken(\'' + trxEsc(t.id) + '\')" style="color:var(--red);border-color:rgba(255,59,92,.4);">REVOKE</button>') + '</div>').join('')
+      : '<div class="trx-mnote">No viewer tokens yet — mint one per VA below.</div>';
+  } catch(e){ list.innerHTML = '<div class="trx-mnote">' + trxEsc(String(e.message || e)) + '</div>'; }
+}
 window.trxOpenSettings = function(){
   document.getElementById('trxKeyInput').value = trx.key || '';
   document.getElementById('trxMetaInput').value = trx.metaToken || '';
   document.getElementById('trxCadence').value = trx.cadence || 'manual';
   document.getElementById('trxMetaExpiry').textContent = trxMetaExpiryText();
+  document.getElementById('trxHubUrl').value = trx.hubUrl || TRX_DEFAULT_HUB;
+  document.getElementById('trxHubTok').value = trx.hubToken || '';
+  document.getElementById('trxHubNote').textContent = trxHubNoteText();
+  document.getElementById('trxHubAdmin').classList.toggle('hidden', !(trxIsHub() && trxIsAdmin()));
+  document.getElementById('trxMintResult').classList.add('hidden');
+  trxRenderTokens();
   document.getElementById('trxSettings').classList.remove('hidden');
 };
 window.trxCloseSettings = function(){ document.getElementById('trxSettings').classList.add('hidden'); };
-window.trxSaveSettings = function(){
+window.trxSaveSettings = async function(){
   trx.key = document.getElementById('trxKeyInput').value.trim();
   const mt = document.getElementById('trxMetaInput').value.trim();
   if (mt !== trx.metaToken) { trx.metaToken = mt; trx.metaExpires = 0; }
   trx.cadence = document.getElementById('trxCadence').value;
-  trxSave(); trxRenderAccounts(); trxCloseSettings();
-  trxToast('Sources saved' + (trx.key ? ' · HikerAPI' : '') + (trx.metaToken ? ' · Meta' : ''));
+  const hu = document.getElementById('trxHubUrl').value.trim().replace(/\/+$/, ''), ht = document.getElementById('trxHubTok').value.trim();
+  const hubChanged = hu !== trx.hubUrl || ht !== trx.hubToken;
+  trx.hubUrl = hu; trx.hubToken = ht;
+  trxSave();
+  if (hubChanged) { trxHub = { role: '', name: '', state: null, lastErr: '' }; if (hu && ht) { try { await trxHubRefresh(); trxHubStartPoll(); } catch(e){ trxHub.lastErr = String(e.message || e); } } }
+  trxRenderAll(); trxCloseSettings();
+  trxToast(trxIsHub() ? 'Connected to hub as ' + trxHub.role : 'Settings saved' + (trx.key ? ' · HikerAPI' : '') + (trx.metaToken ? ' · Meta' : ''));
+  if (!trxIsHub() && hu && ht && trxHub.lastErr) trxToast('Hub: ' + trxHub.lastErr);
+};
+window.trxHubTest = async function(){
+  const hu = document.getElementById('trxHubUrl').value.trim().replace(/\/+$/, ''), ht = document.getElementById('trxHubTok').value.trim();
+  if (!hu || !ht) return trxToast('Hub URL and token needed');
+  const oldU = trx.hubUrl, oldT = trx.hubToken; trx.hubUrl = hu; trx.hubToken = ht;
+  try {
+    const s = await trxHubRefresh();
+    document.getElementById('trxHubNote').textContent = 'Connected as ' + s.role.toUpperCase() + (s.tokenName ? ' (' + s.tokenName + ')' : '') + ' · ' + s.accounts.length + ' accounts on hub';
+    document.getElementById('trxHubAdmin').classList.toggle('hidden', s.role !== 'admin');
+    trxRenderTokens();
+    trxToast('Hub OK — ' + s.role);
+  } catch(e){ trx.hubUrl = oldU; trx.hubToken = oldT; trxHub.role = ''; document.getElementById('trxHubNote').textContent = 'Hub test failed: ' + String(e.message || e); trxToast('Hub test failed'); }
+};
+window.trxHubPushLocal = async function(){
+  if (!trxIsHub() || !trxIsAdmin()) return trxToast('Connect as admin first');
+  let local = null; try { local = JSON.parse(localStorage.getItem(LS + '_local_backup') || 'null'); } catch(e){}
+  if (!local || !local.accounts || !local.accounts.length) return trxToast('No local data to push (nothing synced locally before connecting)');
+  try {
+    const r = await trxHubCall('POST', '/trending/import', { accounts: local.accounts, reels: local.reels || {}, snaps: local.snaps || {}, favs: local.favs || [] });
+    trxToast('Pushed to hub: ' + r.accounts + ' accounts · ' + r.reels + ' reels · ' + r.snaps + ' snapshots');
+    await trxHubRefresh(); trxRenderAll();
+  } catch(e){ trxToast(String(e.message || e)); }
+};
+window.trxHubSaveKeys = async function(){
+  if (!trxIsHub() || !trxIsAdmin()) return trxToast('Connect as admin first');
+  const body = { cadence: document.getElementById('trxCadence').value === 'manual' ? 'manual' : document.getElementById('trxCadence').value };
+  const hk = document.getElementById('trxKeyInput').value.trim(), mt = document.getElementById('trxMetaInput').value.trim();
+  if (hk) body.hikerKey = hk; if (mt) body.metaToken = mt;
+  try { await trxHubCall('PUT', '/trending/settings', body); trxToast('Keys saved on hub' + (hk ? ' · HikerAPI' : '') + (mt ? ' · Meta' : '')); await trxHubRefresh(); trxRenderAll(); }
+  catch(e){ trxToast(String(e.message || e)); }
+};
+window.trxMintToken = async function(){
+  const name = document.getElementById('trxNewTokName').value.trim();
+  if (!name) return trxToast('Give the token a name (the VA)');
+  try {
+    const r = await trxHubCall('POST', '/trending/tokens', { name });
+    const link = trx.hubUrl + '/trending/report.html#t=' + encodeURIComponent(r.token);
+    const box = document.getElementById('trxMintResult');
+    box.innerHTML = '<div style="color:var(--text);font-weight:700;letter-spacing:.1em;">TOKEN FOR ' + trxEsc(name.toUpperCase()) + ' — SHOWN ONCE</div>' +
+      '<div style="color:var(--text-dim);margin-top:4px;">token: <span style="color:var(--text);">' + trxEsc(r.token) + '</span></div>' +
+      '<div style="color:var(--text-dim);">magic link: <span style="color:var(--accent-hi,#9D4EDD);">' + trxEsc(link) + '</span></div>' +
+      '<div style="display:flex;gap:6px;margin-top:8px;"><button class="trx-btn" onclick="navigator.clipboard.writeText(' + JSON.stringify(link).replace(/"/g, '&quot;') + ').then(()=>trxToast(\'Magic link copied — send it privately\'))">COPY MAGIC LINK</button><button class="trx-btn" onclick="navigator.clipboard.writeText(' + JSON.stringify(r.token).replace(/"/g, '&quot;') + ').then(()=>trxToast(\'Token copied\'))">COPY TOKEN</button></div>';
+    box.classList.remove('hidden');
+    document.getElementById('trxNewTokName').value = '';
+    trxRenderTokens();
+  } catch(e){ trxToast(String(e.message || e)); }
+};
+window.trxRevokeToken = async function(id){
+  try { await trxHubCall('DELETE', '/trending/tokens/' + encodeURIComponent(id)); trxToast('Token revoked'); trxRenderTokens(); }
+  catch(e){ trxToast(String(e.message || e)); }
 };
 window.trxTestMeta = async function(){
   const t = document.getElementById('trxMetaInput').value.trim();
@@ -2328,11 +2569,10 @@ window.trxOpenReel = function(pk, id){
   const r = trxFindReel(pk, id); if (!r) return;
   trxModalRef = { pk, id };
   const a = trx.accounts.find(x => x.pk === pk);
-  document.getElementById('trxRPrev').innerHTML = r.trial
-    ? '<div class="trx-trialc"><div class="trx-trialb" style="font-size:11px;padding:6px 14px;">TRIAL</div><div class="trx-nothumb">NO THUMBNAIL RETURNED</div></div>'
-    : (r.thumb ? '<img src="' + trxEsc(r.thumb) + '" onerror="this.remove()">' : '');
+  trxCarIdx = 0;
+  trxRenderPreview(r);
   document.getElementById('trxRHandle').textContent = '@' + (a ? a.username : '');
-  document.getElementById('trxRDate').textContent = r.ts ? 'POSTED ' + new Date(r.ts).toLocaleDateString() : '';
+  document.getElementById('trxRDate').textContent = ((r.type || 'reel').toUpperCase()) + (r.ts ? ' · POSTED ' + new Date(r.ts).toLocaleDateString() : '') + (r.caption ? ' · ' + r.caption.slice(0, 90).replace(/\s+/g, ' ') + (r.caption.length > 90 ? '…' : '') : '');
   const row = (l, v, tag) => '<div class="trx-mrow"><div class="mt"><span class="ml">' + l + '</span><span class="mv">' + (typeof v === 'string' ? v : trxFmt(v)) + '</span></div>' + (tag ? '<div class="trx-mtag">' + tag + '</div>' : '') + '</div>';
   const isMeta = r.source === 'meta';
   const pct = r.views ? Math.round(r.igViews / r.views * 100) : 100;
@@ -2349,10 +2589,44 @@ window.trxOpenReel = function(pk, id){
   }
   const openUrl = u => { const inv = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke; if (inv) inv('open_url', { url: u }); else window.open(u, '_blank'); };
   document.getElementById('trxROpen').onclick = () => (r.permalink || r.code) ? openUrl(r.permalink || ('https://www.instagram.com/reel/' + r.code + '/')) : trxToast('No permalink code in response');
-  document.getElementById('trxRDownload').onclick = () => r.videoUrl ? openUrl(r.videoUrl) : trxToast('No video URL in response — sync again or open the link');
+  document.getElementById('trxRDownload').onclick = () => trxDownload(r, pk);
   trxSyncModalFav();
   document.getElementById('trxReelModal').classList.remove('hidden');
 };
+let trxCarIdx = 0;
+function trxRenderPreview(r){
+  const prev = document.getElementById('trxRPrev');
+  const type = r.type || 'reel';
+  if (type === 'carousel' && r.media && r.media.length) {
+    trxCarIdx = Math.max(0, Math.min(trxCarIdx, r.media.length - 1));
+    const it = r.media[trxCarIdx];
+    prev.innerHTML = '<div class="trx-car">' + (it.video ? '<video src="' + trxEsc(it.video) + '" controls playsinline poster="' + trxEsc(it.img || '') + '"></video>' : (it.img ? '<img src="' + trxEsc(it.img) + '" onerror="this.remove()">' : '')) + '</div>' +
+      (r.media.length > 1 ? '<button class="trx-carnav l" onclick="event.stopPropagation();trxCar(-1)">‹</button><button class="trx-carnav r" onclick="event.stopPropagation();trxCar(1)">›</button><div class="trx-cardots">' + r.media.map((_, i) => '<span class="' + (i === trxCarIdx ? 'on' : '') + '"></span>').join('') + '</div>' : '');
+    return;
+  }
+  if (r.videoUrl) {
+    prev.innerHTML = '<video src="' + trxEsc(r.videoUrl) + '" controls playsinline autoplay muted loop' + (r.thumb ? ' poster="' + trxEsc(r.thumb) + '"' : '') + '></video>' + (r.trial ? '<div class="trx-trialb" style="position:absolute;top:8px;left:8px;z-index:2;">TRIAL</div>' : '');
+    return;
+  }
+  prev.innerHTML = r.trial
+    ? '<div class="trx-trialc"><div class="trx-trialb" style="font-size:11px;padding:6px 14px;">TRIAL</div><div class="trx-nothumb">NO THUMBNAIL RETURNED</div></div>'
+    : (r.thumb ? '<img src="' + trxEsc(r.thumb) + '" onerror="this.remove()">' : '');
+}
+window.trxCar = function(d){ if (!trxModalRef) return; const r = trxFindReel(trxModalRef.pk, trxModalRef.id); if (!r || !r.media) return; trxCarIdx = (trxCarIdx + d + r.media.length) % r.media.length; trxRenderPreview(r); };
+async function trxDownload(r, pk){
+  const openUrl = u => { const inv = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke; if (inv) inv('open_url', { url: u }); else window.open(u, '_blank'); };
+  if (trxIsHub()) {
+    try {
+      const idx = (r.type === 'carousel') ? trxCarIdx : 0;
+      const l = await trxHubCall('POST', '/trending/download-link', { pk, id: r.id, idx });
+      openUrl(trx.hubUrl + l.url); trxToast('Download started in your browser' + (r.type === 'carousel' ? ' — item ' + (idx + 1) : ''));
+    } catch(e){ trxToast(String(e.message || e)); }
+    return;
+  }
+  const src = r.type === 'carousel' && r.media && r.media[trxCarIdx] ? (r.media[trxCarIdx].video || r.media[trxCarIdx].img) : (r.videoUrl || r.thumb);
+  if (!src) return trxToast('No media URL stored — sync again');
+  openUrl(src);
+}
 function trxSyncModalFav(){
   if (!trxModalRef) return;
   const faved = trx.favs.includes(trxModalRef.pk + ':' + trxModalRef.id);
@@ -2360,7 +2634,7 @@ function trxSyncModalFav(){
   document.getElementById('trxRFavLabel').textContent = faved ? 'IN FAVORITES — CLICK TO REMOVE' : 'ADD TO FAVORITES';
 }
 window.trxToggleFavModal = function(){ if (trxModalRef) trxToggleFav(trxModalRef.pk, trxModalRef.id); };
-window.trxCloseReel = function(){ document.getElementById('trxReelModal').classList.add('hidden'); trxModalRef = null; };
+window.trxCloseReel = function(){ document.getElementById('trxReelModal').classList.add('hidden'); document.getElementById('trxRPrev').innerHTML = ''; trxModalRef = null; };
 window.trxViewCreator = function(){
   if (!trxModalRef) return;
   const pk = trxModalRef.pk;
@@ -2375,9 +2649,9 @@ window.trxViewCreator = function(){
 window.trxCsv = function(){
   if (!trxSel) return;
   const a = trx.accounts.find(x => x.pk === trxSel);
-  const rows = [['handle','source','reel_id','date','trial','total_views','ig_views','fb_views','likes','comments','shares','saves','reach','avg_watch_s','link']];
+  const rows = [['handle','source','type','reel_id','date','trial','total_views','ig_views','fb_views','likes','comments','shares','saves','reach','avg_watch_s','link']];
   [...(trx.reels[trxSel] || [])].sort((x, y) => y.views - x.views).forEach(r => {
-    rows.push(['@' + a.username, r.source || 'hiker', r.id, r.ts ? new Date(r.ts).toISOString().slice(0, 10) : '', r.trial ? 'TRIAL' : '', r.views, r.igViews, r.fb, r.likes, r.comments, r.shares, r.saves ?? '', r.reach ?? '', r.watch ? (r.watch / 1000).toFixed(1) : '', r.permalink || (r.code ? 'https://www.instagram.com/reel/' + r.code + '/' : '')]);
+    rows.push(['@' + a.username, r.source || 'hiker', r.type || 'reel', r.id, r.ts ? new Date(r.ts).toISOString().slice(0, 10) : '', r.trial ? 'TRIAL' : '', r.views, r.igViews, r.fb, r.likes, r.comments, r.shares, r.saves ?? '', r.reach ?? '', r.watch ? (r.watch / 1000).toFixed(1) : '', r.permalink || (r.code ? 'https://www.instagram.com/reel/' + r.code + '/' : '')]);
   });
   const csv = rows.map(r => r.join(',')).join('\n');
   navigator.clipboard.writeText(csv).then(() => trxToast('CSV copied — paste into Sheets for the VAs'), () => trxToast('Clipboard blocked'));
@@ -2417,8 +2691,16 @@ document.querySelectorAll('#trxRangeChips .trx-rchip').forEach(c => c.addEventLi
 }));
 
 window.trxSyncAccount = trxSyncAccount;
-window.trxOnEnterTab = function(){
-  trxLoad(); trxRenderAll();
+window.trxOnEnterTab = async function(){
+  trxLoad();
+  if (trx.hubUrl && trx.hubToken) {
+    trxStatus('Connecting to hub…');
+    try { await trxHubRefresh(); trxHubStartPoll(); trxStatus(trxHubStatusLine()); }
+    catch(e){ trxHub.role = ''; trxHub.lastErr = String(e.message || e); trxStatus('HUB OFFLINE — ' + trxHub.lastErr + ' · showing local data'); trxLoad(); }
+    trxRenderAll();
+    return;
+  }
+  trxRenderAll();
   if (trx.key && trx.cadence !== 'manual' && trx.accounts.length) {
     const iv = trx.cadence === '6h' ? 6 * 3600e3 : 24 * 3600e3;
     const stale = trx.accounts.filter(a => Date.now() - (a.lastSync || 0) > iv);
@@ -8379,7 +8661,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.10.0';
+const APP_VERSION = '4.11.0';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -17259,6 +17541,25 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.11.0',
+    date: '2026-08-16',
+    title: 'TRENDING Hub — one shared sync for the whole team, VA web report, previews, downloads, posts + carousels',
+    sections: [
+      { h: '🛰 Trending Hub (shared sync)', items: [
+        '🔗 <b>One sync, many readers.</b> A small hub service on the studio server now does the HikerAPI / Meta pulls on a schedule — once. Every install and every VA reads the stored result, so extra people cost <b>zero extra requests</b>. Keys live on the hub, never on laptops.',
+        '⚙ <b>Settings → HUB:</b> paste the hub URL + your token. Admin token = full control; <b>viewer tokens</b> (minted in the new TEAM section, one per VA) can read + favorite + download but never add accounts or trigger paid syncs. Revoke any VA in one click.',
+        '🌐 <b>VA web report:</b> a magic link (<code>…/trending/report.html#t=…</code>) opens the same TRENDING view in any browser — no install. Auto-refreshes every 2 minutes.',
+        '⬆ <b>PUSH LOCAL DATA TO HUB</b> migrates what you already synced on this Mac so nobody re-pays for the backfill.',
+      ]},
+      { h: '🖼 Previews, downloads, posts + carousels', items: [
+        '▶ <b>In-app previews:</b> reels and trial reels play right in the modal; posts show the image; <b>carousels</b> swipe through every slide (‹ › + dots), videos included.',
+        '⬇ <b>Real downloads for VAs</b> — the hub streams the file as an attachment through a short-lived signed link (works from the report page and the app; carousel downloads grab the slide you\'re on).',
+        '▦ <b>Posts and carousels</b> are now pulled alongside reels (HikerAPI <code>/user/medias</code>, Meta children). New filter tabs: <b>REELS · POSTS · CAROUSELS</b>. Type shown on each card; TOP ALL-TIME and AVG VIEWS stay reels-only.',
+        '🏷 <b>IG / FB dominant tag:</b> crossposted reels show which platform won the views — <b>IG</b> (purple) or <b>FB</b> (blue) bright, the other dimmed. IG-only reels stay untagged. Meta insights now use the right metric set per media type.',
+      ]},
+    ],
+  },
   {
     version: '4.10.0',
     date: '2026-08-16',

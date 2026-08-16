@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Seraphim Studio — Trending</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#050507;--surface:#0A0A12;--surface-2:#12121C;--surface-3:#1A1A28;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.22);--text:#fff;--text-dim:#A8A8B8;--text-faint:#5A5A6E;--accent:#7B2CBF;--accent-hi:#9D4EDD;--accent-dim:#5A1F8F;--glow:rgba(123,44,191,.5);--green:#00FF88;--red:#FF3B5C;--gold:#FFD86B;--shimmer:linear-gradient(110deg,#7B2CBF 0%,#C300FF 50%,#fff 100%);}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Manrope',sans-serif;font-size:13px;line-height:1.5;min-height:100vh;display:flex;flex-direction:column}
+button{font-family:inherit}
+img{display:block;max-width:100%}
+.hidden{display:none!important}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px clamp(16px,3vw,40px);border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#7B2CBF,#C300FF);box-shadow:0 0 16px var(--glow)}
+.logo h1{font-family:'Antonio',sans-serif;font-weight:700;font-size:17px;letter-spacing:.1em;margin:0}
+.meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);letter-spacing:.06em}
+.meta b{color:var(--text-dim);font-weight:500}
+main{flex:1;display:flex;flex-direction:column;min-height:0}
+.subtabs{display:flex;padding:0 clamp(16px,3vw,40px);border-bottom:1px solid var(--border)}
+.subtab{background:transparent;border:none;padding:11px 16px;font-family:'Antonio',sans-serif;font-size:12px;font-weight:700;letter-spacing:.16em;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;display:flex;align-items:center;gap:7px}
+.subtab.active{color:var(--text);border-bottom-color:var(--accent)}
+.count{font-size:9px;background:var(--surface-3);color:var(--text-dim);padding:2px 6px;border-radius:8px;font-family:'JetBrains Mono',monospace}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;padding:16px clamp(16px,3vw,40px) 30px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:4px;cursor:pointer;position:relative;display:flex;flex-direction:column;transition:border-color .15s}
+.card:hover{border-color:var(--accent)}
+.card.mine::before{content:'';position:absolute;inset:0 0 auto 0;height:2px;background:var(--shimmer)}
+.pin{position:absolute;top:8px;right:8px;background:transparent;border:none;font-size:15px;color:var(--text-faint);cursor:pointer;line-height:1}
+.pin.on{color:var(--gold)}
+.chead{display:flex;align-items:center;gap:12px;padding:13px}
+.av{width:48px;height:48px;border-radius:50%;border:2px solid var(--accent);background:linear-gradient(135deg,#2b0a45,var(--accent));display:flex;align-items:center;justify-content:center;font-family:'Antonio',sans-serif;font-size:15px;font-weight:700;text-transform:uppercase;flex-shrink:0}
+.handle{font-family:'Antonio',sans-serif;font-size:15px;font-weight:700;letter-spacing:.04em;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.name{font-size:11px;color:var(--text-dim);margin-top:2px}
+.pill{font-size:8px;background:var(--shimmer);color:#fff;padding:2px 6px;border-radius:8px;letter-spacing:.1em;font-family:'JetBrains Mono',monospace}
+.src{font-size:7px;font-family:'JetBrains Mono',monospace;letter-spacing:.14em;padding:1px 5px;border-radius:6px;border:1px solid var(--border-strong);color:var(--text-faint);vertical-align:middle}
+.src.meta{border-color:#1877F2;color:#5c9eff}
+.stats{padding:0 13px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:rgba(255,255,255,.03);border-radius:2px;padding:9px}
+.stat .l{font-size:9px;color:var(--text-faint);letter-spacing:.12em;margin-bottom:3px;font-family:'JetBrains Mono',monospace}
+.stat .v{font-family:'Antonio',sans-serif;font-size:17px;font-weight:700;line-height:1}
+.purple{color:var(--accent-hi)}
+.sync{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);padding:8px 13px;border-top:1px solid var(--border)}
+.detail{display:flex;flex-direction:column;flex:1;min-height:0}
+.back{display:flex;align-items:center;gap:6px;background:transparent;border:none;color:var(--text-dim);padding:12px clamp(16px,3vw,40px) 6px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;align-self:flex-start}
+.back:hover{color:var(--accent-hi)}
+.dhead{display:flex;align-items:center;gap:16px;padding:6px clamp(16px,3vw,40px) 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.dhead .av{width:64px;height:64px;font-size:20px}
+.dinfo{flex:1;min-width:160px}
+.dhandle{font-family:'Antonio',sans-serif;font-size:21px;font-weight:700;letter-spacing:.04em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dbio{font-size:11px;color:var(--text-dim);margin-top:3px}
+.dstats{display:flex;gap:8px;flex-wrap:wrap}
+.dstat{background:rgba(255,255,255,.03);border:1px solid var(--border);padding:8px 12px;border-radius:3px;min-width:96px}
+.growth{padding:12px clamp(16px,3vw,40px);border-bottom:1px solid var(--border)}
+.ghead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px}
+.ghead h3{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.18em;margin:0;color:var(--text-dim)}
+.ghead h3 b{color:var(--text)}
+.gtotal{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--green);letter-spacing:.06em;font-weight:700}
+.chips{display:flex;gap:4px}
+.chip{background:var(--surface);border:1px solid var(--border);color:var(--text-dim);padding:4px 11px;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:2px;cursor:pointer;letter-spacing:.08em}
+.chip.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
+.chart{width:100%;height:110px;display:block}
+.gempty{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);padding:18px 0;text-align:center;letter-spacing:.06em}
+.bar{cursor:pointer}.bar:hover{filter:brightness(1.5)}
+.tip{position:fixed;pointer-events:none;background:var(--surface-3);border:1px solid var(--accent);padding:7px 12px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:10px;z-index:100;white-space:nowrap}
+.tip b{color:var(--accent-hi)}.tip .g{color:var(--green)}
+.filters{display:flex;padding:0 clamp(16px,3vw,40px);border-bottom:1px solid var(--border);overflow-x:auto;align-items:center;gap:0}
+.ftab{background:transparent;border:none;padding:12px 14px;font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.ftab.active{color:var(--text);border-bottom-color:var(--accent)}
+.flabel{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.16em;margin-left:12px}
+.sel{background:var(--surface);border:1px solid var(--border);border-radius:2px;padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text);outline:none;cursor:pointer;margin-left:10px}
+.reels{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;padding:12px clamp(16px,3vw,40px) 16px}
+.reel{position:relative;aspect-ratio:9/16;background:var(--surface);border-radius:3px;overflow:hidden;cursor:pointer;border:1px solid transparent}
+.reel:hover{border-color:var(--accent)}
+.reel img{width:100%;height:100%;object-fit:cover}
+.shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.78) 0%,transparent 38%,transparent 68%,rgba(0,0,0,.45) 100%);pointer-events:none}
+.rtop{position:absolute;top:7px;left:7px;right:7px;display:flex;justify-content:space-between;align-items:center;z-index:2;gap:6px}
+.rtop .lft{display:flex;align-items:center;gap:5px}
+.rdate{font-family:'JetBrains Mono',monospace;font-size:9px;color:rgba(255,255,255,.75);text-shadow:0 1px 3px rgba(0,0,0,.8)}
+.rank{font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#050507}
+.r1{background:var(--gold)}.r2{background:#C8C8D8}.r3{background:#B08050}
+.fav{background:rgba(0,0,0,.45);border:none;color:rgba(255,255,255,.75);width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
+.fav.on{color:var(--gold)}
+.fbtag{font-size:8px;font-family:'JetBrains Mono',monospace;background:#1877F2;color:#fff;padding:2px 5px;border-radius:6px;font-weight:700}
+.igtag{font-size:8px;font-family:'JetBrains Mono',monospace;background:linear-gradient(90deg,#7B2CBF,#C300FF);color:#fff;padding:2px 5px;border-radius:6px;font-weight:700}
+.fbtag.dim,.igtag.dim{opacity:.55;font-weight:500}
+.typetag{font-size:8px;font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.25);color:#fff;padding:2px 5px;border-radius:6px;letter-spacing:.08em}
+.reel.post,.reel.carousel{aspect-ratio:4/5}
+.rprev video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+.rprev .car{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000}
+.rprev .car img,.rprev .car video{width:100%;height:100%;object-fit:contain}
+.carnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.3);color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;z-index:3}
+.carnav.l{left:8px}.carnav.r{right:8px}
+.cardots{position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:5px;z-index:3}
+.cardots span{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.35)}.cardots span.on{background:#fff}
+.rhandle{position:absolute;bottom:24px;left:7px;z-index:2;font-family:'JetBrains Mono',monospace;font-size:8px;color:rgba(255,255,255,.6);text-shadow:0 1px 3px rgba(0,0,0,.8)}
+.rstats{position:absolute;bottom:7px;left:7px;right:7px;display:flex;justify-content:space-between;color:#fff;font-size:9px;font-weight:600;z-index:2;text-shadow:0 1px 3px rgba(0,0,0,.7);font-family:'JetBrains Mono',monospace}
+.reel.trial{border:1px dashed var(--accent-dim);background:rgba(123,44,191,.06)}
+.trialc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;z-index:1}
+.trialb{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.22em;color:#fff;background:var(--accent);padding:4px 10px;border-radius:3px}
+.nothumb{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-faint);letter-spacing:.14em}
+.empty{grid-column:1/-1;border:2px dashed var(--border-strong);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--text-faint);min-height:170px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.06em;text-align:center;padding:16px}
+.export{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px clamp(16px,3vw,40px);border-top:1px solid var(--border);flex-wrap:wrap}
+.note{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:.05em}
+.btn{border-radius:2px;padding:8px 16px;font-family:'Antonio',sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;cursor:pointer;border:1px solid var(--border-strong);background:var(--surface);color:var(--text-dim);text-decoration:none;display:inline-block}
+.btn:hover{color:var(--text);border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.veil{position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;z-index:50;padding:12px}
+.rmodal{width:min(660px,96vw);background:var(--surface);border:1px solid var(--accent-dim);border-radius:6px;overflow:hidden;display:grid;grid-template-columns:minmax(150px,220px) 1fr}
+@media(max-width:560px){.rmodal{grid-template-columns:1fr}.rprev{max-height:40vh}}
+.rprev{aspect-ratio:9/16;position:relative;background:rgba(255,255,255,.03);overflow:hidden}
+.rprev img{width:100%;height:100%;object-fit:cover}
+.rinfo{display:flex;flex-direction:column;padding:16px;gap:12px;min-width:0}
+.rmtop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.rmhandle{font-family:'Antonio',sans-serif;font-size:16px;font-weight:700}
+.rmdate{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);margin-top:3px}
+.x{background:transparent;border:none;color:var(--text-faint);font-size:16px;cursor:pointer}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.metrics.two{grid-template-columns:1fr 1fr}
+.mrow{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:3px;padding:8px 11px}
+.mt{display:flex;justify-content:space-between;align-items:center}
+.ml{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--text-faint)}
+.mv{font-family:'Antonio',sans-serif;font-size:15px;font-weight:700}
+.mtag{font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:.1em;color:var(--text-faint);margin-top:2px}
+.split{display:flex;height:6px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.06)}
+.split span{display:block}.split .ig{background:linear-gradient(90deg,var(--accent),var(--accent-hi))}.split .fb{background:#1877F2}
+.sleg{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);margin-top:4px}
+.igk{color:var(--accent-hi)}.fbk{color:#5c9eff}
+.ract{display:flex;gap:8px;margin-top:auto}.ract .btn{flex:1;text-align:center}
+.favrow{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);cursor:pointer;user-select:none}
+.favrow .s{font-size:15px;color:var(--text-faint)}.favrow.on .s{color:var(--gold)}
+.gate{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+.gate .box{width:min(420px,92vw);background:var(--surface);border:1px solid var(--accent-dim);border-radius:6px;padding:22px;display:flex;flex-direction:column;gap:12px}
+.gate h2{font-family:'Antonio',sans-serif;font-size:14px;letter-spacing:.18em;margin:0}
+.gate input{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:2px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none}
+.gate input:focus{border-color:var(--accent)}
+.gate p{font-size:11px;color:var(--text-faint);margin:0;line-height:1.6}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface-3);border:1px solid var(--accent);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;padding:10px 18px;border-radius:3px;transition:transform .25s;z-index:99;letter-spacing:.04em}
+.toast.show{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-mark"></div><h1>SERAPHIM STUDIO · TRENDING</h1></div>
+  <div class="meta" id="hdrMeta"></div>
+</header>
+<main>
+  <section id="gate" class="gate">
+    <div class="box">
+      <h2>VIEWER ACCESS</h2>
+      <p>Paste the token you were given. It's remembered on this device — you won't be asked again.</p>
+      <input id="gateTok" placeholder="sv_…" autocomplete="off">
+      <button class="btn primary" onclick="gateGo()">OPEN REPORT</button>
+      <p id="gateErr" style="color:var(--red)"></p>
+    </div>
+  </section>
+
+  <section id="home" class="hidden" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+    <div class="subtabs">
+      <button class="subtab active" id="tabAcc" onclick="setTab('accounts')">ACCOUNTS <span class="count" id="accCount">0</span></button>
+      <button class="subtab" id="tabFav" onclick="setTab('favs')"><span style="color:var(--gold)">★</span> FAVORITES <span class="count" id="favCount">0</span></button>
+      <span class="meta" id="syncMeta" style="margin-left:auto;padding:0 8px;align-self:center"></span>
+    </div>
+    <div class="grid" id="accGrid"></div>
+    <div class="reels hidden" id="favGrid"></div>
+  </section>
+
+  <section id="detail" class="detail hidden">
+    <button class="back" onclick="closeDetail()">← ACCOUNTS</button>
+    <div class="dhead" id="dhead"></div>
+    <div class="growth">
+      <div class="ghead">
+        <h3><b>ACCOUNT GROWTH</b> — FOLLOWERS</h3>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="gtotal" id="gtotal"></span>
+          <div class="chips" id="rangeChips"><button class="chip" data-r="7">7D</button><button class="chip" data-r="15">15D</button><button class="chip active" data-r="30">30D</button></div>
+        </div>
+      </div>
+      <svg class="chart" id="chart" viewBox="0 0 1000 110" preserveAspectRatio="none"></svg>
+      <div class="gempty hidden" id="gempty">GROWTH CHART BUILDS AS SYNCS ACCUMULATE</div>
+    </div>
+    <div class="filters">
+      <button class="ftab active" data-f="all">ALL <span class="count" id="allCount">0</span></button>
+      <button class="ftab" data-f="top">TOP ALL-TIME</button>
+      <button class="ftab" data-f="trial">◌ TRIALS <span class="count" id="trialCount">0</span></button>
+      <button class="ftab" data-f="reels">REELS</button>
+      <button class="ftab" data-f="posts">POSTS</button>
+      <button class="ftab" data-f="carousels">CAROUSELS</button>
+      <select class="sel" id="sort"><option value="recent">SORT: RECENT</option><option value="views">SORT: VIEWS</option><option value="shares">SORT: SHARES</option><option value="likes">SORT: LIKES</option><option value="comments">SORT: COMMENTS</option><option value="saves">SORT: SAVES (META)</option></select>
+      <span class="flabel">VIEWS</span>
+      <div class="chips" id="viewsSrc" style="margin-left:6px"><button class="chip active" data-s="total">TOTAL</button><button class="chip" data-s="ig">IG</button><button class="chip" data-s="fb">FB</button></div>
+    </div>
+    <div class="reels" id="reelGrid"></div>
+    <div class="export">
+      <span class="note" id="exportNote"></span>
+      <div style="display:flex;gap:8px;"><a class="btn" id="csvLink" href="#" onclick="return downloadCsv()">⬇ CSV</a></div>
+    </div>
+  </section>
+</main>
+
+<div class="veil hidden" id="rmodalVeil" onclick="if(event.target===this)closeReel()">
+  <div class="rmodal">
+    <div class="rprev" id="rprev"></div>
+    <div class="rinfo">
+      <div class="rmtop"><div><div class="rmhandle" id="rhandle"></div><div class="rmdate" id="rdate"></div></div><button class="x" onclick="closeReel()">✕</button></div>
+      <div class="metrics" id="rviews"></div>
+      <div id="rsplit"></div>
+      <div class="metrics two" id="rmetrics"></div>
+      <div class="favrow" id="rfav" onclick="toggleFavModal()"><span class="s">★</span><span id="rfavLabel">ADD TO FAVORITES</span></div>
+      <div class="ract"><a class="btn" id="rdl" href="#" target="_blank" rel="noopener">⬇ DOWNLOAD</a><a class="btn primary" id="ropen" href="#" target="_blank" rel="noopener">↗ OPEN LINK</a></div>
+    </div>
+  </div>
+</div>
+<div class="tip hidden" id="tip"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+const HUB = location.origin;
+const LS_TOK = 'trx_report_token';
+let TOKEN = '', S = null, sel = null, filter = 'all', sortKey = 'recent', viewMode = 'total', range = 30, tab = 'accounts', modalRef = null;
+
+// magic link: #t=<token> → store, strip from URL
+(function(){ const m = location.hash.match(/[#&]t=([^&]+)/); if (m) { localStorage.setItem(LS_TOK, decodeURIComponent(m[1])); history.replaceState(null, '', location.pathname); } TOKEN = localStorage.getItem(LS_TOK) || ''; })();
+
+const fmt = n => { n = +n || 0; return n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(n<1e4?1:0)+'K' : String(n); };
+const vv = r => viewMode === 'ig' ? (r.igViews||0) : viewMode === 'fb' ? (r.fb||0) : (r.views||0);
+const dt = ts => new Date(ts).toLocaleDateString('en-US',{month:'short',day:'2-digit'}).toUpperCase();
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let toastT; function toast(m){ const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2400); }
+
+async function api(path, opts){
+  const r = await fetch(HUB + path, Object.assign({ headers: Object.assign({ 'Authorization': 'Bearer ' + TOKEN }, (opts && opts.json) ? { 'content-type': 'application/json' } : {}) , method: (opts && opts.method) || 'GET', body: (opts && opts.json) ? JSON.stringify(opts.json) : undefined }));
+  if (r.status === 401) { localStorage.removeItem(LS_TOK); TOKEN = ''; showGate('Token invalid or revoked — ask for a new link.'); throw new Error('unauthorized'); }
+  if (!r.ok) { let m = 'HTTP ' + r.status; try { m = (await r.json()).detail || m; } catch(e){} throw new Error(m); }
+  return r.json();
+}
+function showGate(err){ document.getElementById('gate').classList.remove('hidden'); document.getElementById('home').classList.add('hidden'); document.getElementById('detail').classList.add('hidden'); document.getElementById('gateErr').textContent = err || ''; }
+window.gateGo = async function(){ const t = document.getElementById('gateTok').value.trim(); if (!t) return; TOKEN = t; localStorage.setItem(LS_TOK, t); await load(); };
+document.getElementById('gateTok').addEventListener('keydown', e => { if (e.key === 'Enter') gateGo(); });
+
+async function load(){
+  if (!TOKEN) return showGate('');
+  try { S = await api('/trending/state'); } catch(e){ if (e.message !== 'unauthorized') showGate(String(e.message)); return; }
+  document.getElementById('gate').classList.add('hidden');
+  document.getElementById('home').classList.remove('hidden');
+  document.getElementById('hdrMeta').innerHTML = (S.tokenName ? '<b>' + esc(S.tokenName) + '</b> · ' : '') + S.role.toUpperCase() + ' · HUB v' + esc(S.hubVersion);
+  renderAll();
+}
+function renderAll(){ renderAccounts(); if (tab === 'favs') renderFavs(); if (sel) renderDetail(); }
+
+function accCard(a){
+  const reels = S.reels[a.pk] || [];
+  return '<div class="card' + (a.mine ? ' mine' : '') + '" onclick="openDetail(\'' + esc(a.pk) + '\')">' +
+    '<button class="pin' + (a.pinned ? ' on' : '') + '" onclick="event.stopPropagation();togglePin(\'' + esc(a.pk) + '\')">' + (a.pinned ? '★' : '☆') + '</button>' +
+    '<div class="chead"><div class="av">' + esc((a.username || '?').slice(0,2)) + '</div><div><div class="handle">@' + esc(a.username) + (a.mine ? ' <span class="pill">MINE</span>' : '') + '</div>' +
+    '<div class="name">' + esc(a.fullName || '') + ' <span class="src ' + (a.source === 'meta' ? 'meta' : '') + '">' + (a.source === 'meta' ? 'META' : 'HIKER') + '</span></div></div></div>' +
+    '<div class="stats"><div class="stat"><div class="l">FOLLOWERS</div><div class="v">' + fmt(a.followers) + '</div></div>' +
+    '<div class="stat"><div class="l">AVG REEL VIEWS</div><div class="v">' + fmt(a.avgViews) + '</div></div>' +
+    '<div class="stat"><div class="l">REELS</div><div class="v">' + reels.length + '</div></div>' +
+    '<div class="stat"><div class="l">TRIALS</div><div class="v purple">' + (a.trialCount || 0) + '</div></div></div>' +
+    '<div class="sync">' + (a.lastSync ? 'SYNCED ' + new Date(a.lastSync).toLocaleString() : 'NEVER SYNCED') + '</div></div>';
+}
+function renderAccounts(){
+  const sorted = [...S.accounts].sort((a,b) => (b.pinned?1:0) - (a.pinned?1:0));
+  document.getElementById('accGrid').innerHTML = sorted.length ? sorted.map(accCard).join('') : '<div class="empty"><span>NO ACCOUNTS TRACKED YET — THE ADMIN ADDS THEM FROM SERAPHIM STUDIO</span></div>';
+  document.getElementById('accCount').textContent = S.accounts.length;
+  document.getElementById('favCount').textContent = S.favs.length;
+  document.getElementById('syncMeta').innerHTML = (S.sync && S.sync.busy) ? '<b>SYNCING…</b> ' + esc(S.sync.status) : (S.lastSync ? 'LAST SYNC <b>' + new Date(S.lastSync).toLocaleString() + '</b> · every ' + esc(S.cadence) : 'NO SYNC YET');
+}
+function reelCard(pk, r, opts){
+  opts = opts || {};
+  const faved = S.favs.includes(pk + ':' + r.id);
+  const star = '<button class="fav' + (faved ? ' on' : '') + '" onclick="event.stopPropagation();toggleFav(\'' + esc(pk) + '\',\'' + esc(r.id) + '\')">★</button>';
+  const rank = opts.rank ? '<div class="rank r' + opts.rank + '">' + opts.rank + '</div>' : '';
+  const plat = r.fb > 0 ? ((r.igViews||0) >= r.fb ? '<span class="igtag">IG</span><span class="fbtag dim">FB</span>' : '<span class="fbtag">FB</span><span class="igtag dim">IG</span>') : '';
+  const type = r.type || 'reel';
+  const typeTag = type === 'carousel' ? '<span class="typetag">▦ ' + ((r.media||[]).length || '') + '</span>' : type === 'post' ? '<span class="typetag">POST</span>' : type === 'video' ? '<span class="typetag">VIDEO</span>' : '';
+  const handle = opts.handle ? '<div class="rhandle">@' + esc(opts.handle) + '</div>' : '';
+  const stats = (type === 'reel' || type === 'video')
+    ? '<div class="rstats"><span>▶ ' + fmt(vv(r)) + '</span><span>♥ ' + fmt(r.likes) + '</span><span>↗ ' + fmt(r.shares) + '</span></div>'
+    : '<div class="rstats"><span>♥ ' + fmt(r.likes) + '</span><span>💬 ' + fmt(r.comments) + '</span>' + (r.saves ? '<span>🔖 ' + fmt(r.saves) + '</span>' : '<span></span>') + '</div>';
+  const top = '<div class="rtop"><span class="lft">' + star + rank + plat + typeTag + '</span><span class="rdate">' + (r.ts ? dt(r.ts) : '') + '</span></div>';
+  if (r.trial) return '<div class="reel trial" onclick="openReel(\'' + esc(pk) + '\',\'' + esc(r.id) + '\')"><div class="shade"></div>' + top + '<div class="trialc"><div class="trialb">TRIAL</div><div class="nothumb">NO THUMBNAIL</div></div>' + handle + stats + '</div>';
+  return '<div class="reel ' + type + '" onclick="openReel(\'' + esc(pk) + '\',\'' + esc(r.id) + '\')">' + (r.thumb ? '<img loading="lazy" referrerpolicy="no-referrer" src="' + esc(r.thumb) + '" onerror="this.remove()">' : '') + '<div class="shade"></div>' + top + handle + stats + '</div>';
+}
+function renderReels(){
+  const all = S.reels[sel] || [];
+  let list = [...all];
+  document.getElementById('allCount').textContent = all.length;
+  document.getElementById('trialCount').textContent = all.filter(r => r.trial).length;
+  const tOf = r => r.type || 'reel';
+  if (filter === 'trial') list = list.filter(r => r.trial);
+  else if (filter === 'reels') list = list.filter(r => tOf(r) === 'reel' || tOf(r) === 'video');
+  else if (filter === 'posts') list = list.filter(r => tOf(r) === 'post');
+  else if (filter === 'carousels') list = list.filter(r => tOf(r) === 'carousel');
+  else if (filter === 'top') list = list.filter(r => !r.trial && (tOf(r) === 'reel' || tOf(r) === 'video'));
+  if (viewMode === 'fb') list = list.filter(r => r.fb > 0);
+  const ranked = all.filter(r => !r.trial && (tOf(r) === 'reel' || tOf(r) === 'video')).sort((a,b) => vv(b) - vv(a)).map(r => r.id);
+  if (filter === 'top' || sortKey !== 'recent') { const k = sortKey === 'recent' ? 'views' : sortKey; list.sort((a,b) => k === 'views' ? vv(b) - vv(a) : (b[k]||0) - (a[k]||0)); }
+  else list.sort((a,b) => (b.ts||0) - (a.ts||0));
+  document.getElementById('reelGrid').innerHTML = list.length ? list.map(r => { const rk = ranked.indexOf(r.id) + 1; return reelCard(sel, r, { rank: (filter === 'top' && rk >= 1 && rk <= 3) ? rk : 0 }); }).join('') : '<div class="empty"><span>' + (all.length ? 'NOTHING MATCHES THIS FILTER' : 'NO REELS SYNCED YET') + '</span></div>';
+  const a = S.accounts.find(x => x.pk === sel);
+  document.getElementById('exportNote').textContent = a && a.lastSync ? 'LAST SYNC ' + new Date(a.lastSync).toLocaleString() + ' · ' + all.length + ' REELS · VIA ' + (a.source === 'meta' ? 'META API' : 'HIKERAPI') : '';
+}
+function renderFavs(){
+  const items = [];
+  S.favs.forEach(k => { const i = k.indexOf(':'); const pk = k.slice(0,i), id = k.slice(i+1); const r = (S.reels[pk]||[]).find(x => x.id === id); const a = S.accounts.find(x => x.pk === pk); if (r) items.push({pk, r, handle: a ? a.username : ''}); });
+  document.getElementById('favGrid').innerHTML = items.length ? items.map(x => reelCard(x.pk, x.r, {handle: x.handle})).join('') : '<div class="empty"><span style="font-size:26px;color:var(--gold);opacity:.5">★</span><span>NO FAVORITES YET — HIT ★ ON ANY REEL</span></div>';
+}
+function renderGrowth(){
+  const svg = document.getElementById('chart'), empty = document.getElementById('gempty');
+  const snaps = (S.snaps[sel]||[]).filter(s => Date.now() - s.t < range * 864e5);
+  const byDay = {}; snaps.forEach(s => { byDay[Math.floor(s.t/864e5)] = s; });
+  const days = Object.keys(byDay).sort((a,b)=>a-b).map(d => byDay[d]);
+  if (days.length < 2) { svg.innerHTML=''; svg.classList.add('hidden'); empty.classList.remove('hidden'); document.getElementById('gtotal').textContent=''; return; }
+  svg.classList.remove('hidden'); empty.classList.add('hidden');
+  const W=1000,H=110,top=20,bottom=5, min=Math.min(...days.map(d=>d.followers)), max=Math.max(...days.map(d=>d.followers)), span=Math.max(1,max-min), slot=W/days.length, barW=Math.min(slot*.62,46);
+  let out='<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9D4EDD"/><stop offset="100%" stop-color="#5A1F8F"/></linearGradient></defs>';
+  days.forEach((d,i)=>{ const h=12+((d.followers-min)/span)*(H-top-bottom-12), x=i*slot+(slot-barW)/2, y=H-bottom-h; out+='<rect class="bar" data-i="'+i+'" x="'+x+'" y="'+y+'" width="'+barW+'" height="'+h+'" rx="2" fill="url(#bg)"></rect>'; });
+  svg.innerHTML = out;
+  svg.querySelectorAll('.bar').forEach(b => { b.addEventListener('mousemove', e => { const d=days[+b.dataset.i], p=days[+b.dataset.i-1]; const tip=document.getElementById('tip'); tip.innerHTML = dt(d.t)+' — <b>'+fmt(d.followers)+' followers</b>'+(p?' · <span class="g">'+((d.followers-p.followers)>=0?'+':'')+(d.followers-p.followers)+'</span>':''); tip.style.left=Math.min(e.clientX+14, innerWidth-260)+'px'; tip.style.top=(e.clientY-42)+'px'; tip.classList.remove('hidden'); }); b.addEventListener('mouseleave', ()=>document.getElementById('tip').classList.add('hidden')); });
+  const total = days[days.length-1].followers - days[0].followers;
+  document.getElementById('gtotal').textContent = (total>=0?'▲ +':'▼ ') + total.toLocaleString() + ' · ' + range + 'D';
+}
+function renderDetail(){
+  const a = S.accounts.find(x => x.pk === sel); if (!a) return closeDetail();
+  const st = (l,v,cls) => '<div class="dstat"><div class="l" style="font-size:9px;color:var(--text-faint);font-family:\'JetBrains Mono\',monospace;letter-spacing:.12em">'+l+'</div><div class="v '+(cls||'')+'" style="font-family:\'Antonio\',sans-serif;font-size:17px;font-weight:700">'+v+'</div></div>';
+  document.getElementById('dhead').innerHTML = '<div class="av">'+esc((a.username||'?').slice(0,2))+'</div><div class="dinfo"><div class="dhandle">@'+esc(a.username)+(a.mine?' <span class="pill">MINE</span>':'')+' <span class="src '+(a.source==='meta'?'meta':'')+'">'+(a.source==='meta'?'META':'HIKER')+'</span></div><div class="dbio">'+esc(a.fullName||'')+(a.source==='meta'?' — via Meta API: owner insights (saves · reach · watch time)':' — via HikerAPI: reels with no thumbnail are auto-tagged TRIAL')+'</div></div><div class="dstats">'+st('FOLLOWERS',(a.followers||0).toLocaleString())+st('REELS',(S.reels[sel]||[]).length)+st('TRIALS',a.trialCount||0,'purple')+st('AVG VIEWS',fmt(a.avgViews))+'</div>';
+  renderGrowth(); renderReels();
+}
+window.openDetail = function(pk){ sel = pk; document.getElementById('home').classList.add('hidden'); document.getElementById('detail').classList.remove('hidden'); renderDetail(); window.scrollTo(0,0); };
+window.closeDetail = function(){ sel = null; document.getElementById('detail').classList.add('hidden'); document.getElementById('home').classList.remove('hidden'); renderAccounts(); if (tab==='favs') renderFavs(); };
+window.setTab = function(w){ tab = w; document.getElementById('tabAcc').classList.toggle('active', w==='accounts'); document.getElementById('tabFav').classList.toggle('active', w==='favs'); document.getElementById('accGrid').classList.toggle('hidden', w!=='accounts'); document.getElementById('favGrid').classList.toggle('hidden', w!=='favs'); if (w==='favs') renderFavs(); };
+window.togglePin = async function(pk){ const a = S.accounts.find(x => x.pk === pk); try { const r = await api('/trending/accounts/'+encodeURIComponent(pk)+'/pin', {method:'POST', json:{on: !a.pinned}}); a.pinned = r.pinned; renderAccounts(); } catch(e){ toast(String(e.message)); } };
+window.toggleFav = async function(pk, id){ const key = pk+':'+id; const on = !S.favs.includes(key); try { const r = await api('/trending/favorites', {method:'POST', json:{key, on}}); S.favs = r.favs; renderAll(); if (modalRef && modalRef.pk===pk && modalRef.id===id) syncModalFav(); toast(on ? '★ Added to FAVORITES' : 'Removed from FAVORITES'); } catch(e){ toast(String(e.message)); } };
+window.openReel = function(pk, id){
+  const r = (S.reels[pk]||[]).find(x => x.id === id); if (!r) return; modalRef = {pk, id};
+  const a = S.accounts.find(x => x.pk === pk);
+  carIdx = 0; renderPreview(r);
+  document.getElementById('rhandle').textContent = '@' + (a ? a.username : '');
+  document.getElementById('rdate').textContent = (r.type || 'reel').toUpperCase() + (r.ts ? ' · POSTED ' + new Date(r.ts).toLocaleDateString() : '') + (r.caption ? ' · ' + r.caption.slice(0, 90).replace(/\s+/g,' ') + (r.caption.length > 90 ? '…' : '') : '');
+  const row = (l,v,tag) => '<div class="mrow"><div class="mt"><span class="ml">'+l+'</span><span class="mv">'+(typeof v==='string'?v:fmt(v))+'</span></div>'+(tag?'<div class="mtag">'+tag+'</div>':'')+'</div>';
+  const pct = r.views ? Math.round((r.igViews||0)/r.views*100) : 100;
+  if (r.source === 'meta') {
+    document.getElementById('rviews').innerHTML = row('VIEWS', r.views, 'META INSIGHTS') + row('REACH', r.reach||0, 'UNIQUE ACCOUNTS') + row('AVG WATCH', r.watch ? (r.watch/1000).toFixed(1)+'s' : '—', 'RETENTION');
+    document.getElementById('rsplit').innerHTML = '<div class="sleg"><span class="igk">SOURCE: META API — IG/FB SPLIT NOT EXPOSED · SAVES ARE REAL</span></div>';
+    document.getElementById('rmetrics').innerHTML = row('SAVES', r.saves||0, 'META INSIGHTS') + row('SHARES', r.shares||0, 'META INSIGHTS') + row('LIKES', r.likes, 'IG COUNTER') + row('COMMENTS', r.comments, 'IG COUNTER');
+  } else {
+    document.getElementById('rviews').innerHTML = row('TOTAL VIEWS', r.views) + row('IG VIEWS', r.igViews) + row('FB VIEWS', r.fb);
+    document.getElementById('rsplit').innerHTML = r.fb > 0 ? '<div class="split"><span class="ig" style="flex:'+pct+'"></span><span class="fb" style="flex:'+(100-pct)+'"></span></div><div class="sleg"><span class="igk">IG '+pct+'%</span><span class="fbk">FB '+(100-pct)+'%</span></div>' : '<div class="sleg"><span class="igk">IG ONLY — NOT CROSSPOSTED TO FB</span></div>';
+    document.getElementById('rmetrics').innerHTML = row('SHARES', r.shares, 'IG COUNTER') + row('LIKES', r.likes, 'IG COUNTER') + row('COMMENTS', r.comments, 'IG COUNTER') + row('SAVES', 0, 'OWNER INSIGHTS ONLY');
+  }
+  const link = r.permalink || (r.code ? 'https://www.instagram.com/' + ((r.type||'reel') === 'reel' ? 'reel/' : 'p/') + r.code + '/' : '');
+  const op = document.getElementById('ropen'); op.href = link || '#'; op.classList.toggle('hidden', !link);
+  const dl = document.getElementById('rdl'); dl.classList.toggle('hidden', !(r.videoUrl || r.thumb || (r.media && r.media.length)));
+  syncModalFav();
+  document.getElementById('rmodalVeil').classList.remove('hidden');
+};
+let carIdx = 0;
+function renderPreview(r){
+  const prev = document.getElementById('rprev'); const type = r.type || 'reel';
+  if (type === 'carousel' && r.media && r.media.length) {
+    carIdx = Math.max(0, Math.min(carIdx, r.media.length - 1)); const it = r.media[carIdx];
+    prev.innerHTML = '<div class="car">' + (it.video ? '<video src="'+esc(it.video)+'" controls playsinline poster="'+esc(it.img||'')+'"></video>' : (it.img ? '<img referrerpolicy="no-referrer" src="'+esc(it.img)+'" onerror="this.remove()">' : '')) + '</div>' +
+      (r.media.length > 1 ? '<button class="carnav l" onclick="event.stopPropagation();carMove(-1)">‹</button><button class="carnav r" onclick="event.stopPropagation();carMove(1)">›</button><div class="cardots">' + r.media.map((_,i)=>'<span class="'+(i===carIdx?'on':'')+'"></span>').join('') + '</div>' : '');
+    return;
+  }
+  if (r.videoUrl) { prev.innerHTML = '<video src="'+esc(r.videoUrl)+'" controls playsinline autoplay muted loop'+(r.thumb?' poster="'+esc(r.thumb)+'"':'')+'></video>' + (r.trial ? '<div class="trialb" style="position:absolute;top:8px;left:8px;z-index:2">TRIAL</div>' : ''); return; }
+  prev.innerHTML = r.trial ? '<div class="trialc"><div class="trialb" style="font-size:11px;padding:6px 14px">TRIAL</div><div class="nothumb">NO THUMBNAIL RETURNED</div></div>' : (r.thumb ? '<img referrerpolicy="no-referrer" src="'+esc(r.thumb)+'" onerror="this.remove()">' : '');
+}
+window.carMove = function(d){ if (!modalRef) return; const r = (S.reels[modalRef.pk]||[]).find(x => x.id === modalRef.id); if (!r || !r.media) return; carIdx = (carIdx + d + r.media.length) % r.media.length; renderPreview(r); };
+document.getElementById('rdl').addEventListener('click', async e => {
+  e.preventDefault(); if (!modalRef) return;
+  const r = (S.reels[modalRef.pk]||[]).find(x => x.id === modalRef.id); if (!r) return;
+  try {
+    const l = await api('/trending/download-link', { method: 'POST', json: { pk: modalRef.pk, id: r.id, idx: (r.type === 'carousel') ? carIdx : 0 } });
+    const a = document.createElement('a'); a.href = HUB + l.url; a.download = ''; document.body.appendChild(a); a.click(); a.remove();
+    toast('Downloading…' + (r.type === 'carousel' ? ' item ' + (carIdx + 1) : ''));
+  } catch(err){ toast(String(err.message || err)); }
+});
+function syncModalFav(){ if (!modalRef) return; const on = S.favs.includes(modalRef.pk+':'+modalRef.id); document.getElementById('rfav').classList.toggle('on', on); document.getElementById('rfavLabel').textContent = on ? 'IN FAVORITES — CLICK TO REMOVE' : 'ADD TO FAVORITES'; }
+window.toggleFavModal = function(){ if (modalRef) toggleFav(modalRef.pk, modalRef.id); };
+window.closeReel = function(){ document.getElementById('rmodalVeil').classList.add('hidden'); document.getElementById('rprev').innerHTML = ''; modalRef = null; };
+window.downloadCsv = function(){ if (!sel) return false; fetch(HUB+'/trending/export.csv?pk='+encodeURIComponent(sel), {headers:{'Authorization':'Bearer '+TOKEN}}).then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'reels.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u), 5000); }).catch(e => toast(String(e.message))); return false; };
+
+document.querySelectorAll('.ftab').forEach(t => t.addEventListener('click', () => { document.querySelectorAll('.ftab').forEach(x=>x.classList.remove('active')); t.classList.add('active'); filter = t.dataset.f; if (filter==='top') document.getElementById('sort').value='views'; renderReels(); }));
+document.getElementById('sort').addEventListener('change', e => { sortKey = e.target.value; renderReels(); });
+document.querySelectorAll('#viewsSrc .chip').forEach(c => c.addEventListener('click', () => { document.querySelectorAll('#viewsSrc .chip').forEach(x=>x.classList.remove('active')); c.classList.add('active'); viewMode = c.dataset.s; renderReels(); }));
+document.querySelectorAll('#rangeChips .chip').forEach(c => c.addEventListener('click', () => { document.querySelectorAll('#rangeChips .chip').forEach(x=>x.classList.remove('active')); c.classList.add('active'); range = +c.dataset.r; renderGrowth(); }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReel(); });
+setInterval(() => { if (TOKEN && S && !modalRef) api('/trending/state').then(s => { S = s; renderAll(); }).catch(()=>{}); }, 120000);
+load();
+})();
+</script>
+</body>
+</html>

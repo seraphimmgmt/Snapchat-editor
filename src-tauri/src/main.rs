@@ -45,6 +45,7 @@ fn main() {
             cloud_render,
             hiker_fetch,
             meta_fetch,
+            hub_request,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1051,4 +1052,48 @@ async fn meta_fetch(
         return Err(format!("HTTP {}: {}", status, msg));
     }
     Ok(body)
+}
+
+// ---------- Trending Hub client (TRENDING tab, HUB mode) ----------
+//
+// The hub is our own FastAPI service on the droplet (infra/trending-hub).
+// Plain http:// like the render server, so the same ATS reasoning applies —
+// go through reqwest. Generic method+path+JSON body against a user-configured
+// base URL; hub token in the Authorization header.
+
+#[tauri::command]
+async fn hub_request(
+    base: String,
+    method: String,
+    path: String,
+    token: String,
+    body: Option<serde_json::Value>,
+) -> Result<String, String> {
+    if !(base.starts_with("http://") || base.starts_with("https://")) {
+        return Err("hub base must be http(s)://".into());
+    }
+    if !path.starts_with('/') || path.contains("..") {
+        return Err("invalid hub path".into());
+    }
+    let url = format!("{}{}", base.trim_end_matches('/'), path);
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let m = reqwest::Method::from_bytes(method.to_uppercase().as_bytes()).map_err(|e| e.to_string())?;
+    let mut req = client.request(m, &url).bearer_auth(token).header("accept", "application/json");
+    if let Some(b) = body {
+        req = req.json(&b);
+    }
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+    let status = resp.status().as_u16();
+    let text = resp.text().await.map_err(|e| e.to_string())?;
+    if status >= 400 {
+        let msg = serde_json::from_str::<serde_json::Value>(&text)
+            .ok()
+            .and_then(|v| v.get("detail").and_then(|d| d.as_str().map(|s| s.to_string())))
+            .unwrap_or_else(|| text.chars().take(300).collect());
+        return Err(format!("HTTP {}: {}", status, msg));
+    }
+    Ok(text)
 }
