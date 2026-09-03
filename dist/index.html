@@ -8914,7 +8914,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.11.5';
+const APP_VERSION = '4.11.6';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -15746,6 +15746,68 @@ function patchMp4Timestamps(bytes, dateEpochSeconds) {
   return bytes;
 }
 
+// v4.11.6: strip the 'mp4-muxer-hdlr' handler name from every hdlr box in the
+// MOV's moov tree. mp4-muxer stamps that string as the hdlr name on each
+// track's Media Handler box; forensic scanners can grep for it as a clear
+// "made by JS library X" fingerprint (much like a User-Agent header). Real
+// iPhone MOVs have Apple-specific names ('Core Media Video' etc), but any
+// same-size replacement wins vs the library-name tell.
+//
+// Same-size in-place rewrite (so no downstream offset shifting is needed):
+//   * If the name area is big enough, write the ISO/BMFF standard name for
+//     the track type — 'VideoHandler'/'SoundHandler' — which countless real
+//     capture tools use, then null-pad.
+//   * Otherwise null-fill the whole area (valid per ISO 14496-12: name may be
+//     a NULL character to indicate no name).
+//
+// hdlr box layout (ISO 14496-12 §8.4.3):
+//   [0..3]   box size
+//   [4..7]   'hdlr'
+//   [8..11]  version + flags
+//   [12..15] pre_defined (=0)
+//   [16..19] handler_type ('vide'/'soun'/'meta'/...)
+//   [20..31] reserved[3] (=0)
+//   [32..end] name (null-terminated UTF-8 string)
+function patchMp4HandlerNames(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const writeName = (nameStart, nameEnd, str) => {
+    // Zero the whole name area first so any leftover bytes are clean nulls.
+    for (let i = nameStart; i < nameEnd; i++) bytes[i] = 0;
+    if (!str) return;
+    const encoded = new TextEncoder().encode(str + '\0');
+    const room = nameEnd - nameStart;
+    if (encoded.byteLength > room) return; // too long — leave null-filled
+    for (let i = 0; i < encoded.byteLength; i++) bytes[nameStart + i] = encoded[i];
+  };
+  const walk = (start, end) => {
+    let offset = start;
+    while (offset + 8 <= end) {
+      const size = view.getUint32(offset);
+      if (size < 8 || size > end - offset) break;
+      const type = _readAscii4(view, offset + 4);
+      if (!type) break;
+      if (type === 'hdlr' && size >= 33) {
+        const handlerType = _readAscii4(view, offset + 16);
+        const nameStart = offset + 32;
+        const nameEnd = offset + size;
+        let replacement = null;
+        if (handlerType === 'vide') replacement = 'VideoHandler';
+        else if (handlerType === 'soun') replacement = 'SoundHandler';
+        // 'meta', 'mdta', anything else → null-fill (no name)
+        writeName(nameStart, nameEnd, replacement);
+      }
+      if (type === 'moov' || type === 'trak' || type === 'mdia' || type === 'meta') {
+        // 'meta' is a FullBox — skip its 4-byte version/flags before recursing.
+        const inner = type === 'meta' ? offset + 12 : offset + 8;
+        walk(inner, offset + size);
+      }
+      offset += size;
+    }
+  };
+  walk(0, bytes.byteLength);
+  return bytes;
+}
+
 // v4.11.3: rewrite the ftyp box to declare a QuickTime brand.
 //
 // mp4-muxer emits an `isom`/`mp42` MP4. iOS Photos will NOT surface the Apple
@@ -15833,6 +15895,11 @@ async function injectIphoneMp4Metadata(blob) {
     // info + location). Prior to this, keys were physically present but hidden
     // by Photos because the container advertised itself as third-party MP4.
     patchFtypToQuickTime(head);
+
+    // v4.11.6: overwrite the 'mp4-muxer-hdlr' handler names — closes the last
+    // "made by JS library" fingerprint on our MOV output. Same-size rewrite;
+    // no downstream offset shift.
+    patchMp4HandlerNames(head);
 
     // Patch moov size header (grow by udta length).
     new DataView(head.buffer).setUint32(moovOffset, moovSize + delta);
@@ -17994,6 +18061,21 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.11.6',
+    date: '2026-09-03',
+    title: 'Video injector — kill the "mp4-muxer-hdlr" fingerprint on every track',
+    sections: [
+      { h: '🕵️ The tell', items: [
+        '📵 Every MOV Seraphim produced had <code>HandlerDescription: mp4-muxer-hdlr</code> stamped on both the video AND audio tracks — a clean string a forensic scanner could grep for as a "made by this JS library" fingerprint (much like a leaked User-Agent header).',
+      ]},
+      { h: '🩹 Fix', items: [
+        '🧬 New <code>patchMp4HandlerNames(head)</code> walks the moov → trak → mdia → hdlr tree, rewrites each track\'s handler name in place: <code>vide</code> → <code>VideoHandler</code>, <code>soun</code> → <code>SoundHandler</code>, everything else null-filled (empty name is valid per ISO 14496-12).',
+        '📏 Same-size in-place rewrite so downstream <code>stco</code>/<code>co64</code> offsets stay valid — no re-patching needed. Runs alongside the ftyp brand fix and the container-timestamp patch inside <code>injectIphoneMp4Metadata</code>, so all 5 export engines (Fast/Reliable/Cloud/Legacy/Editor) get it.',
+        '✅ Verified end-to-end on a real Seraphim MOV export: Track1 HandlerDescription <code>mp4-muxer-hdlr</code> → <code>VideoHandler</code>, Track2 → <code>SoundHandler</code>, file remains playable, all 9 Apple <code>com.apple.quicktime.*</code> keys still present.',
+      ]},
+    ],
+  },
   {
     version: '4.11.5',
     date: '2026-09-03',
