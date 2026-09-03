@@ -8914,7 +8914,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.11.9';
+const APP_VERSION = '4.11.10';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -15929,11 +15929,36 @@ async function injectIphoneMp4Metadata(blob) {
       return null;
     }
 
+    // v4.11.10: detect any existing udta inside moov. FFmpeg's cloud-render
+    // pipeline emits its own udta with `©too` (encoder = "Lavf60.16.100") —
+    // BOTH a forensic tell AND a spec-duplicate when we then append ours.
+    // ISO/BMFF permits one udta per parent; iOS Photos stops at the first
+    // udta it encounters, so ours was silently ignored even though every
+    // atom wrote correctly. We record the position now, splice it out AFTER
+    // the in-place patchers finish, then append our new udta so exactly one
+    // survives (ours).
+    let existingUdtaOffset = -1, existingUdtaSize = 0;
+    {
+      let o = moovOffset + 8;
+      const moovContentEnd = moovOffset + moovSize;
+      while (o + 8 <= moovContentEnd) {
+        const sz = view.getUint32(o);
+        const ty = _readAscii4(view, o + 4);
+        if (!ty || sz < 8 || sz > moovContentEnd - o) break;
+        if (ty === 'udta') { existingUdtaOffset = o; existingUdtaSize = sz; break; }
+        o += sz;
+      }
+    }
+
     const udta = await buildIphoneUdta();
-    const delta = udta.byteLength;
+    // Net delta AFTER splice-out + append. Positive → mdat moves later.
+    const delta = udta.byteLength - existingUdtaSize;
     const moovEnd = moovOffset + moovSize;
 
-    // Take a writable copy of bytes 0..moovEnd
+    // Take a writable copy of the ORIGINAL bytes 0..moovEnd (including any
+    // existing udta). All in-place patchers below walk the tree using declared
+    // box sizes — they need the ORIGINAL structure intact to recurse correctly.
+    // The splice happens AFTER, at "Splice + reassemble" below.
     const head = new Uint8Array(buffer.slice(0, moovEnd));
 
     // v4.7.4: rewrite mvhd/tkhd/mdhd timestamps so exiftool reports real
@@ -15965,16 +15990,30 @@ async function injectIphoneMp4Metadata(blob) {
     // no downstream offset shift.
     patchMp4HandlerNames(head);
 
-    // Patch moov size header (grow by udta length).
-    new DataView(head.buffer).setUint32(moovOffset, moovSize + delta);
-
-    // If moov sits before mdat, patch stco/co64 entries (they reference absolute file offsets)
+    // v4.11.10: Splice + reassemble. Patch stco/co64 first (walk still needs
+    // the ORIGINAL box structure to find them), then remove the existing udta
+    // bytes, then update the moov header to reflect the net size change.
     if (mdatOffset > moovOffset) {
       patchOffsetsInRange(head, moovOffset + 8, moovOffset + moovSize, delta);
     }
 
+    let finalHead;
+    if (existingUdtaOffset >= 0) {
+      const preLen = existingUdtaOffset;
+      const postStart = existingUdtaOffset + existingUdtaSize;
+      const postLen = moovEnd - postStart;
+      finalHead = new Uint8Array(preLen + postLen);
+      finalHead.set(head.subarray(0, preLen), 0);
+      finalHead.set(head.subarray(postStart, moovEnd), preLen);
+    } else {
+      finalHead = head;
+    }
+    // Now that any old udta is gone from finalHead, patch moov size to the
+    // final value = old size - removed udta + our new udta.
+    new DataView(finalHead.buffer).setUint32(moovOffset, moovSize + delta);
+
     const tail = buffer.slice(moovEnd);
-    return new Blob([head, udta, tail], { type: blob.type });
+    return new Blob([finalHead, udta, tail], { type: blob.type });
   } catch (e) {
     console.warn('injectIphoneMp4Metadata failed:', e);
     return null;
@@ -18125,6 +18164,21 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.11.10',
+    date: '2026-09-03',
+    title: 'Video injector — splice out FFmpeg\'s duplicate udta so iOS Photos actually sees our metadata',
+    sections: [
+      { h: '📵 The bug (unmasked by v4.11.9 shipping)', items: [
+        '📱 iOS Photos still hid our injected camera / location on cloud-rendered MOVs even after all of v4.11.3-v4.11.8 landed. Byte-level inspection of a v4.11.9 export revealed the real reason: FFmpeg on the render server emits its own <code>udta</code> box carrying just <code>©too</code> (encoder = "Lavf60.16.100"), and our injector was APPENDING a second <code>udta</code> alongside it. ISO/BMFF only permits one <code>udta</code> per parent, and iOS Photos stops at the first one it sees — so it only ever read <code>©too</code> and ignored the entire block of Apple metadata we wrote.',
+      ]},
+      { h: '🩹 Fix', items: [
+        '✂️ <code>injectIphoneMp4Metadata</code> now walks moov\'s children and splices out any existing <code>udta</code> before appending ours. Net delta (removed size + added size) drives both the moov size header update and the <code>stco</code>/<code>co64</code> offset patch so mdat stays playable.',
+        '🚫 Bonus: dropping FFmpeg\'s <code>©too</code> also kills a "made by Lavf60" forensic fingerprint — cloud-rendered MOVs no longer advertise the encoder library.',
+        '🛡 Order-of-ops: record the existing udta\'s position first, run every in-place patcher (timestamps, ftyp, hdlr) on the UNTOUCHED byte tree so their walkers still recurse correctly, THEN splice + re-write moov size. All 5 export engines pick this up because the fix lives inside the shared <code>injectIphoneMp4Metadata</code>.',
+      ]},
+    ],
+  },
   {
     version: '4.11.9',
     date: '2026-09-03',
