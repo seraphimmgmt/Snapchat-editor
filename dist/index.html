@@ -5362,6 +5362,131 @@ function _uuidV4() {
   });
 }
 
+// v4.11.5: Build a compact 8-tag Apple MakerNote binary that survives the
+// full JPEG → sips → HEIC pipeline. Reverse-engineered from a competitor
+// injector's HEIC output that reads perfectly in exiftool as:
+//   MakerNoteVersion, AEStable, AETarget, AEAverage, AFStable,
+//   AccelerationVector, ImageCaptureType, ImageUniqueID.
+//
+// Our previous 22-tag MakerNote got shredded by sips (only 5 tags survived
+// the JPEG → HEIC round-trip). This minimal 8-tag version matches real iPhone
+// tag density AND can be written directly to the finished HEIC via
+// `exiftool -MakerNoteApple<=/path/to/bytes.bin`, so the values are guaranteed.
+//
+// Returns Uint8Array (174 bytes total: 14-byte header + 8-entry IFD + external
+// data for AccelerationVector + ImageUniqueID).
+function buildAppleMakerNoteBinary() {
+  const HEADER = new Uint8Array([
+    0x41,0x70,0x70,0x6C,0x65,0x20,0x69,0x4F,0x53,0x00, // "Apple iOS\0"
+    0x00,0x01,                                          // version
+    0x4D,0x4D,                                          // "MM" big-endian
+  ]);
+  const IFD_START = HEADER.byteLength; // 14
+
+  const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+  const aeTarget = rand(150, 200);
+  // AEAverage jittered near AETarget (±20) so the pair is internally consistent.
+  const aeAverage = Math.max(0, Math.min(255, aeTarget + rand(-20, 20)));
+  // 32-char UPPERCASE HEX (not UUID with dashes). Real Apple MakerNote uses
+  // this shape; UUID format was our old tell.
+  const hexChars = '0123456789ABCDEF';
+  let hex = '';
+  for (let i = 0; i < 32; i++) hex += hexChars[Math.floor(Math.random() * 16)];
+  const uuidBytes = new TextEncoder().encode(hex + '\0'); // 33 bytes
+
+  // AccelerationVector — 3 SRATIONALs (24 bytes external). Vertical phone
+  // gravity: small X, ≈-1 Y, small Z. Randomised per export so no two shots
+  // share the exact same tilt vector.
+  const accel = new Uint8Array(24);
+  const av = new DataView(accel.buffer);
+  const gx = rand(-5000, 5000);
+  const gy = -950000 + rand(-40000, 0);
+  const gz = rand(-200000, 200000);
+  av.setInt32(0, gx, false);  av.setInt32(4, 1000000, false);
+  av.setInt32(8, gy, false);  av.setInt32(12, 1000000, false);
+  av.setInt32(16, gz, false); av.setInt32(20, 1000000, false);
+
+  const TYPE_ASCII = 2, TYPE_SLONG = 9, TYPE_SRATIONAL = 10;
+  // Tag order is IFD-required ascending. Types match what real iPhone output
+  // uses (SLONG for the AE/AF/Version/Capture-Type fields).
+  const tags = [
+    { tag: 0x0001, type: TYPE_SLONG, count: 1, inline: 14 },        // MakerNoteVersion
+    { tag: 0x0004, type: TYPE_SLONG, count: 1, inline: 1 },         // AEStable = Yes
+    { tag: 0x0005, type: TYPE_SLONG, count: 1, inline: aeTarget },  // AETarget
+    { tag: 0x0006, type: TYPE_SLONG, count: 1, inline: aeAverage }, // AEAverage
+    { tag: 0x0007, type: TYPE_SLONG, count: 1, inline: 1 },         // AFStable = Yes
+    { tag: 0x0008, type: TYPE_SRATIONAL, count: 3, ext: accel },    // AccelerationVector
+    { tag: 0x0014, type: TYPE_SLONG, count: 1, inline: 1 },         // ImageCaptureType
+    { tag: 0x0015, type: TYPE_ASCII, count: uuidBytes.length, ext: uuidBytes }, // ImageUniqueID
+  ];
+
+  const ifdSize = 2 + tags.length * 12 + 4; // count + entries + next-IFD ptr
+  let extSize = 0;
+  for (const t of tags) if (t.ext) extSize += t.ext.byteLength + (t.ext.byteLength & 1);
+  const out = new Uint8Array(HEADER.byteLength + ifdSize + extSize);
+  out.set(HEADER, 0);
+  const dv = new DataView(out.buffer);
+  dv.setUint16(IFD_START, tags.length, false);
+
+  let off = IFD_START + 2;
+  let extAbs = IFD_START + ifdSize;
+  let extRel = IFD_START + ifdSize; // offset base = byte 0 of MakerNote
+  for (const t of tags) {
+    dv.setUint16(off, t.tag, false);
+    dv.setUint16(off + 2, t.type, false);
+    dv.setUint32(off + 4, t.count, false);
+    if (t.ext) {
+      dv.setUint32(off + 8, extRel, false);
+      out.set(t.ext, extAbs);
+      const padded = t.ext.byteLength + (t.ext.byteLength & 1);
+      extAbs += padded;
+      extRel += padded;
+    } else {
+      if (t.type === TYPE_SLONG) dv.setInt32(off + 8, t.inline, false);
+      else dv.setUint32(off + 8, t.inline >>> 0, false);
+    }
+    off += 12;
+  }
+  dv.setUint32(off, 0, false); // next-IFD ptr = 0
+  return out;
+}
+
+// v4.11.5: Post-HEIC MakerNote injection.
+// sips (Apple ImageIO) drops most Apple MakerNote tags when converting our
+// JPEG → HEIC. Solve by REPLACING the MakerNote wholesale on the finished HEIC
+// with a compact 8-tag binary that exiftool preserves and reads perfectly.
+async function enrichHeicMakerNote(heicPath) {
+  if (!window.__TAURI__) return;
+  const { invoke } = window.__TAURI__.core;
+  try {
+    const bytes = buildAppleMakerNoteBinary();
+    // Stash the raw binary in the same temp area as everything else.
+    const binName = 'makernote-' + Date.now() + '.bin';
+    const binPath = await invoke('save_temp_file', {
+      name: binName,
+      bytes: Array.from(bytes),
+    });
+    try {
+      await invoke('exiftool_run', {
+        args: [
+          '-overwrite_original',
+          '-q', '-q',
+          `-MakerNoteApple<=${binPath}`,
+          // v4.11.5: EXIF CustomRendered=2 marks the image as "HDR (no original
+          // saved)" — a common tell competitor injectors set on iPhone-style
+          // HEIC. Value 2 is the EXIF enum for HDR.
+          '-EXIF:CustomRendered=2',
+        ],
+        filePath: heicPath,
+      });
+    } finally {
+      invoke('delete_temp_file', { path: binPath }).catch(() => {});
+    }
+  } catch (e) {
+    console.warn('[iphone] HEIC MakerNote enrichment failed:', e);
+  }
+}
+
 async function enrichWithExiftool(jpegPath, opts) {
   if (!window.__TAURI__) return;
   const { invoke } = window.__TAURI__.core;
@@ -5581,6 +5706,13 @@ async function exportImage() {
         });
       } catch (et) { console.warn('[exiftool] enrichment failed:', et); }
       const heicPath = await invoke('jpeg_to_heic', { jpegPath });
+      // v4.11.5: sips strips most Apple MakerNote tags in the JPEG → HEIC
+      // convert. Post-HEIC exiftool pass re-injects a compact 8-tag MakerNote
+      // that matches real iPhone density and survives forensic checks
+      // (MakerNoteVersion, AEStable, AETarget, AEAverage, AFStable,
+      // AccelerationVector, ImageCaptureType, ImageUniqueID as 32-char HEX).
+      // Also sets EXIF:CustomRendered=2 (HDR).
+      await enrichHeicMakerNote(heicPath);
       const heicBytes = await invoke('read_temp_file', { path: heicPath });
       blob = new Blob([new Uint8Array(heicBytes)], { type: 'image/heic' });
       filename = filename.replace(/\.jpg$/i, '.HEIC');
@@ -8782,7 +8914,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.11.4';
+const APP_VERSION = '4.11.5';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13157,6 +13289,9 @@ async function renderCarouselOutputs(onProgress) {
             await enrichWithExiftool(jpegPath, { captureDate: captureDates[i] });
           } catch (et) { console.warn('[exiftool] carousel enrichment failed for', item.name, et); }
           const heicPath = await invoke('jpeg_to_heic', { jpegPath });
+          // v4.11.5: post-HEIC MakerNote injection — see enrichHeicMakerNote()
+          // docblock. Restores the 8 Apple tags sips strips during convert.
+          await enrichHeicMakerNote(heicPath);
           const heicBytes = await invoke('read_temp_file', { path: heicPath });
           blob = new Blob([new Uint8Array(heicBytes)], { type: 'image/heic' });
           fname = fname.replace(/\.jpe?g$/i, '.HEIC');
@@ -17859,6 +17994,23 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.11.5',
+    date: '2026-09-03',
+    title: 'HEIC injector — closes the MakerNote gap with competitor injectors (8-tag MakerNote survives sips, ImageUniqueID as 32-char HEX, CustomRendered HDR)',
+    sections: [
+      { h: '🔍 The gap', items: [
+        '📊 A HEIC produced by <b>a competitor injector</b> read cleanly in exiftool as 8 Apple MakerNote tags — <code>MakerNoteVersion=14</code>, <code>AEStable=Yes</code>, <code>AETarget</code>, <code>AEAverage</code>, <code>AFStable=Yes</code>, <code>AccelerationVector</code>, <code>ImageCaptureType=ProRAW</code>, <code>ImageUniqueID</code> (32-char UPPERCASE HEX, no dashes). <b>Ours only had 3</b> (AETarget, AccelerationVector, ImageUniqueID as UUID-with-dashes).',
+        '🧪 Root cause: the JPEG we hand to sips carries a full 22-tag MakerNote from piexifjs — <code>sips</code> (Apple ImageIO) drops 17 of them during the HEIC re-encode, and exiftool can\'t write those tags back onto a HEIC as individual <code>-Apple:*=</code> args (they\'re nested inside the MakerNote binary).',
+      ]},
+      { h: '🩹 Fix — replace the MakerNote wholesale after HEIC', items: [
+        '🧬 New <code>buildAppleMakerNoteBinary()</code> assembles a 174-byte MakerNote IFD in JS with the 8 tags competitor uses (matches byte-for-byte on structure, types, header). AEStable/AFStable = 1, AETarget = jittered 150–200, AEAverage = AETarget ± 20, ImageCaptureType = 1, ImageUniqueID = 32 UPPERCASE HEX chars.',
+        '🔧 New <code>enrichHeicMakerNote(heicPath)</code> runs after <code>jpeg_to_heic</code>: writes the binary to a temp file and invokes <code>exiftool -MakerNoteApple&lt;=&lt;tmp&gt;</code>, which REPLACES the whole MakerNote wholesale (bypassing the individual-tag write limitation). Wired into both the single-image editor export path and the carousel export path.',
+        '☀️ Same exiftool call sets <code>EXIF:CustomRendered=2</code> — the "HDR (no original saved)" tell that real iPhone HEICs (and competitor injectors) carry.',
+        '🆔 <b>ImageUniqueID format fix</b> — was UUID with dashes (<code>6B09CF9F-75FC-49DB-...</code>), now 32-char UPPERCASE HEX (<code>BD744495CCA286F2...</code>) matching real Apple MakerNote format.',
+      ]},
+    ],
+  },
   {
     version: '4.11.4',
     date: '2026-09-03',
