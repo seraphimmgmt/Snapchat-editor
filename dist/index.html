@@ -8914,7 +8914,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.11.7';
+const APP_VERSION = '4.11.8';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -15526,31 +15526,37 @@ async function _computeCameraIdentifier(device) {
 // - Lon: signed, 4 decimals, no zero-padding on integer part
 // - Alt: signed, 3 decimals, integer part zero-padded to 3 digits ("000.000")
 // - Terminates with '/'.
-// v4.11.7: build the classic QuickTime `©xyz` user-data atom for GPS.
-// iOS Photos reads GPS PRIMARILY from this atom — not from the modern
-// com.apple.quicktime.location.ISO6709 Keys metadata that we already write.
-// Without ©xyz, Photos on iPhone will show a captured location as "No location"
-// even when desktop exiftool sees the coord fine.
+// v4.11.7 / v4.11.8: build a classic QuickTime user-data atom whose type
+// starts with the © glyph (0xA9). iOS Photos reads camera info / GPS /
+// creation date PRIMARILY from these legacy atoms — the modern
+// com.apple.quicktime.* Keys metadata alone (even in a qt-branded container)
+// is often ignored by Photos.app.
 //
 // Atom layout (Apple QuickTime "user data" atom, distinct from ISO BMFF box):
 //   [4 bytes] size (BE)
-//   [4 bytes] type = 0xA9 'xyz' (© is 0xA9)
+//   [4 bytes] type = 0xA9 + 3 ASCII chars (e.g. '©xyz', '©mak', '©mod', ...)
 //   [2 bytes] string length (BE, uint16)
 //   [2 bytes] language code (BE, uint16) — 0x55C4 = 'und' (undefined)
-//   [N bytes] UTF-8 string in ISO 6709 form, e.g. "+25.7934-80.2071+000.000/"
-function _buildXyzAtom(iso6709String) {
-  const str = new TextEncoder().encode(iso6709String);
-  const payloadLen = 2 + 2 + str.byteLength;
+//   [N bytes] UTF-8 string
+function _buildQtUserDataAtom(threeCharType, str) {
+  const bytes = new TextEncoder().encode(str);
+  const payloadLen = 2 + 2 + bytes.byteLength;
   const total = 8 + payloadLen;
   const out = new Uint8Array(total);
   const dv = new DataView(out.buffer);
   dv.setUint32(0, total, false);
-  // '©xyz' = 0xA9 0x78 0x79 0x7A
-  out[4] = 0xA9; out[5] = 0x78; out[6] = 0x79; out[7] = 0x7A;
-  dv.setUint16(8, str.byteLength, false);   // string length
-  dv.setUint16(10, 0x55C4, false);           // language 'und'
-  out.set(str, 12);
+  out[4] = 0xA9; // ©
+  out[5] = threeCharType.charCodeAt(0);
+  out[6] = threeCharType.charCodeAt(1);
+  out[7] = threeCharType.charCodeAt(2);
+  dv.setUint16(8, bytes.byteLength, false);
+  dv.setUint16(10, 0x55C4, false);
+  out.set(bytes, 12);
   return out;
+}
+// Keep _buildXyzAtom as a thin wrapper so nothing else changes.
+function _buildXyzAtom(iso6709String) {
+  return _buildQtUserDataAtom('xyz', iso6709String);
 }
 
 function _formatIso6709(lat, lon, alt) {
@@ -15664,11 +15670,29 @@ async function buildIphoneUdta(deviceOverride, dateOverride) {
   const ilst = _makeBox('ilst', _concatU8(ilstKids));
 
   const meta = _makeFullBox('meta', hdlr, keys, ilst);
-  // v4.11.7: ©xyz (legacy GPS) goes at the top of udta so iOS Photos finds it
-  // first — Photos reads location from ©xyz, not the modern Keys atom.
-  return xyzAtom
-    ? _makeBox('udta', xyzAtom, meta)
-    : _makeBox('udta', meta);
+
+  // v4.11.8: legacy QuickTime user-data atoms. iOS Photos reads camera info,
+  // creation date, and GPS PRIMARILY from these '©'-prefixed atoms (0xA9 +
+  // 3-char code) that live directly under udta — even with a qt-branded
+  // container and correct modern Keys, Photos hides the "Info" fields unless
+  // it finds these classic atoms. Real iPhone MOVs write both.
+  //
+  // ©day format matches Apple's own: "YYYY-MM-DDTHH:MM:SS±ZZZZ" (ISO 8601
+  // basic-form offset, no colon in the tz). Same date the Keys atom uses,
+  // reformatted from ISO 8601 extended form.
+  const dayString = isoDate.replace(/([+-]\d{2}):?(\d{2})$/, '$1$2');
+  const legacyAtoms = [
+    _buildQtUserDataAtom('mak', 'Apple'),
+    _buildQtUserDataAtom('mod', device.model),
+    _buildQtUserDataAtom('swr', device.qtSoftware),
+    _buildQtUserDataAtom('day', dayString),
+  ];
+  if (xyzAtom) legacyAtoms.push(xyzAtom);
+
+  // udta layout: legacy '©'-atoms first (classic Photos-app source of truth),
+  // modern meta/keys+ilst last (structured metadata for scanners / desktop
+  // tools that prefer the mdta model).
+  return _makeBox('udta', ...legacyAtoms, meta);
 }
 
 // --- MP4 chunk-offset patcher (recursive walk for stco/co64) ---
@@ -18101,6 +18125,25 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.11.8',
+    date: '2026-09-03',
+    title: 'Video injector — add the classic ©mak/©mod/©swr/©day/©xyz user-data atoms so iPhone Photos surfaces camera info, timestamp AND location',
+    sections: [
+      { h: '📵 The real bug', items: [
+        '📱 Even after v4.11.3 (ftyp → <code>qt  </code>) and v4.11.7 (©xyz for GPS), iOS Photos was <b>still ignoring the entire Apple metadata block</b> on our MOVs — no camera, no lens info, no software, no creation date, no location. Root cause: Photos reads camera/date/GPS PRIMARILY from the classic <code>©'-prefixed</code> user-data atoms (0xA9 + 3-char code) that live directly under <code>udta</code>. The modern Keys atoms alone — even in a qt-branded container — don\'t light up the Photos "Info" panel.',
+      ]},
+      { h: '🩹 Fix — write the classic five', items: [
+        '🧬 Generalised <code>_buildXyzAtom</code> into <code>_buildQtUserDataAtom(type, str)</code>, then added the full five real iPhone MOVs carry:',
+        '• <code>©mak</code> → <code>"Apple"</code>',
+        '• <code>©mod</code> → device model (e.g. <code>"iPhone 17 Pro Max"</code>)',
+        '• <code>©swr</code> → software version (e.g. <code>"26.5"</code>)',
+        '• <code>©day</code> → creation date in Apple\'s ISO 8601 basic-offset form (<code>"2026-09-03T13:59:19+0100"</code>, no colon in the tz)',
+        '• <code>©xyz</code> → GPS ISO 6709 (already added v4.11.7)',
+        '🌳 <code>buildIphoneUdta</code> now emits <code>udta[©mak, ©mod, ©swr, ©day, ©xyz, meta[keys+ilst]]</code> matching real iPhone MOV layout. Modern Keys still there for exiftool / desktop scanners. Existing stco/co64 offset patcher handles the extra ~135 bytes automatically.',
+      ]},
+    ],
+  },
   {
     version: '4.11.7',
     date: '2026-09-03',
