@@ -8781,7 +8781,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.11.2';
+const APP_VERSION = '4.11.3';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -15610,6 +15610,40 @@ function patchMp4Timestamps(bytes, dateEpochSeconds) {
   return bytes;
 }
 
+// v4.11.3: rewrite the ftyp box to declare a QuickTime brand.
+//
+// mp4-muxer emits an `isom`/`mp42` MP4. iOS Photos will NOT surface the Apple
+// `com.apple.quicktime.*` keys in a file whose ftyp says isom/mp41/mp42 — it
+// treats those as third-party MP4 containers and hides the camera / location
+// fields even when the keys are physically present. Real iPhone .MOV files
+// have MajorBrand 'qt  ' and CompatibleBrand 'qt  '. This helper rewrites the
+// ftyp payload in place, preserving box size so no downstream offsets shift.
+function patchFtypToQuickTime(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (bytes.byteLength < 16) return false;
+  const size = view.getUint32(0);
+  const type = _readAscii4(view, 4);
+  if (type !== 'ftyp' || size < 16 || size > bytes.byteLength) return false;
+
+  const write4 = (off, s) => {
+    for (let i = 0; i < 4; i++) bytes[off + i] = s.charCodeAt(i);
+  };
+
+  // Major brand + minor version match real iPhone (`qt  `, 0x00000200).
+  write4(8, 'qt  ');
+  view.setUint32(12, 0x00000200);
+
+  // Compatible brands: first slot is 'qt  '; pad any remaining 4-byte slots
+  // with plausible AV brands so the payload length stays identical.
+  const fallback = ['avc1', 'mp42', 'isom'];
+  let fi = 0;
+  for (let o = 16; o + 4 <= size; o += 4) {
+    if (o === 16) write4(o, 'qt  ');
+    else { write4(o, fallback[fi % fallback.length]); fi++; }
+  }
+  return true;
+}
+
 // --- iPhone MP4 metadata injection ---
 async function injectIphoneMp4Metadata(blob) {
   try {
@@ -15657,6 +15691,12 @@ async function injectIphoneMp4Metadata(blob) {
     }
     if (!tsDate) tsDate = new Date();
     patchMp4Timestamps(head, Math.floor(tsDate.getTime() / 1000));
+
+    // v4.11.3: rewrite ftyp brand to 'qt  ' so iOS Photos parses this file as
+    // a real Apple .MOV and surfaces the com.apple.quicktime.* keys (camera
+    // info + location). Prior to this, keys were physically present but hidden
+    // by Photos because the container advertised itself as third-party MP4.
+    patchFtypToQuickTime(head);
 
     // Patch moov size header (grow by udta length).
     new DataView(head.buffer).setUint32(moovOffset, moovSize + delta);
@@ -17661,6 +17701,20 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.11.3',
+    date: '2026-09-03',
+    title: 'iPhone injector — MOV container now brands itself as real QuickTime so iOS Photos surfaces camera info + location',
+    sections: [
+      { h: '🎬 The bug', items: [
+        '📵 <b>Videos injected by Seraphim showed no camera info and no location on the iPhone Photos app</b>, even though desktop <code>exiftool</code> read every Apple key correctly. Root cause: the underlying <code>mp4-muxer</code> output declared itself as a generic MP4 (<code>MajorBrand: isom</code>, <code>CompatibleBrands: isom, avc1, mp41</code>). iOS Photos treats non-QuickTime containers as third-party MP4 and <b>ignores the <code>com.apple.quicktime.*</code> keys entirely</b>, even when they\'re physically present in the file.',
+      ]},
+      { h: '🩹 The fix', items: [
+        '🏷 New <code>patchFtypToQuickTime(head)</code> pass in <code>injectIphoneMp4Metadata</code>. Rewrites the <code>ftyp</code> box in place: MajorBrand → <code>qt  </code>, MinorVersion → <code>0x00000200</code>, first CompatibleBrand → <code>qt  </code>. Payload length preserved so downstream <code>stco</code>/<code>co64</code> offsets don\'t shift — no re-patching needed.',
+        '✅ Result: iPhone Photos now recognises the file as a real Apple <code>.MOV</code> and surfaces Make/Model/Software/CreationDate/GPS/CameraLensModel in the Info panel, just like a native capture.',
+      ]},
+    ],
+  },
   {
     version: '4.11.2',
     date: '2026-08-16',
