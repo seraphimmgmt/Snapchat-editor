@@ -1530,7 +1530,7 @@ EXPORT TO DRIVE
 <div class="inspector-inner">
 <div class="inspector-intro">
 <h2>METADATA INSPECTOR</h2>
-<p>Drop up to 3 files to compare their metadata side-by-side. Differing values are flagged in red. Works with JPG, PNG, HEIC, and TIFF for full EXIF; basic info shown for video and other formats.</p>
+<p>Drop up to 3 files anywhere to compare their metadata side-by-side — batch drops fill empty slots automatically. Differing values are flagged in red. Uses bundled exiftool: works with JPG, PNG, HEIC/HEIF, TIFF, WebP, RAW, MP4, MOV — everything exiftool reads.</p>
 </div>
 <div class="inspector-slots" id="inspectorSlots">
 <label class="inspector-slot" data-slot="0">
@@ -1566,6 +1566,7 @@ EXPORT TO DRIVE
 <button class="seg-btn" data-display-mode="diff">DIFF ONLY</button>
 </div>
 <div class="toolbar-help" id="inspectorToolbarHelp">Showing every field across loaded files.</div>
+<button type="button" class="seg-btn" id="inspectorClearAllBtn" title="Clear all slots">CLEAR ALL</button>
 </div>
 <div class="metadata-table-wrap" id="metadataTableWrap">
 <div class="metadata-empty">DROP A FILE ABOVE TO BEGIN</div>
@@ -8781,7 +8782,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.11.3';
+const APP_VERSION = '4.11.4';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -15910,8 +15911,46 @@ async function extractMetadata(file) {
     } catch (e) { /* ignore */ }
   }
 
-  // exifr extraction
-  if (typeof exifr !== 'undefined') {
+  // v4.11.4: exiftool-first metadata read.
+  //
+  // Prior versions leaned on the JS `exifr` library, which silently fails on
+  // many real iPhone HEIC files (their box layouts don't match what exifr
+  // expects). Bundled exiftool reads them fine — the same subprocess the
+  // injector uses. Strategy:
+  //   1. If Tauri is present (real app), use bundled exiftool as ground truth
+  //      for all images. Skip it for videos — the MP4 parser + exiftool below
+  //      already cover them.
+  //   2. If Tauri isn't available (browser preview / test), or exiftool comes
+  //      back empty, fall back to exifr so the Inspector still shows *something*.
+  //   3. For videos, don't run exifr at all — it doesn't parse MP4/MOV and
+  //      would emit a misleading "No EXIF found" note.
+  const isImage = file.type.startsWith('image/');
+  const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|m4v|m4a)$/i.test(file.name);
+
+  let exiftoolGroups = null;
+  if (isImage || isVideo) {
+    try {
+      exiftoolGroups = await readAllMetaViaExiftool(file);
+      if (exiftoolGroups) {
+        for (const [group, fields] of Object.entries(exiftoolGroups)) {
+          const groupName = group.toUpperCase();
+          const formatted = {};
+          for (const [k, v] of Object.entries(fields)) {
+            const fv = formatMetaValue(v);
+            if (fv != null) formatted[k] = fv;
+          }
+          if (Object.keys(formatted).length) meta[groupName] = formatted;
+        }
+      }
+    } catch (e) {
+      console.warn('[inspector] exiftool pass errored:', e);
+    }
+  }
+
+  // exifr fallback — only when exiftool isn't available or came back empty,
+  // and only for images (exifr can't parse video containers).
+  const needExifr = isImage && !exiftoolGroups && typeof exifr !== 'undefined';
+  if (needExifr) {
     try {
       const all = await exifr.parse(file, {
         tiff: true, ifd0: true, ifd1: true, exif: true, gps: true,
@@ -15925,6 +15964,7 @@ async function extractMetadata(file) {
         for (const [groupKey, groupVal] of Object.entries(all)) {
           if (groupVal && typeof groupVal === 'object' && !Array.isArray(groupVal)) {
             const groupName = groupKey.toUpperCase();
+            if (meta[groupName]) continue; // don't clobber exiftool
             const formatted = {};
             for (const [k, v] of Object.entries(groupVal)) {
               const fv = formatMetaValue(v);
@@ -15935,7 +15975,8 @@ async function extractMetadata(file) {
         }
       }
     } catch (e) {
-      meta['_Note'] = { 'Error': 'No EXIF found or unreadable: ' + (e.message || 'unknown') };
+      // Silently ignore — exifr failing on a video or unusual container isn't
+      // a user-facing error, we already have other groups (File, MP4 parser).
     }
   }
 
@@ -16044,6 +16085,69 @@ async function extractMetadata(file) {
   }
 
   return meta;
+}
+
+// v4.11.4: Full-metadata exiftool pass for the Inspector.
+//
+// The JS `exifr` library was the Inspector's primary EXIF source, but it fails
+// silently on many real iPhone HEIC files (their box ordering / property atoms
+// don't match what exifr expects). Meanwhile our bundled exiftool reads them
+// perfectly. This helper spawns the same exiftool the injector uses and returns
+// the entire tag dump as { GROUP: { Tag: Value } }, matching exifr's shape so
+// downstream rendering doesn't need to change.
+//
+// Returns null when the sidecar isn't reachable (browser preview, missing
+// bundle, etc.) — the caller falls back to exifr in that case.
+async function readAllMetaViaExiftool(file) {
+  if (!window.__TAURI__?.core?.invoke) return null;
+  const { invoke } = window.__TAURI__.core;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let tmpPath;
+  try {
+    tmpPath = await invoke('save_temp_file', {
+      name: file.name || 'inspector_input',
+      bytes: Array.from(bytes),
+    });
+  } catch (e) {
+    console.warn('[inspector] save_temp_file failed:', e);
+    return null;
+  }
+  let stdout = '';
+  try {
+    stdout = await invoke('exiftool_run', {
+      args: ['-G1', '-a', '-s', '-api', 'LargeFileSupport=1'],
+      filePath: tmpPath,
+    });
+  } catch (e) {
+    console.warn('[inspector] exiftool_run failed:', e);
+  } finally {
+    try { await invoke('delete_temp_file', { path: tmpPath }); } catch (e) {}
+  }
+  if (!stdout) return null;
+
+  // Parse [GROUP] Tag : Value lines into { GROUP: { Tag: Value, ... } }.
+  // Group labels we don't want cluttering the Inspector: System / ExifTool
+  // (host-side noise, not file metadata).
+  const skipGroup = new Set(['System', 'ExifTool']);
+  const result = {};
+  const re = /^\[([A-Za-z0-9_\-]+)\]\s+([A-Za-z0-9_\-]+)\s*:\s*(.*)$/;
+  for (const line of stdout.split(/\r?\n/)) {
+    const m = line.match(re);
+    if (!m) continue;
+    const [, group, tag, valueRaw] = m;
+    if (skipGroup.has(group)) continue;
+    const value = valueRaw.trim();
+    if (!result[group]) result[group] = {};
+    // Handle duplicate tag names within a group (e.g. multiple Apple keys)
+    if (result[group][tag] != null && result[group][tag] !== value) {
+      let n = 2;
+      while (result[group][`${tag} #${n}`] != null) n++;
+      result[group][`${tag} #${n}`] = value;
+    } else {
+      result[group][tag] = value;
+    }
+  }
+  return Object.keys(result).length ? result : null;
 }
 
 // v4.6.5: Spawn bundled exiftool, dump JUMBF / CBOR / XMP-c2pa groups.
@@ -16517,14 +16621,47 @@ function clearInspectorSlot(slotIndex) {
   renderInspectorTable();
 }
 
+// v4.11.4: fill starting at the given slot, spilling into subsequent empty
+// slots so a drag of 3 files onto FILE 1 loads all three at once. Returns
+// the count actually accepted (may be less than files.length if slots run out).
+function loadInspectorFiles(startSlot, files) {
+  if (!files || !files.length) return 0;
+  let loaded = 0;
+  let slot = startSlot;
+  const totalSlots = document.querySelectorAll('.inspector-slot').length;
+  for (const file of files) {
+    // Find next empty slot at or after `slot` — wrap to slot 0 if needed so a
+    // batch drop always fills the panel even if the user aimed at slot 2.
+    let target = slot;
+    while (target < totalSlots && inspectorState.files[target] && target !== startSlot + loaded) {
+      target++;
+    }
+    if (target >= totalSlots) {
+      for (target = 0; target < totalSlots && inspectorState.files[target]; target++) {}
+      if (target >= totalSlots) break;
+    }
+    loadInspectorFile(target, file);
+    slot = target + 1;
+    loaded++;
+  }
+  return loaded;
+}
+
+function clearAllInspectorSlots() {
+  const totalSlots = document.querySelectorAll('.inspector-slot').length;
+  for (let i = 0; i < totalSlots; i++) clearInspectorSlot(i);
+}
+
 function setupInspector() {
   document.querySelectorAll('.inspector-slot').forEach(slotEl => {
     const slotIdx = parseInt(slotEl.dataset.slot);
     const fileInput = slotEl.querySelector('input[type="file"]');
+    // v4.11.4: allow selecting multiple files at once from the picker.
+    fileInput.setAttribute('multiple', 'multiple');
 
     fileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) loadInspectorFile(slotIdx, file);
+      const files = Array.from(e.target.files || []);
+      if (files.length) loadInspectorFiles(slotIdx, files);
     });
 
     slotEl.addEventListener('dragover', (e) => {
@@ -16535,8 +16672,9 @@ function setupInspector() {
     slotEl.addEventListener('drop', (e) => {
       e.preventDefault();
       slotEl.classList.remove('dragover');
-      const file = e.dataTransfer.files[0];
-      if (file) loadInspectorFile(slotIdx, file);
+      // v4.11.4: dropping N files fills consecutive slots starting here.
+      const files = Array.from(e.dataTransfer.files || []);
+      if (files.length) loadInspectorFiles(slotIdx, files);
     });
 
     const clearBtn = slotEl.querySelector('.slot-clear');
@@ -16551,6 +16689,26 @@ function setupInspector() {
   document.querySelectorAll('.seg-btn[data-display-mode]').forEach(btn => {
     btn.addEventListener('click', () => setInspectorDisplayMode(btn.dataset.displayMode));
   });
+
+  // v4.11.4: CLEAR ALL button in toolbar
+  const clearAllBtn = document.getElementById('inspectorClearAllBtn');
+  if (clearAllBtn) clearAllBtn.addEventListener('click', () => clearAllInspectorSlots());
+
+  // v4.11.4: whole Inspector view accepts a drop; files spill across empty
+  // slots starting at slot 0. Only active when the drop misses a slot box.
+  const viewEl = document.getElementById('inspectorView');
+  if (viewEl) {
+    viewEl.addEventListener('dragover', (e) => {
+      if (e.target.closest('.inspector-slot')) return;
+      e.preventDefault();
+    });
+    viewEl.addEventListener('drop', (e) => {
+      if (e.target.closest('.inspector-slot')) return;
+      e.preventDefault();
+      const files = Array.from(e.dataTransfer.files || []);
+      if (files.length) loadInspectorFiles(0, files);
+    });
+  }
 }
 
 // ============================================================================
@@ -17701,6 +17859,27 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.11.4',
+    date: '2026-09-03',
+    title: 'INSPECTOR — reads everything exiftool can read (real iPhone HEICs no longer come back empty), batch drop, CLEAR ALL',
+    sections: [
+      { h: '🔍 The bug', items: [
+        '📵 <b>Inspector was silently failing on many real iPhone HEIC files</b> — the JS <code>exifr</code> library couldn\'t parse them and returned only File + ICC groups (0 EXIF, 0 GPS, 0 MakerNote), while our bundled exiftool read the same file just fine (100+ fields). Also for videos, exifr emitted a misleading <code>_Note: "No EXIF found or unreadable: Unknown file format"</code> — videos don\'t have EXIF; that message shouldn\'t exist.',
+      ]},
+      { h: '🩹 Fix — exiftool as ground truth', items: [
+        '🥇 New <code>readAllMetaViaExiftool(file)</code> helper: spawns bundled exiftool with <code>-G1 -a -s -api LargeFileSupport=1</code>, parses the full output into <code>{ GROUP: { Tag: Value } }</code>. Runs for every image + video the Inspector loads.',
+        '🥈 <code>exifr</code> demoted to a fallback — used only when the exiftool sidecar isn\'t reachable (browser preview, missing bundle, etc.) or comes back empty. For videos, exifr is skipped entirely.',
+        '🧹 <b>Misleading <code>_Note: Error</code> message removed.</b>',
+      ]},
+      { h: '⚡ UX — batch drops, drop anywhere, CLEAR ALL', items: [
+        '📥 <b>Multi-file drop</b> — dropping N files onto FILE 1 (or any slot) fills consecutive empty slots automatically. No more three separate drag-drops to load three files.',
+        '🎯 <b>Drop anywhere in the panel</b> — dropping outside the three slots fills starting from slot 0.',
+        '🧼 <b>CLEAR ALL</b> button in the toolbar wipes every slot in one click.',
+        '📚 Intro copy updated: no more "Works with JPG, PNG, HEIC, TIFF" hedge — the Inspector now reads whatever exiftool reads (RAW, WebP, MOV, MP4, and everything else).',
+      ]},
+    ],
+  },
   {
     version: '4.11.3',
     date: '2026-09-03',
