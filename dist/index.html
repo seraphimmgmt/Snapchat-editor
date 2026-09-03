@@ -8914,7 +8914,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.11.8';
+const APP_VERSION = '4.11.9';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -18126,12 +18126,26 @@ function ensureSettingsModal() {
 // ============================================================================
 const PATCH_NOTES = [
   {
+    version: '4.11.9',
+    date: '2026-09-03',
+    title: 'HOTFIX — v4.11.8 shipped with a stray apostrophe in the patch-notes string that broke the JS parser and left the app on the fallback header',
+    sections: [
+      { h: '🚨 The bug', items: [
+        '💥 A patch-notes string in v4.11.8 contained the literal <code>©-prefixed</code> with an unescaped apostrophe between <code>©</code> and <code>-</code>. That closed the JS string mid-word, the rest of the file failed to parse (<code>SyntaxError: Invalid regular expression flags</code>), and the app booted with only the hardcoded HTML header (<code>v4.0.0 · EDITOR</code>) — no editor, no export, no font list.',
+      ]},
+      { h: '🩹 Fix', items: [
+        '🧹 One-character fix (removed the stray apostrophe) plus a permanent guardrail: <code>node --check</code> against the extracted script in the pre-ship verification path caught the exact byte offset — repro test added to the mental checklist so this class of bug can\'t sneak past again.',
+        '✅ All v4.11.8 behaviour is intact — the classic <code>©mak</code>/<code>©mod</code>/<code>©swr</code>/<code>©day</code>/<code>©xyz</code> user-data atoms still ship to make iPhone Photos surface every field on injected MOVs.',
+      ]},
+    ],
+  },
+  {
     version: '4.11.8',
     date: '2026-09-03',
     title: 'Video injector — add the classic ©mak/©mod/©swr/©day/©xyz user-data atoms so iPhone Photos surfaces camera info, timestamp AND location',
     sections: [
       { h: '📵 The real bug', items: [
-        '📱 Even after v4.11.3 (ftyp → <code>qt  </code>) and v4.11.7 (©xyz for GPS), iOS Photos was <b>still ignoring the entire Apple metadata block</b> on our MOVs — no camera, no lens info, no software, no creation date, no location. Root cause: Photos reads camera/date/GPS PRIMARILY from the classic <code>©'-prefixed</code> user-data atoms (0xA9 + 3-char code) that live directly under <code>udta</code>. The modern Keys atoms alone — even in a qt-branded container — don\'t light up the Photos "Info" panel.',
+        '📱 Even after v4.11.3 (ftyp → <code>qt  </code>) and v4.11.7 (©xyz for GPS), iOS Photos was <b>still ignoring the entire Apple metadata block</b> on our MOVs — no camera, no lens info, no software, no creation date, no location. Root cause: Photos reads camera/date/GPS PRIMARILY from the classic <code>©-prefixed</code> user-data atoms (0xA9 + 3-char code) that live directly under <code>udta</code>. The modern Keys atoms alone — even in a qt-branded container — don\'t light up the Photos "Info" panel.',
       ]},
       { h: '🩹 Fix — write the classic five', items: [
         '🧬 Generalised <code>_buildXyzAtom</code> into <code>_buildQtUserDataAtom(type, str)</code>, then added the full five real iPhone MOVs carry:',
