@@ -4405,6 +4405,76 @@ function renderRecentsDropdown() {
   if (clearBtn) clearBtn.onclick = () => { clearRecents(); document.getElementById('recentsDropdown').classList.add('hidden'); };
 }
 
+// v4.11.11: attach a source URL to the shared <video> element and wait for
+// metadata. Returns true only if the WebView actually decoded it (real
+// dimensions came back). Returns false — never throws — on decode failure so
+// the caller can fall back. Setting .src re-runs the resource-selection
+// algorithm, which resets any prior error state, so this is safe to call
+// twice on the same element (native attempt, then proxy retry).
+async function _attachVideoSource(video, srcUrl) {
+  try {
+    video.pause();
+    if (video.src) URL.revokeObjectURL(video.src);
+    video.src = srcUrl;
+    video.loop = false;
+    video.muted = false;
+    await new Promise((resolve, reject) => {
+      const onLoad = () => { cleanup(); resolve(); };
+      const onErr = () => { cleanup(); reject(new Error('video load failed')); };
+      const cleanup = () => {
+        video.removeEventListener('loadedmetadata', onLoad);
+        video.removeEventListener('error', onErr);
+      };
+      video.addEventListener('loadedmetadata', onLoad);
+      video.addEventListener('error', onErr);
+    });
+    return !!(video.videoWidth && video.videoHeight);
+  } catch (e) {
+    console.warn('[load] native decode failed:', e && e.message);
+    return false;
+  }
+}
+
+// v4.11.11: transcode a source the WebView cannot decode into an H.264 proxy
+// via the bundled ffmpeg sidecar. The concrete case: Windows WebView2
+// (Chromium) ships NO HEVC/H.265 decoder unless the user bought Microsoft's
+// "HEVC Video Extensions" — and HEVC is the iPhone camera default ("High
+// Efficiency"). Mac WebKit decodes HEVC natively, so this never runs there.
+//
+// Output is 8-bit yuv420p on purpose: 10-bit HEVC (iPhone HDR / Dolby Vision)
+// would otherwise land as yuv420p10, which WebView2 also refuses. HDR is
+// clipped to SDR without tonemapping — acceptable for a preview/edit proxy.
+// CRF 18 + veryfast is near-transparent and fast (a 6 s clip is ~2-5 s).
+// Returns a File, or null on any failure (caller shows the original toast).
+async function _transcodeToH264Proxy(file) {
+  const { invoke } = window.__TAURI__.core;
+  let tmpDir = null;
+  try {
+    tmpDir = await invoke('make_temp_dir', { prefix: 'proxy' });
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await invoke('write_temp_bytes', { dir: tmpDir, name: 'source.bin', bytes: Array.from(bytes) });
+    await invoke('ffmpeg_run', {
+      args: [
+        '-y', '-hide_banner', '-loglevel', 'error',
+        '-i', 'source.bin',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac', '-b:a', '192k',
+        '-movflags', '+faststart',
+        'proxy.mp4',
+      ],
+      cwd: tmpDir,
+    });
+    const out = await invoke('read_temp_file', { path: tmpDir + '/proxy.mp4' });
+    const base = (file.name || 'video').replace(/\.[^.]+$/, '');
+    return new File([new Uint8Array(out)], base + '.mp4', { type: 'video/mp4' });
+  } catch (e) {
+    console.warn('[proxy] transcode failed:', e);
+    return null;
+  } finally {
+    if (tmpDir) invoke('delete_temp_file', { path: tmpDir }).catch(() => {});
+  }
+}
+
 async function handleFile(file) {
   if (!file) return;
   const type = detectMediaType(file);
@@ -4431,28 +4501,30 @@ async function handleFile(file) {
     }
   } else {
     try {
-      video.pause();
-      if (video.src) URL.revokeObjectURL(video.src);
-      video.src = url;
-      video.loop = false;
-      video.muted = false;
-
-      await new Promise((resolve, reject) => {
-        const onLoad = () => { cleanup(); resolve(); };
-        const onErr = () => { cleanup(); reject(new Error('video load failed')); };
-        const cleanup = () => {
-          video.removeEventListener('loadedmetadata', onLoad);
-          video.removeEventListener('error', onErr);
-        };
-        video.addEventListener('loadedmetadata', onLoad);
-        video.addEventListener('error', onErr);
-      });
+      // v4.11.11: native decode first; on failure, transcode to an H.264
+      // proxy through the bundled ffmpeg sidecar and retry. See
+      // _transcodeToH264Proxy for the why (Windows WebView2 has no HEVC).
+      let loadedFile = file;
+      let ok = await _attachVideoSource(video, url);
+      if (!ok && window.__TAURI__?.core?.invoke) {
+        showToast('CODEC NOT DECODABLE HERE — TRANSCODING TO H.264 PROXY…');
+        const proxy = await _transcodeToH264Proxy(file);
+        if (proxy) {
+          loadedFile = proxy;
+          ok = await _attachVideoSource(video, URL.createObjectURL(proxy));
+        }
+      }
+      if (!ok) throw new Error('video load failed');
 
       state.mediaType = 'video';
       state.mediaElement = video;
       state.mediaWidth = video.videoWidth;
       state.mediaHeight = video.videoHeight;
-      __lastVideoFile = file; // V3.7: keep the source for WebCodecs audio decode
+      // V3.7: keep the source for WebCodecs audio decode. v4.11.11: when a
+      // proxy was needed, hand every export engine the H.264 proxy — Fast
+      // (WebCodecs) cannot decode HEVC on Windows either, and Reliable/Cloud
+      // both work off H.264.
+      __lastVideoFile = loadedFile;
 
       if (!state.mediaWidth || !state.mediaHeight) {
         throw new Error('video has no dimensions');
@@ -8914,7 +8986,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.11.10';
+const APP_VERSION = '4.11.11';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -18164,6 +18236,22 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.11.11',
+    date: '2026-09-03',
+    title: 'Windows — "FAILED TO LOAD VIDEO" on iPhone clips fixed with an automatic H.264 proxy transcode',
+    sections: [
+      { h: '📵 The bug', items: [
+        '🪟 On Windows, dropping an iPhone-recorded clip into the Editor kept failing with <b>FAILED TO LOAD VIDEO</b>. Root cause is a platform gap, not a Seraphim bug: Windows WebView2 (Chromium) ships <b>no HEVC / H.265 decoder</b> unless the user has bought the Microsoft "HEVC Video Extensions" — and HEVC is the iPhone camera default ("High Efficiency"). Mac WebKit decodes HEVC natively, which is why the same clip loads fine on Mac. AI-generated clips (Kling / Veo / Sora) are H.264 and were never affected.',
+      ]},
+      { h: '🩹 Fix — decode natively, fall back to a proxy', items: [
+        '🔁 New <code>_attachVideoSource()</code> tries the native decoder first. Only on a real decode failure does the new <code>_transcodeToH264Proxy()</code> spool the file to temp and run the bundled ffmpeg sidecar: <code>libx264 · veryfast · CRF 18 · yuv420p · aac 192k · faststart</code>. The proxy is then loaded in its place. Mac never pays the cost.',
+        '🎞 Output is forced to 8-bit <code>yuv420p</code> on purpose — 10-bit HEVC (iPhone HDR / Dolby Vision) would otherwise land as <code>yuv420p10</code>, which WebView2 refuses too. HDR clips are clipped to SDR for the preview (no tonemap yet).',
+        '📤 When a proxy was needed, every export engine is handed the H.264 proxy: the Fast (WebCodecs) engine cannot decode HEVC on Windows either, and Reliable / Cloud both work off H.264.',
+        '💬 A toast now reads <code>CODEC NOT DECODABLE HERE — TRANSCODING TO H.264 PROXY…</code> while it runs (a 6 s clip takes ~2-5 s), so it no longer looks like a silent hang.',
+      ]},
+    ],
+  },
   {
     version: '4.11.10',
     date: '2026-09-03',
