@@ -1578,32 +1578,41 @@ EXPORT TO DRIVE
 <div class="inspector-inner">
 <div class="inspector-intro">
 <h2>🧼 LAUNDER</h2>
-<p>Drop any video → get a clean iPhone-authentic <b>.MOV</b>. Strips every trace of origin metadata, re-encodes to break the perceptual hash, and writes correct iPhone QuickTime metadata into the exact boxes iOS Photos reads — camera, lens, GPS, date. Works on any source: AI-generated, screen-recorded, or another camera.</p>
+<p>Drop videos → get clean iPhone-authentic <b>.MOV</b> files. Strips every trace of origin metadata, optionally disrupts pixels to break the perceptual hash, and writes a coherent iPhone identity into the exact boxes iOS Photos reads — device, lens, GPS, date, Apple container fields. Works on any source: AI-generated, screen-recorded, or another camera. Batch-drop as many as you like.</p>
 </div>
-<label class="inspector-slot" id="launderDrop" style="min-height:110px;margin-bottom:16px;">
-<input type="file" hidden accept="video/*" id="launderInput">
-<div class="slot-empty"><span class="slot-add">+ DROP VIDEO</span><span>or click to choose · MP4 · MOV · WEBM</span></div>
-<div class="slot-filled">
-<div class="slot-filename" id="launderFileName">--</div>
-<div class="slot-meta"><span id="launderFileMeta">--</span><button type="button" class="slot-clear" id="launderClear" title="Remove">×</button></div>
-</div>
+<label class="inspector-slot" id="launderDrop" style="min-height:96px;margin-bottom:16px;">
+<input type="file" hidden accept="video/*" multiple id="launderInput">
+<div class="slot-empty"><span class="slot-add">+ DROP VIDEOS</span><span>or click to choose · MP4 · MOV · M4V · WEBM · drop as many as you like</span></div>
 </label>
-<div class="inspector-toolbar" id="launderControls" style="flex-wrap:wrap;gap:18px;align-items:center;">
-<div style="display:flex;align-items:center;gap:8px;">
-<span class="toolbar-label">DEVICE</span>
-<select id="launderDevice" style="background:var(--surface-2,#15121c);color:var(--text,#e8e2f0);border:1px solid var(--border,#2a2436);border-radius:3px;padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;"></select>
+<div class="inspector-toolbar" id="launderControls" style="flex-wrap:wrap;gap:20px 26px;align-items:flex-start;">
+<div style="display:flex;flex-direction:column;gap:6px;">
+<span class="toolbar-label">DEVICE IDENTITY</span>
+<select id="launderDevice" style="background:var(--surface-2,#15121c);color:var(--text,#e8e2f0);border:1px solid var(--border,#2a2436);border-radius:3px;padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;min-width:180px;"></select>
 </div>
-<div style="display:flex;align-items:center;gap:8px;">
-<span class="toolbar-label">CAPTURE DATE</span>
-<input type="datetime-local" id="launderDate" style="background:var(--surface-2,#15121c);color:var(--text,#e8e2f0);border:1px solid var(--border,#2a2436);border-radius:3px;padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;">
+<div style="display:flex;flex-direction:column;gap:6px;">
+<span class="toolbar-label">GPS LOCATION</span>
+<div style="display:flex;gap:6px;align-items:center;">
+<span class="seg-control" style="display:inline-flex;">
+<button type="button" class="seg-btn" data-ld-gps="off">OFF</button>
+<button type="button" class="seg-btn" data-ld-gps="random">RANDOM</button>
+<button type="button" class="seg-btn active" data-ld-gps="city">CITY</button>
+</span>
+<select id="launderCity" style="background:var(--surface-2,#15121c);color:var(--text,#e8e2f0);border:1px solid var(--border,#2a2436);border-radius:3px;padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;min-width:170px;"></select>
 </div>
-<div style="display:flex;align-items:center;gap:8px;">
-<span class="toolbar-label">GPS</span>
-<span id="launderGpsLabel" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint,#8a7fa0);">none — set a pin in Editor → iPhone Meta</span>
 </div>
-<button type="button" class="seg-btn" id="launderRunBtn" disabled style="margin-left:auto;font-weight:700;letter-spacing:.12em;padding:9px 18px;">LAUNDER →</button>
+<div style="display:flex;flex-direction:column;gap:6px;">
+<span class="toolbar-label">DISRUPTION PRESET</span>
+<span class="seg-control" id="launderPreset" style="display:inline-flex;">
+<button type="button" class="seg-btn" data-ld-preset="gentle">GENTLE</button>
+<button type="button" class="seg-btn active" data-ld-preset="balanced">BALANCED</button>
+<button type="button" class="seg-btn" data-ld-preset="aggressive">AGGRESSIVE</button>
+<button type="button" class="seg-btn" data-ld-preset="metadata">META ONLY</button>
+</span>
 </div>
-<div id="launderStatus" style="margin-top:16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim,#b4a8c8);letter-spacing:.03em;min-height:20px;"></div>
+<button type="button" class="seg-btn" id="launderRunBtn" disabled style="margin-left:auto;align-self:flex-end;font-weight:700;letter-spacing:.12em;padding:10px 22px;">RUN LAUNDER →</button>
+</div>
+<div id="launderStatus" style="margin-top:14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim,#b4a8c8);letter-spacing:.03em;min-height:16px;"></div>
+<div id="launderQueue" style="margin-top:12px;display:flex;flex-direction:column;gap:6px;"></div>
 </div>
 </div>
 <div id="trendingView" class="hidden">
@@ -9019,7 +9028,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.12.0';
+const APP_VERSION = '4.13.0';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -16047,96 +16056,489 @@ function patchFtypToQuickTime(bytes) {
 //   captureDate Date; defaults to state.iphoneCaptureDate, else now
 //   gps         [lat, lon]; defaults to getGpsForExport()
 //   onStatus    optional (msg:string) => void progress callback
-async function launderVideoBlob(blob, opts = {}) {
+// ============================================================================
+// v4.13.0: LAUNDER — 1:1 port of Media Studio's launder subsystem.
+// Ported from the source repo (v3devv/snap-caption-studio, app/src/repost/core):
+// gps-cities.ts, device-profiles.ts, launder-pipeline.ts, metadata-inject.ts,
+// metadata-scrub.ts, mov-compressorname.ts, launder.ts, rng.ts.
+// Focused on the VIDEO path (Apple identity). Every ffmpeg/exiftool/byte-patch
+// step verified against the bundled sidecars.
+// ============================================================================
+
+// --- mulberry32 seeded RNG (rng.ts) ---
+function _ldRng(seed) {
+  let s = (seed | 0) >>> 0;
+  return function () {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// --- Cities (gps-cities.ts) ---
+const LAUNDER_CITIES = [
+  { name: 'London', country: 'UK', lat: 51.5074, lon: -0.1278, radiusKm: 9, elevM: 11, tzStd: 0, dst: true, hemi: 'N' },
+  { name: 'Paris', country: 'France', lat: 48.8566, lon: 2.3522, radiusKm: 7, elevM: 35, tzStd: 60, dst: true, hemi: 'N' },
+  { name: 'Berlin', country: 'Germany', lat: 52.5200, lon: 13.4050, radiusKm: 9, elevM: 34, tzStd: 60, dst: true, hemi: 'N' },
+  { name: 'Madrid', country: 'Spain', lat: 40.4168, lon: -3.7038, radiusKm: 8, elevM: 667, tzStd: 60, dst: true, hemi: 'N' },
+  { name: 'Rome', country: 'Italy', lat: 41.9028, lon: 12.4964, radiusKm: 7, elevM: 21, tzStd: 60, dst: true, hemi: 'N' },
+  { name: 'Amsterdam', country: 'Netherlands', lat: 52.3676, lon: 4.9041, radiusKm: 5, elevM: 2, tzStd: 60, dst: true, hemi: 'N' },
+  { name: 'Barcelona', country: 'Spain', lat: 41.3874, lon: 2.1686, radiusKm: 5, elevM: 12, tzStd: 60, dst: true, hemi: 'N' },
+  { name: 'Dublin', country: 'Ireland', lat: 53.3498, lon: -6.2603, radiusKm: 6, elevM: 20, tzStd: 0, dst: true, hemi: 'N' },
+  { name: 'Lisbon', country: 'Portugal', lat: 38.7223, lon: -9.1393, radiusKm: 5, elevM: 2, tzStd: 0, dst: true, hemi: 'N' },
+  { name: 'Vienna', country: 'Austria', lat: 48.2082, lon: 16.3738, radiusKm: 6, elevM: 151, tzStd: 60, dst: true, hemi: 'N' },
+  { name: 'Stockholm', country: 'Sweden', lat: 59.3293, lon: 18.0686, radiusKm: 6, elevM: 28, tzStd: 60, dst: true, hemi: 'N' },
+  { name: 'New York', country: 'USA', lat: 40.7128, lon: -74.0060, radiusKm: 9, elevM: 10, tzStd: -300, dst: true, hemi: 'N' },
+  { name: 'Los Angeles', country: 'USA', lat: 34.0522, lon: -118.2437, radiusKm: 9, elevM: 71, tzStd: -480, dst: true, hemi: 'N' },
+  { name: 'Chicago', country: 'USA', lat: 41.8781, lon: -87.6298, radiusKm: 8, elevM: 182, tzStd: -360, dst: true, hemi: 'N' },
+  { name: 'San Francisco', country: 'USA', lat: 37.7749, lon: -122.4194, radiusKm: 6, elevM: 16, tzStd: -480, dst: true, hemi: 'N' },
+  { name: 'Miami', country: 'USA', lat: 25.7617, lon: -80.1918, radiusKm: 7, elevM: 2, tzStd: -300, dst: true, hemi: 'N' },
+  { name: 'Seattle', country: 'USA', lat: 47.6062, lon: -122.3321, radiusKm: 7, elevM: 53, tzStd: -480, dst: true, hemi: 'N' },
+  { name: 'Toronto', country: 'Canada', lat: 43.6532, lon: -79.3832, radiusKm: 8, elevM: 76, tzStd: -300, dst: true, hemi: 'N' },
+  { name: 'Vancouver', country: 'Canada', lat: 49.2827, lon: -123.1207, radiusKm: 6, elevM: 70, tzStd: -480, dst: true, hemi: 'N' },
+  { name: 'Mexico City', country: 'Mexico', lat: 19.4326, lon: -99.1332, radiusKm: 9, elevM: 2240, tzStd: -360, dst: false, hemi: 'N' },
+  { name: 'Tokyo', country: 'Japan', lat: 35.6762, lon: 139.6503, radiusKm: 9, elevM: 40, tzStd: 540, dst: false, hemi: 'N' },
+  { name: 'Hong Kong', country: 'Hong Kong', lat: 22.3193, lon: 114.1694, radiusKm: 5, elevM: 40, tzStd: 480, dst: false, hemi: 'N' },
+  { name: 'Singapore', country: 'Singapore', lat: 1.3521, lon: 103.8198, radiusKm: 6, elevM: 15, tzStd: 480, dst: false, hemi: 'N' },
+  { name: 'Seoul', country: 'South Korea', lat: 37.5665, lon: 126.9780, radiusKm: 8, elevM: 38, tzStd: 540, dst: false, hemi: 'N' },
+  { name: 'Bangkok', country: 'Thailand', lat: 13.7563, lon: 100.5018, radiusKm: 8, elevM: 2, tzStd: 420, dst: false, hemi: 'N' },
+  { name: 'Mumbai', country: 'India', lat: 19.0760, lon: 72.8777, radiusKm: 8, elevM: 14, tzStd: 330, dst: false, hemi: 'N' },
+  { name: 'Dubai', country: 'UAE', lat: 25.2048, lon: 55.2708, radiusKm: 8, elevM: 5, tzStd: 240, dst: false, hemi: 'N' },
+  { name: 'Shanghai', country: 'China', lat: 31.2304, lon: 121.4737, radiusKm: 9, elevM: 4, tzStd: 480, dst: false, hemi: 'N' },
+  { name: 'Sydney', country: 'Australia', lat: -33.8688, lon: 151.2093, radiusKm: 8, elevM: 39, tzStd: 600, dst: true, hemi: 'S' },
+  { name: 'Melbourne', country: 'Australia', lat: -37.8136, lon: 144.9631, radiusKm: 8, elevM: 31, tzStd: 600, dst: true, hemi: 'S' },
+  { name: 'Auckland', country: 'New Zealand', lat: -36.8485, lon: 174.7633, radiusKm: 6, elevM: 25, tzStd: 720, dst: true, hemi: 'S' },
+  { name: 'São Paulo', country: 'Brazil', lat: -23.5505, lon: -46.6333, radiusKm: 9, elevM: 760, tzStd: -180, dst: false, hemi: 'S' },
+  { name: 'Rio de Janeiro', country: 'Brazil', lat: -22.9068, lon: -43.1729, radiusKm: 7, elevM: 2, tzStd: -180, dst: false, hemi: 'S' },
+  { name: 'Buenos Aires', country: 'Argentina', lat: -34.6037, lon: -58.3816, radiusKm: 8, elevM: 25, tzStd: -180, dst: false, hemi: 'S' },
+  { name: 'Cape Town', country: 'South Africa', lat: -33.9249, lon: 18.4241, radiusKm: 6, elevM: 25, tzStd: 120, dst: false, hemi: 'S' },
+  { name: 'Johannesburg', country: 'South Africa', lat: -26.2041, lon: 28.0473, radiusKm: 8, elevM: 1753, tzStd: 120, dst: false, hemi: 'S' },
+  { name: 'Cairo', country: 'Egypt', lat: 30.0444, lon: 31.2357, radiusKm: 9, elevM: 23, tzStd: 120, dst: true, hemi: 'N' },
+  { name: 'Istanbul', country: 'Turkey', lat: 41.0082, lon: 28.9784, radiusKm: 9, elevM: 40, tzStd: 180, dst: false, hemi: 'N' },
+  { name: 'Copenhagen', country: 'Denmark', lat: 55.6761, lon: 12.5683, radiusKm: 5, elevM: 14, tzStd: 60, dst: true, hemi: 'N' },
+];
+const LAUNDER_DEFAULT_CITY = 'Miami';
+
+function _ldIsDst(when, hemi) {
+  const m = when.getUTCMonth();
+  return hemi === 'N' ? (m >= 2 && m <= 9) : (m <= 2 || m >= 9);
+}
+function _ldP2(n) { return String(n).padStart(2, '0'); }
+function _ldTzForCity(city, when) {
+  const mins = city.tzStd + (city.dst && _ldIsDst(when, city.hemi) ? 60 : 0);
+  const a = Math.abs(mins);
+  return `${mins < 0 ? '-' : '+'}${_ldP2(Math.floor(a / 60))}:${_ldP2(a % 60)}`;
+}
+function _ldClampLat(l) { return Math.max(-90, Math.min(90, l)); }
+function _ldWrapLon(l) { return ((l + 540) % 360) - 180; }
+function _ldRandomInCity(city, rng) {
+  const R = city.radiusKm;
+  const r = R * Math.sqrt(rng());
+  const theta = 2 * Math.PI * rng();
+  const dLat = (r * Math.cos(theta)) / 111.0;
+  const cosLat = Math.max(0.01, Math.cos((city.lat * Math.PI) / 180));
+  const dLon = (r * Math.sin(theta)) / (111.0 * cosLat);
+  const altitudeM = Math.max(0, city.elevM + (rng() - 0.5) * 50);
+  return { lat: _ldClampLat(city.lat + dLat), lon: _ldWrapLon(city.lon + dLon), altitudeM };
+}
+function _ldRandomCity(rng) { return LAUNDER_CITIES[Math.floor(rng() * LAUNDER_CITIES.length)] || LAUNDER_CITIES[0]; }
+function _ldFindCity(name) { const n = (name || '').trim().toLowerCase(); return LAUNDER_CITIES.find(c => c.name.toLowerCase() === n); }
+function _ldDefaultCity() { return _ldFindCity(LAUNDER_DEFAULT_CITY) || LAUNDER_CITIES[0]; }
+
+// --- Device profiles (device-profiles.ts), Apple only for video ---
+const _LD_IOS = ['26.3', '26.4', '26.4.1', '26.5', '26.5.1', '26.6', '18.6.1'];
+const _LD_IOS17 = ['26.0', '26.0.1', '26.1', '26.4.1', '26.5', '26.5.1', '26.6'];
+function _ldIphone(id, model, sw, fl, fl35, fn, cams) {
+  return { id, label: model, make: 'Apple', model, software: sw, lensMake: 'Apple',
+    lensModel: `${model} back ${cams} camera ${fl}mm f/${fn}`, focalLengthMm: fl, focalLength35: fl35, fNumber: fn };
+}
+const LAUNDER_DEVICES = [
+  _ldIphone('iphone-11', 'iPhone 11', _LD_IOS, 4.25, 26, 1.8, 'dual'),
+  _ldIphone('iphone-11-pro', 'iPhone 11 Pro', _LD_IOS, 4.25, 26, 1.8, 'triple'),
+  _ldIphone('iphone-11-pro-max', 'iPhone 11 Pro Max', _LD_IOS, 4.25, 26, 1.8, 'triple'),
+  _ldIphone('iphone-12-mini', 'iPhone 12 mini', _LD_IOS, 4.2, 26, 1.6, 'dual'),
+  _ldIphone('iphone-12', 'iPhone 12', _LD_IOS, 4.2, 26, 1.6, 'dual'),
+  _ldIphone('iphone-12-pro', 'iPhone 12 Pro', _LD_IOS, 4.2, 26, 1.6, 'triple'),
+  _ldIphone('iphone-12-pro-max', 'iPhone 12 Pro Max', _LD_IOS, 5.1, 26, 1.6, 'triple'),
+  _ldIphone('iphone-13-mini', 'iPhone 13 mini', _LD_IOS, 5.1, 26, 1.6, 'dual'),
+  _ldIphone('iphone-13', 'iPhone 13', _LD_IOS, 5.1, 26, 1.6, 'dual'),
+  _ldIphone('iphone-13-pro', 'iPhone 13 Pro', _LD_IOS, 5.7, 26, 1.5, 'triple'),
+  _ldIphone('iphone-13-pro-max', 'iPhone 13 Pro Max', _LD_IOS, 5.7, 26, 1.5, 'triple'),
+  _ldIphone('iphone-14', 'iPhone 14', _LD_IOS, 5.7, 26, 1.5, 'dual'),
+  _ldIphone('iphone-14-plus', 'iPhone 14 Plus', _LD_IOS, 5.7, 26, 1.5, 'dual'),
+  _ldIphone('iphone-14-pro', 'iPhone 14 Pro', _LD_IOS, 6.86, 24, 1.78, 'triple'),
+  _ldIphone('iphone-14-pro-max', 'iPhone 14 Pro Max', _LD_IOS, 6.86, 24, 1.78, 'triple'),
+  _ldIphone('iphone-15', 'iPhone 15', _LD_IOS, 6.86, 26, 1.6, 'dual'),
+  _ldIphone('iphone-15-plus', 'iPhone 15 Plus', _LD_IOS, 6.86, 26, 1.6, 'dual'),
+  _ldIphone('iphone-15-pro', 'iPhone 15 Pro', _LD_IOS, 6.765, 24, 1.78, 'triple'),
+  _ldIphone('iphone-15-pro-max', 'iPhone 15 Pro Max', _LD_IOS, 6.765, 24, 1.78, 'triple'),
+  _ldIphone('iphone-16', 'iPhone 16', _LD_IOS, 6.86, 26, 1.6, 'dual'),
+  _ldIphone('iphone-16-plus', 'iPhone 16 Plus', _LD_IOS, 6.86, 26, 1.6, 'dual'),
+  _ldIphone('iphone-16-pro', 'iPhone 16 Pro', _LD_IOS, 6.765, 24, 1.78, 'triple'),
+  _ldIphone('iphone-16-pro-max', 'iPhone 16 Pro Max', _LD_IOS, 6.765, 24, 1.78, 'triple'),
+  _ldIphone('iphone-17', 'iPhone 17', _LD_IOS17, 6.88, 26, 1.6, 'dual'),
+  _ldIphone('iphone-17-pro', 'iPhone 17 Pro', _LD_IOS17, 6.765, 24, 1.78, 'triple'),
+  _ldIphone('iphone-17-pro-max', 'iPhone 17 Pro Max', _LD_IOS17, 6.765, 24, 1.78, 'triple'),
+];
+const LAUNDER_DEFAULT_DEVICE = 'iphone-16-pro';
+function _ldFindDevice(id) { return LAUNDER_DEVICES.find(d => d.id === id); }
+function _ldPickSoftware(d, rng) { return d.software[Math.floor(rng() * d.software.length)] || d.software[0]; }
+
+// --- Disruption presets + ffmpeg -vf builder (launder-pipeline.ts) ---
+const LAUNDER_PRESETS = {
+  gentle:     { noise: 0.15, colorShift: 0.2, blur: 0.1, sharpen: 0.1, crop: 0.2, chromaAberration: 0.15, vignette: 0.25, distortion: 0.1 },
+  balanced:   { noise: 0.35, colorShift: 0.45, blur: 0.15, sharpen: 0.25, crop: 0.4, chromaAberration: 0.3, vignette: 0.4, distortion: 0.25 },
+  aggressive: { noise: 0.6, colorShift: 0.7, blur: 0.25, sharpen: 0.4, crop: 0.65, chromaAberration: 0.55, vignette: 0.6, distortion: 0.45 },
+};
+const _ldLerp = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t));
+const _ldJit = (rng, sp) => (rng() - 0.5) * 2 * sp;
+function _ldBuildVf(cfg, seed) {
+  const rng = _ldRng(seed);
+  const f = [];
+  if (cfg.crop > 0.01) {
+    const z = 1 + _ldLerp(0.004, 0.02, cfg.crop);
+    const px = (0.5 + _ldJit(rng, 0.4)).toFixed(3);
+    const py = (0.5 + _ldJit(rng, 0.4)).toFixed(3);
+    f.push(`scale=iw*${z.toFixed(4)}:ih*${z.toFixed(4)}`, `crop=iw/${z.toFixed(4)}:ih/${z.toFixed(4)}:(in_w-out_w)*${px}:(in_h-out_h)*${py}`);
+  }
+  if (cfg.distortion > 0.01) {
+    const k = _ldLerp(0.004, 0.03, cfg.distortion) * (rng() < 0.5 ? 1 : -1);
+    f.push(`lenscorrection=k1=${k.toFixed(4)}:k2=${(k * 0.4).toFixed(4)}`);
+  }
+  if (cfg.colorShift > 0.01) {
+    const b = _ldJit(rng, _ldLerp(0.01, 0.05, cfg.colorShift)).toFixed(3);
+    const c = (1 + _ldJit(rng, _ldLerp(0.02, 0.08, cfg.colorShift))).toFixed(3);
+    const s = (1 + _ldJit(rng, _ldLerp(0.03, 0.10, cfg.colorShift))).toFixed(3);
+    const g = (1 + _ldJit(rng, _ldLerp(0.02, 0.06, cfg.colorShift))).toFixed(3);
+    const h = _ldJit(rng, _ldLerp(1.5, 5, cfg.colorShift)).toFixed(2);
+    f.push(`eq=brightness=${b}:contrast=${c}:saturation=${s}:gamma=${g}`, `hue=h=${h}`);
+  }
+  if (cfg.chromaAberration > 0.01) {
+    const sh = Math.max(1, Math.round(_ldLerp(1, 4, cfg.chromaAberration)));
+    f.push(`rgbashift=rh=${sh}:bh=${-sh}`);
+  }
+  if (cfg.blur > 0.01) f.push(`gblur=sigma=${_ldLerp(0.2, 1.0, cfg.blur).toFixed(2)}`);
+  if (cfg.sharpen > 0.01) f.push(`unsharp=5:5:${_ldLerp(0.2, 1.2, cfg.sharpen).toFixed(2)}:5:5:0`);
+  if (cfg.vignette > 0.01) f.push(`vignette=angle=${(Math.PI / _ldLerp(7, 4, cfg.vignette)).toFixed(4)}`);
+  if (cfg.noise > 0.01) f.push(`noise=alls=${Math.round(_ldLerp(2, 14, cfg.noise))}:allf=t+u`);
+  return f.length ? f.join(',') : 'null';
+}
+
+// --- exiftool video inject args (metadata-inject.ts buildVideoInjectArgs) ---
+function _ldTzMinutes(tz) {
+  const m = (tz || '').match(/^([+-])(\d{2}):?(\d{2})$/);
+  if (!m) return -240;
+  return (m[1] === '-' ? -1 : 1) * (parseInt(m[2], 10) * 60 + parseInt(m[3], 10));
+}
+function _ldIsoLocal(utc, tz) {
+  const local = new Date(utc.getTime() + _ldTzMinutes(tz) * 60000);
+  const s = _ldP2;
+  return `${local.getUTCFullYear()}-${s(local.getUTCMonth() + 1)}-${s(local.getUTCDate())}T${s(local.getUTCHours())}:${s(local.getUTCMinutes())}:${s(local.getUTCSeconds())}${tz}`;
+}
+function _ldUtcDateTime(utc) {
+  const s = _ldP2;
+  return `${utc.getUTCFullYear()}:${s(utc.getUTCMonth() + 1)}:${s(utc.getUTCDate())} ${s(utc.getUTCHours())}:${s(utc.getUTCMinutes())}:${s(utc.getUTCSeconds())}`;
+}
+// Returns exiftool args WITHOUT the trailing path (caller passes filePath separately).
+function _ldBuildVideoInjectArgs(device, gps, whenUtc, tz, seed) {
+  const rng = _ldRng(seed);
+  const d = device;
+  const sw = _ldPickSoftware(d, rng);
+  const utc = _ldUtcDateTime(whenUtc);
+  const args = ['-overwrite_original', '-q', '-m',
+    `-Keys:Make=${d.make}`,
+    `-Keys:Model=${d.model}`,
+    `-Keys:Software=${sw}`,
+    `-Keys:CreationDate=${_ldIsoLocal(whenUtc, tz)}`,
+    `-QuickTime:CreateDate=${utc}`, `-QuickTime:ModifyDate=${utc}`,
+    `-QuickTime:TrackCreateDate=${utc}`, `-QuickTime:TrackModifyDate=${utc}`,
+    `-QuickTime:MediaCreateDate=${utc}`, `-QuickTime:MediaModifyDate=${utc}`,
+    `-Keys:FullFrameRatePlaybackIntent=1`,
+    `-QuickTime:LensModel-eng-US=${d.model} back camera ${d.focalLengthMm}mm f/${d.fNumber}`,
+    `-QuickTime:FocalLengthIn35mmFormat-eng-US=${d.focalLength35}`,
+  ];
+  if (gps) {
+    args.push(`-Keys:GPSCoordinates=${gps.lat.toFixed(6)}, ${gps.lon.toFixed(6)}, ${gps.altitudeM.toFixed(3)}`);
+    args.push(`-Keys:LocationAccuracyHorizontal=${(4 + rng() * 11).toFixed(6)}`);
+  }
+  return args;
+}
+
+// --- MOV byte-patchers (mov-compressorname.ts) ---
+function _ldBoxes(buf, start, end) {
+  const u32 = o => (buf[o] * 0x1000000 + (buf[o + 1] << 16) + (buf[o + 2] << 8) + buf[o + 3]) >>> 0;
+  const t4 = o => String.fromCharCode(buf[o + 4], buf[o + 5], buf[o + 6], buf[o + 7]);
+  const out = []; let p = start;
+  while (p + 8 <= end) {
+    let size = u32(p), hdr = 8;
+    if (size === 1) { const hi = u32(p + 8), lo = u32(p + 12); size = hi === 0 ? lo : hi * 0x100000000 + lo; hdr = 16; }
+    else if (size === 0) { size = end - p; }
+    if (size < hdr || p + size > end) break;
+    out.push({ type: t4(p), start: p, size, dataStart: p + hdr, end: p + size });
+    p += size;
+  }
+  return out;
+}
+const _LD_LEAK = /lav[cf]|libx26[45]|x26[45]|ffmpeg|gpac|handbrake|mediainfo/i;
+function _ldCodecLabel(type) {
+  const t = type.toLowerCase();
+  if (['hvc1', 'hev1', 'dvh1', 'dvhe'].includes(t)) return 'HEVC';
+  if (['avc1', 'avc3'].includes(t)) return 'H.264';
+  return null;
+}
+function _ldRead4(buf, o) { return String.fromCharCode(buf[o], buf[o + 1], buf[o + 2], buf[o + 3]); }
+function _ldSet4(buf, o, s) { for (let i = 0; i < 4; i++) buf[o + i] = s.charCodeAt(i); }
+function _ldIs4Zero(buf, o) { return buf[o] === 0 && buf[o + 1] === 0 && buf[o + 2] === 0 && buf[o + 3] === 0; }
+function _ldU32(b, o) { return (b[o] * 0x1000000 + (b[o + 1] << 16) + (b[o + 2] << 8) + b[o + 3]) >>> 0; }
+function _ldWu32(b, o, v) { b[o] = (v >>> 24) & 255; b[o + 1] = (v >>> 16) & 255; b[o + 2] = (v >>> 8) & 255; b[o + 3] = v & 255; }
+function _ldWu64(b, o, v) { _ldWu32(b, o, Math.floor(v / 0x100000000)); _ldWu32(b, o + 4, v >>> 0); }
+
+function _ldPatchCompressorName(buf, force) {
+  let patched = 0;
+  const moov = _ldBoxes(buf, 0, buf.length).find(b => b.type === 'moov');
+  if (!moov) return patched;
+  for (const trak of _ldBoxes(buf, moov.dataStart, moov.end).filter(b => b.type === 'trak')) {
+    const mdia = _ldBoxes(buf, trak.dataStart, trak.end).find(b => b.type === 'mdia'); if (!mdia) continue;
+    const minf = _ldBoxes(buf, mdia.dataStart, mdia.end).find(b => b.type === 'minf'); if (!minf) continue;
+    const stbl = _ldBoxes(buf, minf.dataStart, minf.end).find(b => b.type === 'stbl'); if (!stbl) continue;
+    const stsd = _ldBoxes(buf, stbl.dataStart, stbl.end).find(b => b.type === 'stsd'); if (!stsd) continue;
+    for (const e of _ldBoxes(buf, stsd.dataStart + 8, stsd.end)) {
+      const label = _ldCodecLabel(e.type); if (!label) continue;
+      const cnOff = e.start + 50; if (cnOff + 32 > e.end) continue;
+      const len = Math.min(buf[cnOff], 31);
+      let cur = ''; for (let i = 0; i < len; i++) cur += String.fromCharCode(buf[cnOff + 1 + i]);
+      if (!force && !_LD_LEAK.test(cur)) continue;
+      buf[cnOff] = label.length;
+      for (let i = 0; i < 31; i++) buf[cnOff + 1 + i] = i < label.length ? label.charCodeAt(i) : 0;
+      patched++;
+    }
+  }
+  return patched;
+}
+function _ldPatchAppleHandlers(buf) {
+  let patched = 0;
+  const moov = _ldBoxes(buf, 0, buf.length).find(b => b.type === 'moov');
+  if (!moov) return patched;
+  const ph = h => {
+    const tO = h.start + 12, mO = h.start + 20; if (mO + 4 > h.end) return;
+    let did = false;
+    if (_ldIs4Zero(buf, tO)) { _ldSet4(buf, tO, 'mhlr'); did = true; }
+    if (_ldRead4(buf, mO) !== 'appl') { _ldSet4(buf, mO, 'appl'); did = true; }
+    if (did) patched++;
+  };
+  for (const trak of _ldBoxes(buf, moov.dataStart, moov.end).filter(b => b.type === 'trak')) {
+    const mdia = _ldBoxes(buf, trak.dataStart, trak.end).find(b => b.type === 'mdia'); if (!mdia) continue;
+    for (const h of _ldBoxes(buf, mdia.dataStart, mdia.end).filter(b => b.type === 'hdlr')) ph(h);
+    const minf = _ldBoxes(buf, mdia.dataStart, mdia.end).find(b => b.type === 'minf'); if (!minf) continue;
+    for (const h of _ldBoxes(buf, minf.dataStart, minf.end).filter(b => b.type === 'hdlr')) ph(h);
+  }
+  return patched;
+}
+const _LD_OFFSET_CONTAINERS = new Set(['moov', 'trak', 'mdia', 'minf', 'stbl', 'edts', 'udta']);
+function _ldShiftChunkOffsets(moov, delta) {
+  if (delta === 0) return;
+  const walk = (s, e) => {
+    for (const b of _ldBoxes(moov, s, e)) {
+      if (b.type === 'stco' || b.type === 'co64') {
+        const is64 = b.type === 'co64';
+        let o = b.dataStart + 4;
+        const n = _ldU32(moov, o); o += 4;
+        for (let i = 0; i < n; i++) {
+          if (is64) { _ldWu64(moov, o, _ldU32(moov, o) * 0x100000000 + _ldU32(moov, o + 4) + delta); o += 8; }
+          else { _ldWu32(moov, o, (_ldU32(moov, o) + delta) >>> 0); o += 4; }
+        }
+      } else if (_LD_OFFSET_CONTAINERS.has(b.type)) {
+        walk(b.dataStart, b.end);
+      }
+    }
+  };
+  walk(8, moov.length);
+}
+function _ldMoovToEnd(buf) {
+  const top = _ldBoxes(buf, 0, buf.length);
+  const moov = top.find(b => b.type === 'moov');
+  const mdats = top.filter(b => b.type === 'mdat');
+  if (!moov || mdats.length !== 1) return null;
+  if (moov.size !== moov.end - moov.start) return null;
+  const mdat = mdats[0];
+  const hasPadding = top.some(b => b.type === 'free' || b.type === 'skip');
+  if (top[top.length - 1] === moov && !hasPadding) return null;
+  const keep = top.filter(b => b !== moov && b.type !== 'free' && b.type !== 'skip');
+  let newMdatStart = 0, size = 0;
+  for (const b of keep) { if (b === mdat) newMdatStart = size; size += b.size; }
+  const moovBytes = buf.slice(moov.start, moov.end);
+  _ldShiftChunkOffsets(moovBytes, newMdatStart - mdat.start);
+  const out = new Uint8Array(size + moov.size);
+  let w = 0;
+  for (const b of keep) { out.set(buf.subarray(b.start, b.end), w); w += b.size; }
+  out.set(moovBytes, w);
+  return out;
+}
+const _LD_MDTA_KEYS = [
+  'com.apple.quicktime.camera.lens_irisfnumber',
+  'com.apple.quicktime.apple-maker-note.74',
+  'com.apple.quicktime.apple-maker-note.97',
+];
+const _LD_ENG_US_LOCALE = 1431508423;
+const _ldEnc = s => new TextEncoder().encode(s);
+function _ldInjectPropVideoKeys(buf, opts) {
+  const moov = _ldBoxes(buf, 0, buf.length).find(b => b.type === 'moov');
+  if (!moov) return null;
+  let meta = null, keysB = null, ilst = null, trak = null;
+  for (const tr of _ldBoxes(buf, moov.dataStart, moov.end).filter(b => b.type === 'trak')) {
+    const mdia = _ldBoxes(buf, tr.dataStart, tr.end).find(b => b.type === 'mdia'); if (!mdia) continue;
+    const h = _ldBoxes(buf, mdia.dataStart, mdia.end).find(b => b.type === 'hdlr'); if (!h) continue;
+    if (_ldRead4(buf, h.start + 16) !== 'vide') continue;
+    const mt = _ldBoxes(buf, tr.dataStart, tr.end).find(b => b.type === 'meta'); if (!mt) continue;
+    const k = _ldBoxes(buf, mt.dataStart, mt.end).find(b => b.type === 'keys');
+    const il = _ldBoxes(buf, mt.dataStart, mt.end).find(b => b.type === 'ilst');
+    if (k && il) { trak = tr; meta = mt; keysB = k; ilst = il; break; }
+  }
+  if (!trak || !meta || !keysB || !ilst) return null;
+  if (keysB.end > ilst.start) return null;
+  const count = _ldU32(buf, keysB.dataStart + 4);
+  const keyEntries = _LD_MDTA_KEYS.map(name => { const nb = _ldEnc(name); const e = new Uint8Array(8 + nb.length); _ldWu32(e, 0, e.length); e.set(_ldEnc('mdta'), 4); e.set(nb, 8); return e; });
+  const mkItem = (idx, type, loc, val) => {
+    const d = new Uint8Array(16 + val.length); _ldWu32(d, 0, d.length); d.set(_ldEnc('data'), 4); _ldWu32(d, 8, type); _ldWu32(d, 12, loc); d.set(val, 16);
+    const it = new Uint8Array(8 + d.length); _ldWu32(it, 0, it.length); _ldWu32(it, 4, idx); it.set(d, 8); return it;
+  };
+  const i32 = n => { const a = new Uint8Array(4); _ldWu32(a, 0, n >>> 0); return a; };
+  const ilstItems = [
+    mkItem(count + 1, 1, _LD_ENG_US_LOCALE, _ldEnc(opts.iris)),
+    mkItem(count + 2, 21, 0, i32(opts.mk74)),
+    mkItem(count + 3, 21, 0, i32(opts.mk97)),
+  ];
+  const keyAdd = keyEntries.reduce((s, x) => s + x.length, 0);
+  const ilstAdd = ilstItems.reduce((s, x) => s + x.length, 0);
+  const total = keyAdd + ilstAdd;
+  const w = new Uint8Array(buf);
+  _ldWu32(w, moov.start, moov.size + total);
+  _ldWu32(w, trak.start, trak.size + total);
+  _ldWu32(w, meta.start, meta.size + total);
+  _ldWu32(w, keysB.start, keysB.size + keyAdd);
+  _ldWu32(w, keysB.dataStart + 4, count + 3);
+  _ldWu32(w, ilst.start, ilst.size + ilstAdd);
+  const out = new Uint8Array(w.length + total);
+  let p = 0;
+  const put = a => { out.set(a, p); p += a.length; };
+  put(w.subarray(0, keysB.end));
+  keyEntries.forEach(put);
+  put(w.subarray(keysB.end, ilst.end));
+  ilstItems.forEach(put);
+  put(w.subarray(ilst.end, w.length));
+  return out;
+}
+
+// --- Video launder orchestration (launder.ts video path, Tauri-adapted) ---
+// cfg: { deviceId, gpsMode:'off'|'random'|'city'|'coord', gpsCity, gpsCoord:[lat,lon],
+//        tz?, preset:'gentle'|'balanced'|'aggressive'|'metadata', captureDate?:Date,
+//        seed?, onStatus?(msg) }
+// Returns { blob, device, gps, whenUtc, tz } or null.
+async function launderVideoFile(blob, cfg = {}) {
   if (!window.__TAURI__?.core?.invoke) return null;
   const { invoke } = window.__TAURI__.core;
+  const device = _ldFindDevice(cfg.deviceId) || _ldFindDevice(LAUNDER_DEFAULT_DEVICE);
+  const seed = (cfg.seed != null) ? cfg.seed : Math.floor(Math.random() * 0x7fffffff);
+  const rng = _ldRng(seed);
+  let whenUtc = (cfg.captureDate instanceof Date && !isNaN(cfg.captureDate))
+    ? cfg.captureDate
+    : new Date(Date.now() - Math.floor(rng() * 10 * 86400000)); // within last ~10 days
 
-  const device = opts.device || (typeof pickIphoneDevice === 'function' ? pickIphoneDevice() : null);
-  if (!device) return null;
+  // Resolve location + a location-coherent timezone.
+  let gps = null, tz = cfg.tz || '-04:00';
+  const mode = cfg.gpsMode || 'city';
+  if (mode === 'random') {
+    const city = _ldRandomCity(rng); gps = _ldRandomInCity(city, rng); tz = _ldTzForCity(city, whenUtc);
+  } else if (mode === 'city') {
+    const city = _ldFindCity(cfg.gpsCity) || _ldDefaultCity(); gps = _ldRandomInCity(city, rng); tz = _ldTzForCity(city, whenUtc);
+  } else if (mode === 'coord' && cfg.gpsCoord && cfg.gpsCoord.length === 2) {
+    // Explicit pin (caption export uses the editor's GPS): jitter altitude realistically.
+    gps = { lat: cfg.gpsCoord[0], lon: cfg.gpsCoord[1], altitudeM: Math.max(0, 5 + (rng() - 0.5) * 40) };
+  } // 'off' → gps stays null
 
-  let date = (opts.captureDate instanceof Date && !isNaN(opts.captureDate)) ? opts.captureDate : null;
-  if (!date && typeof state !== 'undefined' && state && state.iphoneCaptureDate) {
-    const d = new Date(state.iphoneCaptureDate);
-    if (!isNaN(d.getTime())) date = d;
-  }
-  if (!date) date = new Date();
-
-  let gps = opts.gps || null;
-  if (!gps && typeof getGpsForExport === 'function') gps = getGpsForExport();
-
-  const status = typeof opts.onStatus === 'function' ? opts.onStatus : () => {};
+  const preset = cfg.preset || 'balanced';
+  const disrupt = preset !== 'metadata' && !!LAUNDER_PRESETS[preset];
+  const status = typeof cfg.onStatus === 'function' ? cfg.onStatus : () => {};
 
   const tmpDir = await invoke('make_temp_dir', { prefix: 'launder' });
   try {
     const srcBytes = new Uint8Array(await blob.arrayBuffer());
     await invoke('write_temp_bytes', { dir: tmpDir, name: 'source.bin', bytes: Array.from(srcBytes) });
 
-    // creation_time is UTC; the Keys:CreationDate below carries the local offset
-    // — both describe the same instant, matching a real iPhone capture.
-    const isoUtc = new Date(date.getTime()).toISOString().replace(/\.\d{3}Z$/, '.000000Z');
-    const ffArgs = ['-y', '-hide_banner', '-loglevel', 'error', '-i', 'source.bin', '-map_metadata', '-1'];
-    if (opts.reencode) {
-      ffArgs.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p');
+    // 1. ffmpeg → real QuickTime .mov (qt brand + Core Media handlers, NO faststart
+    //    so moov trails mdat like a real iPhone). Disrupt = libx265/hvc1 re-encode
+    //    with the preset filter graph; metadata-only = lossless stream copy.
+    const ff = ['-y', '-hide_banner', '-loglevel', 'error', '-i', 'source.bin'];
+    if (disrupt) {
+      status('DISRUPTING PIXELS + RE-ENCODING (HEVC)…');
+      ff.push('-vf', _ldBuildVf(LAUNDER_PRESETS[preset], seed),
+        '-c:v', 'libx265', '-tag:v', 'hvc1', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k');
     } else {
-      ffArgs.push('-c:v', 'copy');
+      status('REMUXING TO QUICKTIME…');
+      ff.push('-map', '0', '-c', 'copy');
     }
-    ffArgs.push(
-      '-c:a', 'aac', '-b:a', '192k',
-      '-metadata', `creation_time=${isoUtc}`,
-      '-movflags', '+faststart', '-f', 'mov', 'out.mov',
-    );
-    status(opts.reencode ? 'LAUNDERING (RE-ENCODE)…' : 'REBRANDING TO .MOV…');
-    await invoke('ffmpeg_run', { args: ffArgs, cwd: tmpDir });
-
+    ff.push('-brand', 'qt',
+      '-metadata:s:v:0', 'handler_name=Core Media Video',
+      '-metadata:s:a:0', 'handler_name=Core Media Audio',
+      '-map_metadata', '-1', 'out.mov');
+    await invoke('ffmpeg_run', { args: ff, cwd: tmpDir });
     const outPath = tmpDir + '/out.mov';
 
-    // Pass 1: movie-level Keys + track-level VideoKeys (correct boxes by group).
-    status('WRITING IPHONE METADATA…');
-    await invoke('exiftool_run', { args: _buildLaunderExifArgs(device, date, gps), filePath: outPath });
-    // Pass 2: strip the udta copies exiftool mirrors, matching a real iPhone MOV.
-    await invoke('exiftool_run', { args: ['-overwrite_original', '-q', '-UserData:all='], filePath: outPath });
+    // 2. scrub — strip any C2PA/AI/provenance the source carried.
+    status('STRIPPING SOURCE SIGNATURE…');
+    await invoke('exiftool_run', { args: ['-all=', '-jumbf:all=', '-icc_profile:all=', '-overwrite_original', '-q', '-q', '--', outPath] });
+    // 3. inject the Apple Keys identity (movie meta) + track-level VideoKeys.
+    status('INJECTING APPLE IDENTITY…');
+    await invoke('exiftool_run', { args: [..._ldBuildVideoInjectArgs(device, gps, whenUtc, tz, seed), '--', outPath] });
+    // 4. byte-patch the tells exiftool/ffmpeg can't: CompressorName (Lavc→HEVC/H.264),
+    //    handler vendor (→Apple), moov-to-end, and the proprietary Apple track keys.
+    status('MATCHING APPLE CONTAINER FIELDS…');
+    let buf = new Uint8Array(await invoke('read_temp_file', { path: outPath }));
+    _ldPatchCompressorName(buf, disrupt);
+    _ldPatchAppleHandlers(buf);
+    buf = _ldMoovToEnd(buf) || buf;
+    const pk = _ldInjectPropVideoKeys(buf, { iris: 'F' + device.fNumber.toFixed(2), mk74: 4, mk97: 13 });
+    if (pk) buf = pk;
 
-    const outBytes = await invoke('read_temp_file', { path: outPath });
-    return new Blob([new Uint8Array(outBytes)], { type: 'video/quicktime' });
+    return { blob: new Blob([buf], { type: 'video/quicktime' }), device, gps, whenUtc, tz, seed };
   } catch (e) {
-    console.warn('[launder] pipeline failed:', e);
+    console.warn('[launder] video pipeline failed:', e);
     return null;
   } finally {
     invoke('delete_temp_file', { path: tmpDir }).catch(() => {});
   }
 }
 
-// Build the exiftool arg list for the launder metadata write. `-n` interprets
-// GPS as numeric "lat lon alt"; every other tag lands in its correct box purely
-// by its group prefix (Keys→moov/meta, QuickTime:LensModel→track meta).
-function _buildLaunderExifArgs(device, date, gps) {
-  const pad = n => String(n).padStart(2, '0');
-  const tzOff = -date.getTimezoneOffset();
-  const sgn = tzOff >= 0 ? '+' : '-';
-  const tzH = pad(Math.floor(Math.abs(tzOff) / 60));
-  const tzM = pad(Math.abs(tzOff) % 60);
-  const dstr = `${date.getFullYear()}:${pad(date.getMonth() + 1)}:${pad(date.getDate())} ` +
-               `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${sgn}${tzH}:${tzM}`;
-
-  const sw = device.software || device.qtSoftware || '26.5';
-  const args = ['-overwrite_original', '-q', '-n',
-    '-Keys:Make=Apple',
-    `-Keys:Model=${device.model}`,
-    `-Keys:Software=${sw}`,
-    `-Keys:CreationDate=${dstr}`,
-    '-Keys:FullFrameRatePlaybackIntent=1',
-    `-QuickTime:LensModel=${device.lensModel || (device.model + ' back camera')}`,
-    `-QuickTime:FocalLengthIn35mmFormat=${device.focalLength35mm || 24}`,
-  ];
-  if (gps && gps.length === 2 && isFinite(gps[0]) && isFinite(gps[1])) {
-    // Realistic altitude + horizontal accuracy (vs the old hardcoded 0 / 9.0).
-    const alt = (Math.random() * 40 + 1).toFixed(3);
-    const acc = (Math.random() * 6 + 3).toFixed(6);
-    args.push(`-Keys:GPSCoordinates=${gps[0]} ${gps[1]} ${alt}`);
-    args.push(`-Keys:LocationAccuracyHorizontal=${acc}`);
+// Caption-export entry point (kept name/signature). Metadata-only launder: the
+// caption video is already encoded, so remux (no re-encode) + inject. Uses the
+// editor's GPS pin + capture date, and a random iPhone identity from the pool.
+async function launderVideoBlob(blob, opts = {}) {
+  const coord = (typeof getGpsForExport === 'function') ? getGpsForExport() : null;
+  let captureDate = null;
+  if (typeof state !== 'undefined' && state && state.iphoneCaptureDate) {
+    const d = new Date(state.iphoneCaptureDate);
+    if (!isNaN(d.getTime())) captureDate = d;
   }
-  return args;
+  // Map the editor's chosen pool device (if any) to a launder profile by model.
+  let deviceId = LAUNDER_DEFAULT_DEVICE;
+  const poolDev = opts.device || (typeof pickIphoneDevice === 'function' ? pickIphoneDevice() : null);
+  if (poolDev && poolDev.model) {
+    const match = LAUNDER_DEVICES.find(d => d.model === poolDev.model);
+    if (match) deviceId = match.id; else { const r = LAUNDER_DEVICES[Math.floor(Math.random() * LAUNDER_DEVICES.length)]; deviceId = r.id; }
+  }
+  const res = await launderVideoFile(blob, {
+    deviceId,
+    gpsMode: (coord && coord.length === 2) ? 'coord' : 'off',
+    gpsCoord: coord,
+    preset: 'metadata',
+    captureDate,
+    onStatus: opts.onStatus,
+  });
+  return res ? res.blob : null;
 }
+
 
 // --- iPhone MP4 metadata injection (caption-export path) ---
 // v4.12.0: routes through the launder pipeline (ffmpeg .mov remux + exiftool),
@@ -17260,10 +17662,18 @@ function setupInspector() {
 }
 
 // ============================================================================
-// v4.12.0: LAUNDER TAB — drop any video, get a clean iPhone-authentic .MOV.
-// Uses the launderVideoBlob pipeline (ffmpeg .mov re-encode + exiftool).
+// v4.13.0: LAUNDER TAB — batch video laundering (1:1 port of Media Studio).
+// Drop many videos → configure device / GPS (off·random·city) / disruption
+// preset → RUN. Each file runs the full launderVideoFile pipeline and downloads.
 // ============================================================================
-let _launderFile = null;
+const launderState = {
+  files: [],            // [{ id, file, status, name }]
+  deviceId: LAUNDER_DEFAULT_DEVICE,
+  gpsMode: 'city',      // 'off' | 'random' | 'city'
+  gpsCity: LAUNDER_DEFAULT_CITY,
+  preset: 'balanced',   // 'gentle' | 'balanced' | 'aggressive' | 'metadata'
+  running: false,
+};
 
 function setLaunderStatus(msg, kind) {
   const el = document.getElementById('launderStatus');
@@ -17274,28 +17684,29 @@ function setLaunderStatus(msg, kind) {
                  : 'var(--text-dim, #b4a8c8)';
 }
 
-// Refresh the GPS + capture-date readout when the tab is opened, so it reflects
-// whatever the user set in Editor → iPhone Meta.
+function renderLaunderQueue() {
+  const q = document.getElementById('launderQueue');
+  if (!q) return;
+  if (!launderState.files.length) { q.innerHTML = ''; return; }
+  q.innerHTML = launderState.files.map(f => {
+    const color = f.status === 'done' ? 'var(--accent,#C300FF)'
+                : f.status === 'error' ? '#ff4d6d'
+                : f.status && f.status !== 'queued' ? 'var(--text,#e8e2f0)'
+                : 'var(--text-faint,#8a7fa0)';
+    const badge = f.status === 'done' ? '✅' : f.status === 'error' ? '⚠' : f.status === 'queued' ? '•' : '⟳';
+    return `<div style="display:flex;align-items:center;gap:10px;font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--surface,#120f1a);border:1px solid var(--border,#2a2436);border-radius:3px;padding:8px 12px;">
+      <span style="color:${color};">${badge}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-dim,#b4a8c8);">${escHtml(f.file.name)}</span>
+      <span style="color:${color};">${escHtml(f.statusText || f.status || '')}</span>
+    </div>`;
+  }).join('');
+}
+
+let _launderSetupDone = false;
 function launderOnEnterTab() {
-  const gpsLabel = document.getElementById('launderGpsLabel');
-  if (gpsLabel) {
-    const g = (typeof getGpsForExport === 'function') ? getGpsForExport() : null;
-    gpsLabel.textContent = (g && g.length === 2)
-      ? `${g[0].toFixed(5)}, ${g[1].toFixed(5)}`
-      : 'none — set a pin in Editor → iPhone Meta';
-  }
-  const dt = document.getElementById('launderDate');
-  if (dt && !dt.value) {
-    // Default to the editor's capture date, else now (local, for the input).
-    let d = null;
-    if (typeof state !== 'undefined' && state && state.iphoneCaptureDate) {
-      const c = new Date(state.iphoneCaptureDate);
-      if (!isNaN(c.getTime())) d = c;
-    }
-    if (!d) d = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    dt.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
+  // Lazy init — robust even if the DOMContentLoaded init aborted earlier for an
+  // unrelated reason; the tab is guaranteed wired the first time it's opened.
+  if (!_launderSetupDone) { setupLaunderTab(); _launderSetupDone = true; }
 }
 
 function setupLaunderTab() {
@@ -17303,89 +17714,103 @@ function setupLaunderTab() {
   const drop = document.getElementById('launderDrop');
   const runBtn = document.getElementById('launderRunBtn');
   const deviceSel = document.getElementById('launderDevice');
-  const clearBtn = document.getElementById('launderClear');
+  const citySel = document.getElementById('launderCity');
   if (!input || !runBtn) return;
 
-  if (deviceSel && typeof IPHONE_DEVICE_POOL !== 'undefined') {
-    deviceSel.innerHTML = '<option value="random">Random (per launder)</option>' +
-      IPHONE_DEVICE_POOL.map((d, i) =>
-        `<option value="${i}">${escHtml(d.model)} · iOS ${escHtml(d.software || d.qtSoftware || '')}</option>`
-      ).join('');
-  }
+  // Device dropdown (Apple identities). Random option first.
+  deviceSel.innerHTML = `<option value="__random__">Random iPhone (per file)</option>` +
+    LAUNDER_DEVICES.map(d => `<option value="${d.id}" ${d.id === launderState.deviceId ? 'selected' : ''}>${escHtml(d.label)}</option>`).join('');
+  // City dropdown.
+  citySel.innerHTML = LAUNDER_CITIES.map(c =>
+    `<option value="${escHtml(c.name)}" ${c.name === launderState.gpsCity ? 'selected' : ''}>${escHtml(c.name)}, ${escHtml(c.country)}</option>`).join('');
 
-  const onFile = (file) => {
-    if (!file) return;
-    _launderFile = file;
-    drop.classList.add('has-file');
-    document.getElementById('launderFileName').textContent = file.name;
-    document.getElementById('launderFileMeta').textContent = formatBytes(file.size);
-    runBtn.disabled = false;
-    setLaunderStatus('');
+  const addFiles = (fileList) => {
+    const vids = Array.from(fileList || []).filter(f => /video\//.test(f.type) || /\.(mp4|mov|m4v|webm)$/i.test(f.name));
+    for (const file of vids) {
+      launderState.files.push({ id: 'ld' + Math.random().toString(36).slice(2, 9), file, status: 'queued', statusText: 'queued' });
+    }
+    runBtn.disabled = launderState.files.length === 0 || launderState.running;
+    renderLaunderQueue();
+    if (vids.length) setLaunderStatus(`${launderState.files.length} file(s) queued.`);
   };
 
-  input.addEventListener('change', (e) => onFile(e.target.files[0]));
+  input.addEventListener('change', (e) => addFiles(e.target.files));
   drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('dragover'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
-  drop.addEventListener('drop', (e) => {
-    e.preventDefault(); drop.classList.remove('dragover');
-    onFile((e.dataTransfer.files || [])[0]);
+  drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('dragover'); addFiles(e.dataTransfer.files); });
+
+  deviceSel.addEventListener('change', (e) => { launderState.deviceId = e.target.value; });
+  citySel.addEventListener('change', (e) => { launderState.gpsCity = e.target.value; });
+
+  // GPS mode segmented control.
+  document.querySelectorAll('[data-ld-gps]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      launderState.gpsMode = btn.dataset.ldGps;
+      document.querySelectorAll('[data-ld-gps]').forEach(b => b.classList.toggle('active', b === btn));
+      const cs = document.getElementById('launderCity');
+      if (cs) cs.disabled = launderState.gpsMode !== 'city';
+      cs.style.opacity = launderState.gpsMode === 'city' ? '1' : '0.45';
+    });
   });
-  if (clearBtn) clearBtn.addEventListener('click', (e) => {
-    e.preventDefault(); e.stopPropagation();
-    _launderFile = null;
-    drop.classList.remove('has-file');
-    input.value = '';
-    runBtn.disabled = true;
-    setLaunderStatus('');
+  // Preset segmented control.
+  document.querySelectorAll('[data-ld-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      launderState.preset = btn.dataset.ldPreset;
+      document.querySelectorAll('[data-ld-preset]').forEach(b => b.classList.toggle('active', b === btn));
+    });
   });
 
-  runBtn.addEventListener('click', runLaunder);
+  runBtn.addEventListener('click', runLaunderBatch);
 }
 
-async function runLaunder() {
-  if (!_launderFile) return;
+async function runLaunderBatch() {
+  if (launderState.running || !launderState.files.length) return;
   if (!window.__TAURI__?.core?.invoke) {
     setLaunderStatus('Launder needs the desktop app (ffmpeg + exiftool).', 'error');
     return;
   }
+  launderState.running = true;
   const runBtn = document.getElementById('launderRunBtn');
   runBtn.disabled = true;
-  try {
-    let device = null;
-    const sel = document.getElementById('launderDevice');
-    if (sel && sel.value !== 'random' && typeof IPHONE_DEVICE_POOL !== 'undefined') {
-      device = IPHONE_DEVICE_POOL[parseInt(sel.value, 10)] || null;
-    }
-    let captureDate = null;
-    const dt = document.getElementById('launderDate');
-    if (dt && dt.value) { const d = new Date(dt.value); if (!isNaN(d.getTime())) captureDate = d; }
 
-    const out = await launderVideoBlob(_launderFile, {
-      reencode: true,
-      device,
-      captureDate,
-      onStatus: (m) => setLaunderStatus(m),
-    });
-    if (!out) {
-      setLaunderStatus('Launder failed — check the console for details.', 'error');
-      runBtn.disabled = false;
-      return;
+  const pending = launderState.files.filter(f => f.status === 'queued' || f.status === 'error');
+  let done = 0, failed = 0;
+  for (let i = 0; i < pending.length; i++) {
+    const item = pending[i];
+    item.status = 'running'; item.statusText = 'starting…'; renderLaunderQueue();
+    setLaunderStatus(`Laundering ${i + 1}/${pending.length}: ${item.file.name}`);
+    try {
+      const deviceId = launderState.deviceId === '__random__'
+        ? LAUNDER_DEVICES[Math.floor(Math.random() * LAUNDER_DEVICES.length)].id
+        : launderState.deviceId;
+      const res = await launderVideoFile(item.file, {
+        deviceId,
+        gpsMode: launderState.gpsMode,
+        gpsCity: launderState.gpsCity,
+        preset: launderState.preset,
+        onStatus: (m) => { item.statusText = m; renderLaunderQueue(); },
+      });
+      if (!res || !res.blob) throw new Error('pipeline failed');
+      const fname = (typeof generateIphoneFilename === 'function') ? generateIphoneFilename('MOV')
+        : ('IMG_' + Math.floor(1000 + Math.random() * 9000) + '.MOV');
+      if (typeof deliverBlob === 'function') deliverBlob(res.blob, fname);
+      else { const a = document.createElement('a'); a.href = URL.createObjectURL(res.blob); a.download = fname; a.click(); }
+      item.status = 'done';
+      item.statusText = `${res.device.model} · ${res.tz}${res.gps ? ' · GPS' : ''} · ${fname}`;
+      done++;
+    } catch (e) {
+      item.status = 'error';
+      item.statusText = 'failed: ' + (e && e.message || e);
+      failed++;
     }
-    const fname = (typeof generateIphoneFilename === 'function')
-      ? generateIphoneFilename('MOV')
-      : ('IMG_' + Math.floor(1000 + Math.random() * 9000) + '.MOV');
-    if (typeof deliverBlob === 'function') deliverBlob(out, fname);
-    else {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(out); a.download = fname; a.click();
-    }
-    setLaunderStatus(`✅ DONE · ${fname} · ${formatBytes(out.size)}`, 'success');
-  } catch (e) {
-    setLaunderStatus('Error: ' + (e && e.message || e), 'error');
-  } finally {
-    runBtn.disabled = false;
+    renderLaunderQueue();
   }
+
+  launderState.running = false;
+  runBtn.disabled = false;
+  setLaunderStatus(`✅ Laundered ${done} file(s)${failed ? ` · ${failed} failed` : ''}.`, failed ? 'error' : 'success');
 }
+
 
 // ============================================================================
 // EDITOR CAPTION TEMPLATES — save/load/delete named text presets that snapshot
@@ -17939,7 +18364,7 @@ function bindEvents() {
 
   // V3.3: Inspector
   setupInspector();
-  if (typeof setupLaunderTab === 'function') setupLaunderTab();
+  if (!_launderSetupDone && typeof setupLaunderTab === 'function') { setupLaunderTab(); _launderSetupDone = true; }
 
   // V3.3: Filename template - live preview
   const fnInput = document.getElementById('filenameTemplate');
@@ -18536,6 +18961,29 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.13.0',
+    date: '2026-09-04',
+    title: 'LAUNDER rebuilt 1:1 — full forensic video pipeline, batch input, 39 cities, 26 devices, HEVC + moov-at-end + Apple container byte-patching',
+    sections: [
+      { h: '🧼 The real Launder, ported from source', items: [
+        '📦 Rebuilt the LAUNDER tab as a faithful 1:1 port of the reference implementation (device-profiles, gps-cities, launder-pipeline, metadata-inject, metadata-scrub, mov-compressorname, launder orchestrator). The previous version only did a shallow remux + tag — this is the whole forensic pipeline.',
+      ]},
+      { h: '🌍 Cities + device identity', items: [
+        '📍 <b>39 built-in cities</b> (real centres + radius + ground elevation + standard/DST timezone). GPS mode: <b>OFF · RANDOM · CITY</b>. A jittered point inside the city\'s radius, realistic altitude, and — critically — <b>CreationDate / OffsetTime derived from the city\'s timezone</b> (with DST), so the clock matches where the GPS says the shot was taken (the old machine-tz mismatch is gone).',
+        '📱 <b>26 iPhone device profiles</b> (11 → 17 Pro Max) with coherent lens string, focal length, aperture and plausible iOS build — or Random per file.',
+      ]},
+      { h: '🎛 Disruption presets + batch', items: [
+        '🌀 <b>GENTLE · BALANCED · AGGRESSIVE · META ONLY.</b> The first three re-encode through a deterministic ffmpeg filter graph (crop, lens distortion, colour jitter, chromatic aberration, micro-blur, clarity, vignette, sensor noise) to break the perceptual hash; META ONLY does a lossless stream-copy remux (no quality loss).',
+        '🗂 <b>Batch input</b> — drop as many videos as you like; each is laundered and downloaded with a live per-file status queue.',
+      ]},
+      { h: '🩹 Forensic container matching (the part that was missing)', items: [
+        '🎬 Apple identity videos re-encode to <b>HEVC (libx265 / hvc1)</b> like a real iPhone, <b>brand qt</b>, <b>Core Media Video/Audio</b> handler names, and <b>NO faststart</b> — moov trails mdat, matching a genuine capture\'s box order.',
+        '🔬 Byte-level patches exiftool/ffmpeg can\'t do: <code>CompressorName</code> Lavc→<b>HEVC/H.264</b>, handler <b>vendor → Apple</b>, <b>moov relocated to end</b> (stco/co64 offsets shifted), and the proprietary Apple track keys <code>camera.lens_irisfnumber</code> + <code>apple-maker-note.74/97</code> injected into the video track — plus a full metadata scrub before the identity inject.',
+        '📤 The caption video export now routes through the same pipeline (metadata-only), so captioned videos get the identical correct container.',
+      ]},
+    ],
+  },
   {
     version: '4.12.0',
     date: '2026-09-04',
