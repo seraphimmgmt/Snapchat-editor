@@ -2935,7 +2935,9 @@ trxLoad();
     const findZoneAt = (x, y) => {
       const el = document.elementFromPoint(x, y);
       if (!el) return null;
-      return el.closest('#uploadZone, #carouselDropZone, #carouselStrip, .inspector-slot');
+      // #launderDrop first so the launder zone isn't captured by its own
+      // .inspector-slot class (which it borrows only for styling).
+      return el.closest('#launderDrop, #uploadZone, #carouselDropZone, #carouselStrip, .inspector-slot');
     };
     const setHover = (el) => {
       if (hoveredZoneEl === el) return;
@@ -2992,6 +2994,10 @@ trxLoad();
       // 1) Specific zone under cursor wins
       const zone = findZoneAt(pos.x, pos.y);
       if (zone) {
+        if (zone.id === 'launderDrop' && typeof launderAddFiles === 'function') {
+          launderAddFiles(files);
+          return;
+        }
         if ((zone.id === 'carouselDropZone' || zone.id === 'carouselStrip')
             && typeof addCarouselFiles === 'function') {
           addCarouselFiles(files);
@@ -3017,6 +3023,10 @@ trxLoad();
       //    carousel page goes to the carousel, anywhere on inspector goes to
       //    the first empty inspector slot, etc.
       const view = (typeof currentView !== 'undefined' && currentView) || 'editor';
+      if (view === 'launder' && typeof launderAddFiles === 'function') {
+        launderAddFiles(files);
+        return;
+      }
       if (view === 'carousel' && typeof addCarouselFiles === 'function') {
         addCarouselFiles(files);
         recordRecent('carousel', files.map((_, i) => i));
@@ -9028,7 +9038,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.13.0';
+const APP_VERSION = '4.13.1';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -17709,6 +17719,21 @@ function launderOnEnterTab() {
   if (!_launderSetupDone) { setupLaunderTab(); _launderSetupDone = true; }
 }
 
+// Module-level so the global Tauri drag-drop handler can add files too (on
+// desktop, Tauri intercepts OS file drops — HTML drop events never fire).
+function launderAddFiles(fileList) {
+  if (!_launderSetupDone) { setupLaunderTab(); _launderSetupDone = true; }
+  const vids = Array.from(fileList || []).filter(f => /video\//.test(f.type) || /\.(mp4|mov|m4v|webm|mkv)$/i.test(f.name));
+  for (const file of vids) {
+    launderState.files.push({ id: 'ld' + Math.random().toString(36).slice(2, 9), file, status: 'queued', statusText: 'queued' });
+  }
+  const runBtn = document.getElementById('launderRunBtn');
+  if (runBtn) runBtn.disabled = launderState.files.length === 0 || launderState.running;
+  renderLaunderQueue();
+  if (vids.length) setLaunderStatus(`${launderState.files.length} file(s) queued.`);
+  return vids.length;
+}
+
 function setupLaunderTab() {
   const input = document.getElementById('launderInput');
   const drop = document.getElementById('launderDrop');
@@ -17724,15 +17749,7 @@ function setupLaunderTab() {
   citySel.innerHTML = LAUNDER_CITIES.map(c =>
     `<option value="${escHtml(c.name)}" ${c.name === launderState.gpsCity ? 'selected' : ''}>${escHtml(c.name)}, ${escHtml(c.country)}</option>`).join('');
 
-  const addFiles = (fileList) => {
-    const vids = Array.from(fileList || []).filter(f => /video\//.test(f.type) || /\.(mp4|mov|m4v|webm)$/i.test(f.name));
-    for (const file of vids) {
-      launderState.files.push({ id: 'ld' + Math.random().toString(36).slice(2, 9), file, status: 'queued', statusText: 'queued' });
-    }
-    runBtn.disabled = launderState.files.length === 0 || launderState.running;
-    renderLaunderQueue();
-    if (vids.length) setLaunderStatus(`${launderState.files.length} file(s) queued.`);
-  };
+  const addFiles = (fileList) => launderAddFiles(fileList);
 
   input.addEventListener('change', (e) => addFiles(e.target.files));
   drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('dragover'); });
@@ -18961,6 +18978,20 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.13.1',
+    date: '2026-09-04',
+    title: 'LAUNDER — fix desktop drag-and-drop (Mac/Windows) routing onto the tab',
+    sections: [
+      { h: '🩹 Drag-and-drop fix', items: [
+        '🖱 On desktop, Tauri intercepts OS file drops so HTML drop events never fire — the app routes drops through a global handler by cursor position. The LAUNDER zone wasn\'t registered there, so dropping a video onto it fell through to the Editor (or Inspector) instead of queueing it. Now the launder dropzone is wired into the native handler: dropping videos onto the LAUNDER tab (or anywhere on it) queues them, on both Mac and Windows. The file picker (click to browse) was unaffected.',
+        '📼 Also accepts <code>.mkv</code> now, and the batch queue is reachable from the native drop path.',
+      ]},
+      { h: '🪟 Windows', items: [
+        '✅ The launder pipeline runs on Windows: bundled ffmpeg (gyan essentials, includes libx265) + exiftool. Because launder hands bytes straight to ffmpeg, it also handles HEVC source videos on Windows that the Editor preview can\'t decode.',
+      ]},
+    ],
+  },
   {
     version: '4.13.0',
     date: '2026-09-04',
