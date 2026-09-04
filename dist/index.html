@@ -961,6 +961,7 @@
 <button class="view-tab" data-view="drive"><span class="tab-icon">▲</span> DRIVE</button>
 <button class="view-tab" data-view="inspector"><span class="tab-icon">🔍</span> METADATA INSPECTOR</button>
 <button class="view-tab" data-view="trending"><span class="tab-icon">⚡</span> TRENDING</button>
+<button class="view-tab" data-view="launder"><span class="tab-icon">🧼</span> LAUNDER</button>
 </div>
 <main id="editorView">
 <section class="workspace">
@@ -1571,6 +1572,38 @@ EXPORT TO DRIVE
 <div class="metadata-table-wrap" id="metadataTableWrap">
 <div class="metadata-empty">DROP A FILE ABOVE TO BEGIN</div>
 </div>
+</div>
+</div>
+<div id="launderView" class="inspector-view hidden">
+<div class="inspector-inner">
+<div class="inspector-intro">
+<h2>🧼 LAUNDER</h2>
+<p>Drop any video → get a clean iPhone-authentic <b>.MOV</b>. Strips every trace of origin metadata, re-encodes to break the perceptual hash, and writes correct iPhone QuickTime metadata into the exact boxes iOS Photos reads — camera, lens, GPS, date. Works on any source: AI-generated, screen-recorded, or another camera.</p>
+</div>
+<label class="inspector-slot" id="launderDrop" style="min-height:110px;margin-bottom:16px;">
+<input type="file" hidden accept="video/*" id="launderInput">
+<div class="slot-empty"><span class="slot-add">+ DROP VIDEO</span><span>or click to choose · MP4 · MOV · WEBM</span></div>
+<div class="slot-filled">
+<div class="slot-filename" id="launderFileName">--</div>
+<div class="slot-meta"><span id="launderFileMeta">--</span><button type="button" class="slot-clear" id="launderClear" title="Remove">×</button></div>
+</div>
+</label>
+<div class="inspector-toolbar" id="launderControls" style="flex-wrap:wrap;gap:18px;align-items:center;">
+<div style="display:flex;align-items:center;gap:8px;">
+<span class="toolbar-label">DEVICE</span>
+<select id="launderDevice" style="background:var(--surface-2,#15121c);color:var(--text,#e8e2f0);border:1px solid var(--border,#2a2436);border-radius:3px;padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;"></select>
+</div>
+<div style="display:flex;align-items:center;gap:8px;">
+<span class="toolbar-label">CAPTURE DATE</span>
+<input type="datetime-local" id="launderDate" style="background:var(--surface-2,#15121c);color:var(--text,#e8e2f0);border:1px solid var(--border,#2a2436);border-radius:3px;padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;">
+</div>
+<div style="display:flex;align-items:center;gap:8px;">
+<span class="toolbar-label">GPS</span>
+<span id="launderGpsLabel" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint,#8a7fa0);">none — set a pin in Editor → iPhone Meta</span>
+</div>
+<button type="button" class="seg-btn" id="launderRunBtn" disabled style="margin-left:auto;font-weight:700;letter-spacing:.12em;padding:9px 18px;">LAUNDER →</button>
+</div>
+<div id="launderStatus" style="margin-top:16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim,#b4a8c8);letter-spacing:.03em;min-height:20px;"></div>
 </div>
 </div>
 <div id="trendingView" class="hidden">
@@ -8986,7 +9019,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.11.11';
+const APP_VERSION = '4.12.0';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -9000,6 +9033,7 @@ function updateHeaderMeta() {
             : currentView === 'carousel' ? 'CAROUSEL EDIT'
             : currentView === 'drive' ? 'DRIVE'
             : currentView === 'inspector' ? 'METADATA INSPECTOR'
+            : currentView === 'launder' ? 'LAUNDER'
             : currentView.toUpperCase();
   let media = '';
   if (currentView === 'editor' && state && state.mediaType) {
@@ -9028,7 +9062,10 @@ function switchView(view) {
   document.getElementById('inspectorView').classList.toggle('hidden', view !== 'inspector');
   const trendingViewEl = document.getElementById('trendingView');
   if (trendingViewEl) trendingViewEl.classList.toggle('hidden', view !== 'trending');
+  const launderViewEl = document.getElementById('launderView');
+  if (launderViewEl) launderViewEl.classList.toggle('hidden', view !== 'launder');
   if (view === 'trending' && typeof trxOnEnterTab === 'function') trxOnEnterTab();
+  if (view === 'launder' && typeof launderOnEnterTab === 'function') launderOnEnterTab();
   // Pause video preview when leaving editor
   if (view !== 'editor' && !video.paused) video.pause();
   // Show or hide carousel drop/edit state
@@ -15978,8 +16015,142 @@ function patchFtypToQuickTime(bytes) {
   return true;
 }
 
-// --- iPhone MP4 metadata injection ---
+// ============================================================================
+// v4.12.0: LAUNDER — the correct iPhone-metadata pipeline.
+// ============================================================================
+// Reverse-engineered from Media Studio's "Launder" output. The old hand-rolled
+// box surgery (buildIphoneUdta → moov/udta/meta) was the wrong tool: iOS Photos
+// reads movie metadata from a TOP-LEVEL moov/meta, so our udta-nested copy was
+// never surfaced in the Info panel. The correct pipeline:
+//
+//   1. ffmpeg -map_metadata -1 … -f mov   → strips source metadata AND produces
+//      a real .MOV: MajorBrand 'qt' + Core Media handler names, for free
+//      (vs our old .mp4 mux → 'isom' brand). Also stamps container timestamps.
+//   2. exiftool writes each tag into its CORRECT box automatically by group:
+//        -Keys:*              → top-level moov/meta   (Make/Model/Software/
+//                               CreationDate/GPS/LocationAccuracy/…)
+//        -QuickTime:LensModel,
+//         -QuickTime:FocalLengthIn35mmFormat → track-level moov/trak/meta
+//   3. exiftool -UserData:all=   → strips the udta copies exiftool mirrors, so
+//      the box tree matches a real iPhone MOV exactly.
+//
+// Verified against a genuine launder output: byte-for-byte identical box tree.
+// Tauri-only (needs the ffmpeg + exiftool sidecars); returns a laundered .mov
+// Blob, or null on failure so the caller can fall back.
+//
+// opts:
+//   reencode    true  = full libx264 re-encode (Launder tab: breaks the
+//                       perceptual hash + normalises the bitstream).
+//               false = stream-copy remux (caption export: the video is
+//                       already encoded — just rebrand to .mov + tag). Default.
+//   device      pool entry; defaults to pickIphoneDevice()
+//   captureDate Date; defaults to state.iphoneCaptureDate, else now
+//   gps         [lat, lon]; defaults to getGpsForExport()
+//   onStatus    optional (msg:string) => void progress callback
+async function launderVideoBlob(blob, opts = {}) {
+  if (!window.__TAURI__?.core?.invoke) return null;
+  const { invoke } = window.__TAURI__.core;
+
+  const device = opts.device || (typeof pickIphoneDevice === 'function' ? pickIphoneDevice() : null);
+  if (!device) return null;
+
+  let date = (opts.captureDate instanceof Date && !isNaN(opts.captureDate)) ? opts.captureDate : null;
+  if (!date && typeof state !== 'undefined' && state && state.iphoneCaptureDate) {
+    const d = new Date(state.iphoneCaptureDate);
+    if (!isNaN(d.getTime())) date = d;
+  }
+  if (!date) date = new Date();
+
+  let gps = opts.gps || null;
+  if (!gps && typeof getGpsForExport === 'function') gps = getGpsForExport();
+
+  const status = typeof opts.onStatus === 'function' ? opts.onStatus : () => {};
+
+  const tmpDir = await invoke('make_temp_dir', { prefix: 'launder' });
+  try {
+    const srcBytes = new Uint8Array(await blob.arrayBuffer());
+    await invoke('write_temp_bytes', { dir: tmpDir, name: 'source.bin', bytes: Array.from(srcBytes) });
+
+    // creation_time is UTC; the Keys:CreationDate below carries the local offset
+    // — both describe the same instant, matching a real iPhone capture.
+    const isoUtc = new Date(date.getTime()).toISOString().replace(/\.\d{3}Z$/, '.000000Z');
+    const ffArgs = ['-y', '-hide_banner', '-loglevel', 'error', '-i', 'source.bin', '-map_metadata', '-1'];
+    if (opts.reencode) {
+      ffArgs.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p');
+    } else {
+      ffArgs.push('-c:v', 'copy');
+    }
+    ffArgs.push(
+      '-c:a', 'aac', '-b:a', '192k',
+      '-metadata', `creation_time=${isoUtc}`,
+      '-movflags', '+faststart', '-f', 'mov', 'out.mov',
+    );
+    status(opts.reencode ? 'LAUNDERING (RE-ENCODE)…' : 'REBRANDING TO .MOV…');
+    await invoke('ffmpeg_run', { args: ffArgs, cwd: tmpDir });
+
+    const outPath = tmpDir + '/out.mov';
+
+    // Pass 1: movie-level Keys + track-level VideoKeys (correct boxes by group).
+    status('WRITING IPHONE METADATA…');
+    await invoke('exiftool_run', { args: _buildLaunderExifArgs(device, date, gps), filePath: outPath });
+    // Pass 2: strip the udta copies exiftool mirrors, matching a real iPhone MOV.
+    await invoke('exiftool_run', { args: ['-overwrite_original', '-q', '-UserData:all='], filePath: outPath });
+
+    const outBytes = await invoke('read_temp_file', { path: outPath });
+    return new Blob([new Uint8Array(outBytes)], { type: 'video/quicktime' });
+  } catch (e) {
+    console.warn('[launder] pipeline failed:', e);
+    return null;
+  } finally {
+    invoke('delete_temp_file', { path: tmpDir }).catch(() => {});
+  }
+}
+
+// Build the exiftool arg list for the launder metadata write. `-n` interprets
+// GPS as numeric "lat lon alt"; every other tag lands in its correct box purely
+// by its group prefix (Keys→moov/meta, QuickTime:LensModel→track meta).
+function _buildLaunderExifArgs(device, date, gps) {
+  const pad = n => String(n).padStart(2, '0');
+  const tzOff = -date.getTimezoneOffset();
+  const sgn = tzOff >= 0 ? '+' : '-';
+  const tzH = pad(Math.floor(Math.abs(tzOff) / 60));
+  const tzM = pad(Math.abs(tzOff) % 60);
+  const dstr = `${date.getFullYear()}:${pad(date.getMonth() + 1)}:${pad(date.getDate())} ` +
+               `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${sgn}${tzH}:${tzM}`;
+
+  const sw = device.software || device.qtSoftware || '26.5';
+  const args = ['-overwrite_original', '-q', '-n',
+    '-Keys:Make=Apple',
+    `-Keys:Model=${device.model}`,
+    `-Keys:Software=${sw}`,
+    `-Keys:CreationDate=${dstr}`,
+    '-Keys:FullFrameRatePlaybackIntent=1',
+    `-QuickTime:LensModel=${device.lensModel || (device.model + ' back camera')}`,
+    `-QuickTime:FocalLengthIn35mmFormat=${device.focalLength35mm || 24}`,
+  ];
+  if (gps && gps.length === 2 && isFinite(gps[0]) && isFinite(gps[1])) {
+    // Realistic altitude + horizontal accuracy (vs the old hardcoded 0 / 9.0).
+    const alt = (Math.random() * 40 + 1).toFixed(3);
+    const acc = (Math.random() * 6 + 3).toFixed(6);
+    args.push(`-Keys:GPSCoordinates=${gps[0]} ${gps[1]} ${alt}`);
+    args.push(`-Keys:LocationAccuracyHorizontal=${acc}`);
+  }
+  return args;
+}
+
+// --- iPhone MP4 metadata injection (caption-export path) ---
+// v4.12.0: routes through the launder pipeline (ffmpeg .mov remux + exiftool),
+// which places metadata in the boxes iOS Photos actually reads. Falls back to
+// the legacy hand-rolled box injection only if the launder pipeline is
+// unavailable (e.g. non-Tauri preview) so we never regress to zero metadata.
 async function injectIphoneMp4Metadata(blob) {
+  const laundered = await launderVideoBlob(blob, { reencode: false });
+  if (laundered) return laundered;
+  return _injectIphoneMp4MetadataLegacy(blob);
+}
+
+// --- legacy hand-rolled box injector (fallback only) ---
+async function _injectIphoneMp4MetadataLegacy(blob) {
   try {
     const buffer = await blob.arrayBuffer();
     const view = new DataView(buffer);
@@ -17089,6 +17260,134 @@ function setupInspector() {
 }
 
 // ============================================================================
+// v4.12.0: LAUNDER TAB — drop any video, get a clean iPhone-authentic .MOV.
+// Uses the launderVideoBlob pipeline (ffmpeg .mov re-encode + exiftool).
+// ============================================================================
+let _launderFile = null;
+
+function setLaunderStatus(msg, kind) {
+  const el = document.getElementById('launderStatus');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.color = kind === 'error' ? '#ff4d6d'
+                 : kind === 'success' ? 'var(--accent, #C300FF)'
+                 : 'var(--text-dim, #b4a8c8)';
+}
+
+// Refresh the GPS + capture-date readout when the tab is opened, so it reflects
+// whatever the user set in Editor → iPhone Meta.
+function launderOnEnterTab() {
+  const gpsLabel = document.getElementById('launderGpsLabel');
+  if (gpsLabel) {
+    const g = (typeof getGpsForExport === 'function') ? getGpsForExport() : null;
+    gpsLabel.textContent = (g && g.length === 2)
+      ? `${g[0].toFixed(5)}, ${g[1].toFixed(5)}`
+      : 'none — set a pin in Editor → iPhone Meta';
+  }
+  const dt = document.getElementById('launderDate');
+  if (dt && !dt.value) {
+    // Default to the editor's capture date, else now (local, for the input).
+    let d = null;
+    if (typeof state !== 'undefined' && state && state.iphoneCaptureDate) {
+      const c = new Date(state.iphoneCaptureDate);
+      if (!isNaN(c.getTime())) d = c;
+    }
+    if (!d) d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    dt.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+}
+
+function setupLaunderTab() {
+  const input = document.getElementById('launderInput');
+  const drop = document.getElementById('launderDrop');
+  const runBtn = document.getElementById('launderRunBtn');
+  const deviceSel = document.getElementById('launderDevice');
+  const clearBtn = document.getElementById('launderClear');
+  if (!input || !runBtn) return;
+
+  if (deviceSel && typeof IPHONE_DEVICE_POOL !== 'undefined') {
+    deviceSel.innerHTML = '<option value="random">Random (per launder)</option>' +
+      IPHONE_DEVICE_POOL.map((d, i) =>
+        `<option value="${i}">${escHtml(d.model)} · iOS ${escHtml(d.software || d.qtSoftware || '')}</option>`
+      ).join('');
+  }
+
+  const onFile = (file) => {
+    if (!file) return;
+    _launderFile = file;
+    drop.classList.add('has-file');
+    document.getElementById('launderFileName').textContent = file.name;
+    document.getElementById('launderFileMeta').textContent = formatBytes(file.size);
+    runBtn.disabled = false;
+    setLaunderStatus('');
+  };
+
+  input.addEventListener('change', (e) => onFile(e.target.files[0]));
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('dragover'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault(); drop.classList.remove('dragover');
+    onFile((e.dataTransfer.files || [])[0]);
+  });
+  if (clearBtn) clearBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    _launderFile = null;
+    drop.classList.remove('has-file');
+    input.value = '';
+    runBtn.disabled = true;
+    setLaunderStatus('');
+  });
+
+  runBtn.addEventListener('click', runLaunder);
+}
+
+async function runLaunder() {
+  if (!_launderFile) return;
+  if (!window.__TAURI__?.core?.invoke) {
+    setLaunderStatus('Launder needs the desktop app (ffmpeg + exiftool).', 'error');
+    return;
+  }
+  const runBtn = document.getElementById('launderRunBtn');
+  runBtn.disabled = true;
+  try {
+    let device = null;
+    const sel = document.getElementById('launderDevice');
+    if (sel && sel.value !== 'random' && typeof IPHONE_DEVICE_POOL !== 'undefined') {
+      device = IPHONE_DEVICE_POOL[parseInt(sel.value, 10)] || null;
+    }
+    let captureDate = null;
+    const dt = document.getElementById('launderDate');
+    if (dt && dt.value) { const d = new Date(dt.value); if (!isNaN(d.getTime())) captureDate = d; }
+
+    const out = await launderVideoBlob(_launderFile, {
+      reencode: true,
+      device,
+      captureDate,
+      onStatus: (m) => setLaunderStatus(m),
+    });
+    if (!out) {
+      setLaunderStatus('Launder failed — check the console for details.', 'error');
+      runBtn.disabled = false;
+      return;
+    }
+    const fname = (typeof generateIphoneFilename === 'function')
+      ? generateIphoneFilename('MOV')
+      : ('IMG_' + Math.floor(1000 + Math.random() * 9000) + '.MOV');
+    if (typeof deliverBlob === 'function') deliverBlob(out, fname);
+    else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(out); a.download = fname; a.click();
+    }
+    setLaunderStatus(`✅ DONE · ${fname} · ${formatBytes(out.size)}`, 'success');
+  } catch (e) {
+    setLaunderStatus('Error: ' + (e && e.message || e), 'error');
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+
+// ============================================================================
 // EDITOR CAPTION TEMPLATES — save/load/delete named text presets that snapshot
 // the caption text + font + size + colors + outline + bg opacity. Persisted in
 // localStorage. Mirrors the carousel-templates pattern but scoped to the
@@ -17640,6 +17939,7 @@ function bindEvents() {
 
   // V3.3: Inspector
   setupInspector();
+  if (typeof setupLaunderTab === 'function') setupLaunderTab();
 
   // V3.3: Filename template - live preview
   const fnInput = document.getElementById('filenameTemplate');
@@ -18236,6 +18536,24 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.12.0',
+    date: '2026-09-04',
+    title: 'LAUNDER — new tab + the correct iPhone-metadata pipeline (ffmpeg .mov + exiftool), so iOS Photos finally reads camera / lens / GPS / date on videos',
+    sections: [
+      { h: '🧼 New LAUNDER tab', items: [
+        '🎬 Drop ANY video — AI-generated, screen-recorded, other-camera — and get a clean iPhone-authentic <code>.MOV</code>. Strips every trace of origin metadata, re-encodes (libx264 CRF 18, breaks the perceptual hash), and writes correct iPhone QuickTime metadata. Pick the device (or Random per launder), capture date, and it uses the GPS pin from Editor → iPhone Meta.',
+      ]},
+      { h: '🩹 The real fix — correct box placement', items: [
+        '🔬 Reverse-engineered from a reference launder output: iOS Photos reads movie metadata from a <b>top-level <code>moov/meta</code></b>, but our old hand-rolled injector wrote to <code>moov/udta/meta</code> — one level too deep, so Photos never surfaced it (desktop exiftool read it fine, which masked the bug through v4.11.x).',
+        '🛠 New pipeline: <code>ffmpeg -map_metadata -1 … -f mov</code> produces a real <code>.MOV</code> — <code>MajorBrand qt</code> + Core Media handlers for free (vs the old <code>.mp4</code> → <code>isom</code>) — then <b>exiftool WRITES</b> each tag into its correct box by group: <code>-Keys:*</code> → <code>moov/meta</code> (Make/Model/Software/CreationDate/GPS), <code>-QuickTime:LensModel/FocalLength</code> → track-level <code>moov/trak/meta</code>. A final <code>-UserData:all=</code> strips the mirrored udta so the box tree matches a real iPhone exactly.',
+        '📍 GPS now carries a realistic altitude + horizontal accuracy (was hardcoded 0 / 9.0).',
+      ]},
+      { h: '🔁 Caption video export upgraded too', items: [
+        '🎞 The caption video export now routes through the same launder pipeline (stream-copy remux — no re-encode of the already-encoded video), so captioned videos get the correct <code>.MOV</code> container + metadata iOS Photos reads. The legacy box injector remains as a fallback only.',
+      ]},
+    ],
+  },
   {
     version: '4.11.11',
     date: '2026-09-03',
