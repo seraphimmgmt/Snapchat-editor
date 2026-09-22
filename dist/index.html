@@ -3033,7 +3033,7 @@ trxLoad();
         return;
       }
       if (view === 'inspector' && typeof loadInspectorFile === 'function') {
-        const slots = document.querySelectorAll('.inspector-slot');
+        const slots = document.querySelectorAll('#inspectorSlots .inspector-slot');
         let target = 0;
         for (let i = 0; i < slots.length; i++) {
           if (!slots[i].classList.contains('has-file')) { target = i; break; }
@@ -9038,7 +9038,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.13.1';
+const APP_VERSION = '4.13.2';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -17588,7 +17588,7 @@ function loadInspectorFiles(startSlot, files) {
   if (!files || !files.length) return 0;
   let loaded = 0;
   let slot = startSlot;
-  const totalSlots = document.querySelectorAll('.inspector-slot').length;
+  const totalSlots = document.querySelectorAll('#inspectorSlots .inspector-slot').length;
   for (const file of files) {
     // Find next empty slot at or after `slot` — wrap to slot 0 if needed so a
     // batch drop always fills the panel even if the user aimed at slot 2.
@@ -17608,21 +17608,27 @@ function loadInspectorFiles(startSlot, files) {
 }
 
 function clearAllInspectorSlots() {
-  const totalSlots = document.querySelectorAll('.inspector-slot').length;
+  const totalSlots = document.querySelectorAll('#inspectorSlots .inspector-slot').length;
   for (let i = 0; i < totalSlots; i++) clearInspectorSlot(i);
 }
 
 function setupInspector() {
-  document.querySelectorAll('.inspector-slot').forEach(slotEl => {
+  // v4.13.2: scope to the inspector's own slot container. The LAUNDER dropzone
+  // borrows the `.inspector-slot` class for styling but has no data-slot / file
+  // input / .slot-clear child — a bare `.inspector-slot` query iterated it too
+  // and threw on the null .slot-clear, aborting bindEvents/init and leaving the
+  // whole editor unwired. Every element lookup below is now null-guarded too.
+  document.querySelectorAll('#inspectorSlots .inspector-slot').forEach(slotEl => {
     const slotIdx = parseInt(slotEl.dataset.slot);
     const fileInput = slotEl.querySelector('input[type="file"]');
-    // v4.11.4: allow selecting multiple files at once from the picker.
-    fileInput.setAttribute('multiple', 'multiple');
-
-    fileInput.addEventListener('change', (e) => {
-      const files = Array.from(e.target.files || []);
-      if (files.length) loadInspectorFiles(slotIdx, files);
-    });
+    if (fileInput) {
+      // v4.11.4: allow selecting multiple files at once from the picker.
+      fileInput.setAttribute('multiple', 'multiple');
+      fileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length) loadInspectorFiles(slotIdx, files);
+      });
+    }
 
     slotEl.addEventListener('dragover', (e) => {
       e.preventDefault();
@@ -17638,7 +17644,7 @@ function setupInspector() {
     });
 
     const clearBtn = slotEl.querySelector('.slot-clear');
-    clearBtn.addEventListener('click', (e) => {
+    if (clearBtn) clearBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       clearInspectorSlot(slotIdx);
@@ -18978,6 +18984,20 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.13.2',
+    date: '2026-09-22',
+    title: 'CRITICAL HOTFIX — v4.13.x init abort left the whole app unwired (sections/filters/tabs/drag-drop dead)',
+    sections: [
+      { h: '🚨 The bug', items: [
+        '💥 The LAUNDER dropzone borrows the <code>.inspector-slot</code> CSS class for its dashed-box styling. <code>setupInspector()</code> iterated <b>every</b> <code>.inspector-slot</code> and called <code>.slot-clear.addEventListener</code> on each — the launder zone has no <code>.slot-clear</code> child, so it threw <code>Cannot read properties of null</code>. That exception <b>aborted <code>bindEvents</code>/<code>init</code></b>, so everything wired after it never ran: editor section collapse, dimension presets, filters, adjustments, tab switching, drag-drop. The whole app read as frozen on Mac and Windows.',
+      ]},
+      { h: '🩹 The fix', items: [
+        '🎯 <code>setupInspector()</code> now scopes its query to <code>#inspectorSlots .inspector-slot</code> (the real slots only) and null-guards every child lookup. All other global <code>.inspector-slot</code> counts were likewise scoped to the container so the launder zone can\'t perturb them.',
+        '✅ Verified: <code>init()</code> now runs to completion with no throw; section collapse toggles correctly; tab switching works; zero console errors on a clean load.',
+      ]},
+    ],
+  },
   {
     version: '4.13.1',
     date: '2026-09-04',
