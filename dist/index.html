@@ -9038,7 +9038,7 @@ function updateFilenamePreview() {
 // ============================================================================
 // V3.3: VIEW TAB SWITCHING (Editor / Inspector)
 // ============================================================================
-const APP_VERSION = '4.13.2';
+const APP_VERSION = '4.13.3';
 let currentView = 'editor';
 
 // Single source of truth for the header meta line. Format:
@@ -13270,13 +13270,35 @@ function updateDestUI() {
 }
 
 // =====================================================================
+// v4.13.3: lock the carousel format to JPG (→HEIC) while iPhone meta is on —
+// WebP/PNG can't carry the Apple identity. Forces jpg active, greys out PNG +
+// WEBP; restores them when iPhone meta is turned off.
+function syncCarouselFormatLock() {
+  const locked = !!(typeof carouselState !== 'undefined' && carouselState.iphoneMeta);
+  if (locked) carouselState.format = 'jpg';
+  document.querySelectorAll('.ratio-btn[data-format]').forEach(b => {
+    const isJpg = b.dataset.format === 'jpg';
+    const disabled = locked && !isJpg;
+    b.classList.toggle('active', locked ? isJpg : (b.dataset.format === carouselState.format));
+    b.disabled = disabled;
+    b.style.opacity = disabled ? '0.4' : '';
+    b.style.cursor = disabled ? 'not-allowed' : '';
+    b.title = disabled ? 'iPhone output is always HEIC/JPG — turn off iPhone Meta to use this format' : '';
+  });
+}
+
 // Render → deliver split (was: monolithic exportCarouselZip)
 // =====================================================================
 
 // Renders all carousel images, applies iPhone metadata if enabled, returns
 // an array of {filename, blob, mime, item}. Reports progress via callback.
 async function renderCarouselOutputs(onProgress) {
-  const fmt = carouselState.format;
+  // v4.13.3: iPhone metadata requires a JPEG base (→ HEIC on Mac). WebP/PNG
+  // can't carry the Apple EXIF / HEIC identity, and a real iPhone never exports
+  // WebP — so when iPhone meta is ON we force jpg regardless of the format
+  // selector. Previously picking WEBP/PNG silently skipped the whole injection
+  // and shipped a bare WebP.
+  const fmt = carouselState.iphoneMeta ? 'jpg' : carouselState.format;
   const ext = fmt === 'png' ? 'png' : (fmt === 'webp' ? 'webp' : 'jpg');
   const mime = fmt === 'png' ? 'image/png' : (fmt === 'webp' ? 'image/webp' : 'image/jpeg');
   const quality = (fmt === 'jpg' || fmt === 'webp') ? carouselState.quality / 100 : undefined;
@@ -14678,6 +14700,9 @@ function bindCarouselEvents() {
   // Format buttons
   document.querySelectorAll('.ratio-btn[data-format]').forEach(btn => {
     btn.addEventListener('click', () => {
+      // v4.13.3: PNG/WEBP are disabled while iPhone meta is on (iPhone output is
+      // always HEIC/JPG). Ignore clicks on the locked options.
+      if (carouselState.iphoneMeta && btn.dataset.format !== 'jpg') return;
       carouselState.format = btn.dataset.format;
       document.querySelectorAll('.ratio-btn[data-format]').forEach(b => b.classList.toggle('active', b === btn));
     });
@@ -14687,6 +14712,7 @@ function bindCarouselEvents() {
   document.querySelectorAll('.ratio-btn[data-respreset]').forEach(btn => {
     btn.addEventListener('click', () => applyResolutionPreset(btn.dataset.respreset));
   });
+  syncCarouselFormatLock();
 
   // iPhone metadata + strip metadata toggles
   document.getElementById('carouselIphoneToggle').addEventListener('click', () => {
@@ -14697,6 +14723,7 @@ function bindCarouselEvents() {
     // Show/hide the GPS + custom-coords sub-panel
     const opts = document.getElementById('carouselIphoneOptions');
     if (opts) opts.style.display = carouselState.iphoneMeta ? 'block' : 'none';
+    syncCarouselFormatLock();
   });
   document.getElementById('carouselStripToggle').addEventListener('click', () => {
     carouselState.stripMeta = !carouselState.stripMeta;
@@ -18552,6 +18579,7 @@ function applyPrefsToFreshState() {
   // Carousel iPhone meta options panel visibility (capture date + GPS)
   const carouselOpts = document.getElementById('carouselIphoneOptions');
   if (carouselOpts) carouselOpts.style.display = carouselState.iphoneMeta ? 'block' : 'none';
+  if (typeof syncCarouselFormatLock === 'function') syncCarouselFormatLock();
 
   if (typeof syncUIToState === 'function') {
     try { syncUIToState(); } catch (_) {}
@@ -18984,6 +19012,19 @@ function ensureSettingsModal() {
 // const for easy maintenance — bump APP_VERSION + add an entry on each batch.
 // ============================================================================
 const PATCH_NOTES = [
+  {
+    version: '4.13.3',
+    date: '2026-10-08',
+    title: 'Carousel — iPhone meta no longer silently skipped when format is WEBP/PNG (forces HEIC/JPG)',
+    sections: [
+      { h: '🩹 The bug', items: [
+        '🖼 Carousel export gated iPhone metadata injection on <code>format === \'jpg\'</code>. With the format set to <b>WEBP</b> (or PNG), the entire injection was skipped and the carousel shipped as a bare WebP with no iPhone identity — real iPhones never export WebP, so this was always wrong.',
+      ]},
+      { h: '🔧 The fix', items: [
+        '📸 When <b>iPhone Meta is ON</b>, the carousel now <b>forces JPG → HEIC</b> output regardless of the format selector, so injection always runs. The PNG and WEBP format buttons are greyed out and locked while iPhone Meta is on (with a tooltip), and re-enabled when you turn it off. State is synced on launch too.',
+      ]},
+    ],
+  },
   {
     version: '4.13.2',
     date: '2026-09-22',
