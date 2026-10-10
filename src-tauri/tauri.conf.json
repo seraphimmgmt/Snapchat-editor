@@ -43,7 +43,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhEMUZERENEMzI4NTZCMTAKUldRUWE0VXl6ZDBmamQ3L1dYdFpYaENHb0d0N1ZJcCt1VXBONUt3aytCTjZkREtiZE1uSU5wUU4K",
       "endpoints": [
-        "https://github.com/seraphimmgmt/Snapchat-editor/releases/latest/download/latest.json"
+        "https://github.com/seraphimcreativestrategies/Snapchat-editor/releases/latest/download/latest.json"
       ]
     }
   }

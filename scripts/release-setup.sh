@@ -6,7 +6,7 @@
 # Pick: GitHub.com → HTTPS → "Login with a web browser" — follow the prompts.
 #
 # What this script does:
-#   1. Force-pushes the local main branch to seraphimmgmt/Snapchat-editor
+#   1. Force-pushes the local main branch to seraphimcreativestrategies/Snapchat-editor
 #      (the remote currently has only initial scaffolding; we overwrite it)
 #   2. Sets the two repo secrets the release workflow needs to sign the
 #      auto-updater artifacts:
@@ -23,7 +23,7 @@
 set -euo pipefail
 
 GH=/opt/homebrew/bin/gh
-REPO=seraphimmgmt/Snapchat-editor
+REPO=seraphimcreativestrategies/Snapchat-editor
 KEY_FILE="$HOME/.tauri/snapcap_updater.key"
 
 if ! "$GH" auth status >/dev/null 2>&1; then

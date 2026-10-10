@@ -10766,7 +10766,7 @@ function updateRatioDisplay() {
 // Required setup (one-time, done by the user in their Google Cloud project):
 //   1. Enable "Google Drive API" in the project
 //   2. Create OAuth 2.0 Client ID (Web application type)
-//   3. Add the deployment origin (e.g. https://seraphimmgmt.github.io) to
+//   3. Add the deployment origin (e.g. https://seraphimcreativestrategies.github.io) to
 //      Authorized JavaScript origins
 //   4. Paste the Client ID into the tool's Drive setup panel
 
@@ -20000,7 +20000,7 @@ const PATCH_NOTES = [
       ]},
       { h: 'How to rotate the team token', items: [
         '(1) ssh root@<droplet> "openssl rand -hex 32 | tee /opt/render-server/auth_token && systemctl restart render-server"',
-        '(2) Update the secret: gh secret set CLOUD_RENDER_CONFIG --repo seraphimmgmt/Snapchat-editor < new-config.json',
+        '(2) Update the secret: gh secret set CLOUD_RENDER_CONFIG --repo seraphimcreativestrategies/Snapchat-editor < new-config.json',
         '(3) Push a new tag — next build bundles the new token. Old binaries still work until users update.',
       ]},
     ]
@@ -20741,7 +20741,7 @@ checkAndOfferRecovery();
 // Leaflet loaded lazily on first open so it doesn't slow startup.
 const GPS_RECENT_KEY = 'snapcap_gps_recent';
 const GPS_SAVED_KEY  = 'snapcap_gps_saved';
-const NOMINATIM_UA = 'SnapCaptionStudio/4.1 (https://github.com/seraphimmgmt/Snapchat-editor)';
+const NOMINATIM_UA = 'SnapCaptionStudio/4.1 (https://github.com/seraphimcreativestrategies/Snapchat-editor)';
 let _leafletLoaded = false;
 let _gpsMap = null;
 let _gpsMarker = null;
