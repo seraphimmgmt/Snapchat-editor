@@ -11622,7 +11622,7 @@ function driveOpenPicker() {
     body.innerHTML = `
       <div class="picker-signin">
         <h3>Hosting required</h3>
-        <p>This page is loaded from <code style="color:var(--red);">file://</code> — Google blocks OAuth from local files for security.<br><br>You need to load this from a real URL. Either:<br><br>1. Upload <code>index.html</code> to your GitHub repo and open <code>https://seraphimmgmt.github.io/...</code><br><br>2. Or run a local server: open Terminal in the file's folder and run <code>python3 -m http.server 8000</code>, then open <code>http://localhost:8000</code> (and add <code>http://localhost:8000</code> to your OAuth Client ID's authorized origins).</p>
+        <p>This page is loaded from <code style="color:var(--red);">file://</code> — Google blocks OAuth from local files for security.<br><br>You need to load this from a real URL. Either:<br><br>1. Upload <code>index.html</code> to your GitHub repo and open <code>https://seraphimcreativestrategies.github.io/seraphim-studio/dist/</code><br><br>2. Or run a local server: open Terminal in the file's folder and run <code>python3 -m http.server 8000</code>, then open <code>http://localhost:8000</code> (and add <code>http://localhost:8000</code> to your OAuth Client ID's authorized origins).</p>
         <button class="cancel" id="drivePickerFileCloseBtn" style="background:transparent;border:1px solid var(--border-strong);color:var(--text-dim);padding:9px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;border-radius:2px;cursor:pointer;">Got it</button>
       </div>`;
     overlay.classList.remove('hidden');
@@ -20000,7 +20000,7 @@ const PATCH_NOTES = [
       ]},
       { h: 'How to rotate the team token', items: [
         '(1) ssh root@<droplet> "openssl rand -hex 32 | tee /opt/render-server/auth_token && systemctl restart render-server"',
-        '(2) Update the secret: gh secret set CLOUD_RENDER_CONFIG --repo seraphimcreativestrategies/Snapchat-editor < new-config.json',
+        '(2) Update the secret: gh secret set CLOUD_RENDER_CONFIG --repo seraphimcreativestrategies/seraphim-studio < new-config.json',
         '(3) Push a new tag — next build bundles the new token. Old binaries still work until users update.',
       ]},
     ]
@@ -20741,7 +20741,7 @@ checkAndOfferRecovery();
 // Leaflet loaded lazily on first open so it doesn't slow startup.
 const GPS_RECENT_KEY = 'snapcap_gps_recent';
 const GPS_SAVED_KEY  = 'snapcap_gps_saved';
-const NOMINATIM_UA = 'SnapCaptionStudio/4.1 (https://github.com/seraphimcreativestrategies/Snapchat-editor)';
+const NOMINATIM_UA = 'SnapCaptionStudio/4.1 (https://github.com/seraphimcreativestrategies/seraphim-studio)';
 let _leafletLoaded = false;
 let _gpsMap = null;
 let _gpsMarker = null;
